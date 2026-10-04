@@ -23,6 +23,11 @@ class Tile(Enum):
     RUBBLE = ","
     GRASS = '"'
     WATER = "~"
+    #: The way out. Only the deepest floor has one, and standing on it ends the
+    #: run in a victory rather than a death. A different tile from the stairs on
+    #: purpose: the map should not make the player wonder whether pressing down
+    #: here drops them another floor or takes them home.
+    RIFT = "%"
 
     # -- presentation -------------------------------------------------------
     @property
@@ -62,6 +67,7 @@ _COLORS: dict[Tile, str] = {
     Tile.RUBBLE: "grey42",
     Tile.GRASS: "green",
     Tile.WATER: "blue",
+    Tile.RIFT: "bright_cyan",
 }
 
 _BACKGROUNDS: dict[Tile, str] = {
@@ -73,6 +79,7 @@ _BACKGROUNDS: dict[Tile, str] = {
     Tile.RUBBLE: "grey11",
     Tile.GRASS: "grey11",
     Tile.WATER: "grey11",
+    Tile.RIFT: "grey11",
 }
 
 _DESCRIPTIONS: dict[Tile, str] = {
@@ -84,6 +91,7 @@ _DESCRIPTIONS: dict[Tile, str] = {
     Tile.RUBBLE: "a pile of rubble",
     Tile.GRASS: "patchy grass",
     Tile.WATER: "shallow water",
+    Tile.RIFT: "a rift out of the dark",
 }
 
 # Rubble is walkable but opaque; everything else opaque is solid.

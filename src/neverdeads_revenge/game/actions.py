@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from neverdeads_revenge.core.direction import Direction, chebyshev, direction_towards
+from neverdeads_revenge.world.tiles import Tile
 
 from .actors import Actor
 from .combat import REVENGE_SPEED_BONUS, apply_revenge, attack
@@ -44,6 +45,8 @@ class Action(Enum):
     WAIT = "wait"
     PICK_UP = "pickup"
     DESCEND = "descend"
+    QUAFF = "quaff"
+    INVENTORY = "inventory"
 
     @property
     def direction(self) -> Direction:
@@ -70,6 +73,7 @@ class ActionResult:
     consumed_turn: bool
     acted: bool
     died: bool = False
+    escaped: bool = False
 
 
 # -- helpers ---------------------------------------------------------------
@@ -126,6 +130,21 @@ def _enemy_takes_damage(state: GameState, enemy: Actor, outcome) -> None:
 # -- player actions --------------------------------------------------------
 
 
+def _outcome(state: GameState, consumed_turn: bool, acted: bool) -> ActionResult:
+    """Wrap a result, reading the ending off the state rather than assuming it.
+
+    Worth the two lines: ``died=state.over`` was true after an escape too, and
+    the game over screen would have announced a death to a player who had just
+    won.
+    """
+    return ActionResult(
+        consumed_turn=consumed_turn,
+        acted=acted,
+        died=state.run_state is RunState.DEAD,
+        escaped=state.run_state is RunState.ESCAPED,
+    )
+
+
 def perform_action(state: GameState, action: Action) -> ActionResult:
     """Apply a player action, then let the world answer.
 
@@ -133,11 +152,15 @@ def perform_action(state: GameState, action: Action) -> ActionResult:
     enemy turns.
     """
     if state.over:
-        return ActionResult(consumed_turn=False, acted=False, died=True)
+        return _outcome(state, consumed_turn=False, acted=False)
 
     match action:
         case Action.PICK_UP:
             return _pick_up(state)
+        case Action.QUAFF:
+            return _quaff(state)
+        case Action.INVENTORY:
+            return _inventory(state)
         case Action.DESCEND:
             return _try_descend(state)
         case _:
@@ -150,7 +173,7 @@ def perform_action(state: GameState, action: Action) -> ActionResult:
         acted = _try_move(state, action.direction)
 
     if state.over:
-        return ActionResult(consumed_turn=acted, acted=acted, died=True)
+        return _outcome(state, consumed_turn=acted, acted=acted)
 
     # Only a real action advances the clock. Bumping a wall must not tick the
     # turn counter, or the displayed turn number drifts away from the world.
@@ -159,7 +182,7 @@ def perform_action(state: GameState, action: Action) -> ActionResult:
         state.total_turns += 1
         advance_world(state)
     state.refresh_vision()
-    return ActionResult(consumed_turn=acted, acted=acted, died=state.over)
+    return _outcome(state, consumed_turn=acted, acted=acted)
 
 
 def _try_move(state: GameState, direction: Direction) -> bool:
@@ -199,17 +222,89 @@ def _pick_up(state: GameState) -> ActionResult:
         state.say("There is nothing here to take.", LogKind.PLAIN)
         return ActionResult(consumed_turn=False, acted=False)
     state.dungeon_map.remove_item(state.player.position)
+    state.inventory.append(item)
     state.say(f"You pick up the {item.name}.", LogKind.GOOD)
     return ActionResult(consumed_turn=False, acted=False)
 
 
-def _try_descend(state: GameState) -> ActionResult:
-    if not state.on_stairs:
-        state.say("There are no stairs here.", LogKind.PLAIN)
+def _inventory(state: GameState) -> ActionResult:
+    """Report what is being carried. Costs nothing -- it is only a look."""
+    if not state.inventory:
+        state.say("You carry nothing.", LogKind.PLAIN)
         return ActionResult(consumed_turn=False, acted=False)
+
+    counts: dict[str, int] = {}
+    for item in state.inventory:
+        counts[item.name] = counts.get(item.name, 0) + 1
+    carried = ", ".join(f"{count}x {name}" for name, count in sorted(counts.items()))
+    state.say(f"You carry {carried}.", LogKind.PLAIN)
+    return ActionResult(consumed_turn=False, acted=False)
+
+
+def _quaff(state: GameState) -> ActionResult:
+    """Drink the cheapest draught that covers the wound.
+
+    Picking the smallest one that still heals in full is the choice a careful
+    player would make anyway: drinking the elixir at 24/26 health throws away
+    sixteen points of it. Handing that decision to the player is a real decision,
+    but it is also one a new player gets wrong once and then never again, so the
+    game makes the obvious play and charges a turn for it.
+    """
+    if not state.inventory:
+        state.say("You have nothing to drink.", LogKind.PLAIN)
+        return ActionResult(consumed_turn=False, acted=False)
+
+    player = state.player
+    missing = player.max_hp - player.stats.hp
+    if missing <= 0:
+        state.say("You are unhurt.", LogKind.PLAIN)
+        return ActionResult(consumed_turn=False, acted=False)
+
+    # Spend the smallest draught that does the job without overflowing; if none
+    # can, spend the smallest one anyway and accept the spill. Either way the
+    # good draught is saved for a wound that needs it.
+    affordable = [item for item in state.inventory if item.heal <= missing]
+    item = (
+        max(affordable, key=lambda i: i.heal)
+        if affordable
+        else min(state.inventory, key=lambda i: i.heal)
+    )
+
+    state.inventory.remove(item)
+    healed = player.stats.heal(item.heal)
+    state.say(f"You drink the {item.name} and recover {healed}.", LogKind.GOOD)
+    if healed < item.heal:
+        state.say(
+            f"Its power spills past the wound; {item.heal - healed} is lost.",
+            LogKind.PLAIN,
+        )
+
+    # Drinking takes a turn, so it is not a free action in the middle of a fight
+    # and monsters get their answer.
+    state.turn += 1
+    state.total_turns += 1
+    advance_world(state)
+    state.refresh_vision()
+    return _outcome(state, consumed_turn=True, acted=True)
+
+
+def _try_descend(state: GameState) -> ActionResult:
+    if not state.on_exit:
+        # On the last floor there are no stairs at all, and "no stairs here"
+        # next to a glowing rift would read as a bug.
+        if state.dungeon_map.find_tile(Tile.RIFT):
+            state.say("There is nothing here to take you out.", LogKind.PLAIN)
+        else:
+            state.say("There are no stairs here.", LogKind.PLAIN)
+        return ActionResult(consumed_turn=False, acted=False)
+
+    if state.at_the_rift:
+        state.escape()
+        return _outcome(state, consumed_turn=False, acted=False)
+
     state.floors_cleared += 1
     state.build_floor(state.depth + 1)
-    return ActionResult(consumed_turn=False, acted=False)
+    return _outcome(state, consumed_turn=False, acted=False)
 
 
 #: Public wrapper so the UI can trigger a descent without importing internals.

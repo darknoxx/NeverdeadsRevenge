@@ -40,7 +40,16 @@ from neverdeads_revenge.game.difficulty import (
     potency,
     weight_at_depth,
 )
-from neverdeads_revenge.game.state import GameState, LogKind, RunState, start_run
+from neverdeads_revenge.game.state import (
+    ESCAPE_BONUS,
+    GameState,
+    LogKind,
+    RunState,
+    start_run,
+)
+from neverdeads_revenge.world.generator import ESCAPE_DEPTH
+from neverdeads_revenge.world.items import ITEMS, make_item
+from neverdeads_revenge.world.map import GroundItem
 
 SEEDS = range(25)
 
@@ -694,6 +703,236 @@ def test_score_rewards_kills_and_depth():
     state.floors_cleared = 2
     state.player.steps = 10
     assert state.score == 3 * 100 + 2 * 250 + 10
+
+
+# -- loot and drinking ------------------------------------------------------
+def _give(state: GameState, key: str) -> GroundItem:
+    """Put a draught of ``key`` in the player's hands."""
+    item = make_item(ITEMS[key])
+    state.inventory.append(item)
+    return item
+
+
+def test_picking_up_puts_the_item_in_the_inventory():
+    """Floor loot and carried loot are different things, and both must update."""
+    state = start_run(NOXX, seed=1)
+    pos = next(iter(state.dungeon_map.items))
+    state.player.position = pos
+    item = state.dungeon_map.item_at(pos)
+
+    result = perform_action(state, Action.PICK_UP)
+
+    assert state.inventory == [item]
+    assert state.dungeon_map.item_at(pos) is None
+    # Taking something off the ground costs no turn: it is not a decision the
+    # monsters should get to answer.
+    assert not result.consumed_turn
+    assert state.turn == 0
+
+
+def test_picking_up_nothing_says_so():
+    state = start_run(NOXX, seed=1)
+    state.player.position = next(
+        pos
+        for pos in state.dungeon_map.floor_positions()
+        if state.dungeon_map.item_at(pos) is None
+    )
+    perform_action(state, Action.PICK_UP)
+    assert state.log[-1].text == "There is nothing here to take."
+    assert state.inventory == []
+
+
+def test_drinking_heals_and_costs_a_turn():
+    """Drinking in a fight has to be a real decision, so it takes a turn."""
+    state = start_run(NOXX, seed=1)
+    _give(state, "potion")
+    state.player.stats.hp = 10
+
+    result = perform_action(state, Action.QUAFF)
+
+    assert state.player.hp == 18
+    assert state.inventory == []
+    assert result.consumed_turn
+    assert state.total_turns == 1
+
+
+def test_drinking_cannot_heal_past_the_maximum():
+    state = start_run(NOXX, seed=1)
+    _give(state, "elixir")
+    state.player.stats.hp = state.player.max_hp - 3
+
+    perform_action(state, Action.QUAFF)
+
+    assert state.player.hp == state.player.max_hp, "healing overflowed the bar"
+
+
+def test_drinking_prefers_the_draught_that_is_not_wasted():
+    """The obvious play, made for the player.
+
+    Drinking the elixir at 24/26 health throws away sixteen points of it. A
+    careful player would always reach for the smaller one; making them do it by
+    hand is busywork, not depth.
+    """
+    state = start_run(NOXX, seed=1)
+    _give(state, "elixir")
+    _give(state, "potion")
+    state.player.stats.hp = state.player.max_hp - 5
+
+    perform_action(state, Action.QUAFF)
+
+    assert state.inventory == [state.inventory[0]]
+    assert state.inventory[0].name == "elixir", "the good draught was spent on 5 hp"
+    assert state.player.hp == state.player.max_hp
+
+
+def test_drinking_uses_the_biggest_draught_the_wound_needs():
+    """A 25-point wound is what the elixir exists for."""
+    state = start_run(NOXX, seed=1)
+    _give(state, "potion")
+    _give(state, "elixir")
+    state.player.stats.hp = 1
+
+    perform_action(state, Action.QUAFF)
+
+    assert state.player.hp == 21, "the elixir was held back from a 25-point wound"
+    assert [item.name for item in state.inventory] == ["potion"]
+
+
+def test_drinking_accepts_a_small_spill_rather_than_a_large_one():
+    """When no draught fits the wound, waste the cheap one.
+
+    At 24/26 both draughts overflow. Spending the elixir would throw away fifteen
+    points to save three; spending the potion throws away five.
+    """
+    state = start_run(NOXX, seed=1)
+    _give(state, "potion")
+    _give(state, "elixir")
+    state.player.stats.hp = state.player.max_hp - 2
+
+    perform_action(state, Action.QUAFF)
+
+    assert [item.name for item in state.inventory] == ["elixir"]
+    assert state.player.hp == state.player.max_hp
+    assert "spills" in " ".join(line.text for line in state.log[-2:])
+
+
+def test_drinking_with_nothing_carried_is_free_and_says_so():
+    state = start_run(NOXX, seed=1)
+    result = perform_action(state, Action.QUAFF)
+    assert state.log[-1].text == "You have nothing to drink."
+    assert not result.consumed_turn
+    assert state.total_turns == 0
+
+
+def test_drinking_at_full_health_does_not_waste_the_draught():
+    state = start_run(NOXX, seed=1)
+    _give(state, "potion")
+
+    result = perform_action(state, Action.QUAFF)
+
+    assert state.inventory, "the draught was drunk for nothing"
+    assert state.log[-1].text == "You are unhurt."
+    assert not result.consumed_turn
+
+
+def test_looking_in_the_inventory_costs_nothing():
+    state = start_run(NOXX, seed=1)
+    _give(state, "potion")
+    _give(state, "potion")
+    _give(state, "elixir")
+
+    result = perform_action(state, Action.INVENTORY)
+
+    assert not result.consumed_turn
+    assert state.total_turns == 0
+    assert "2x potion" in state.log[-1].text
+    assert "1x elixir" in state.log[-1].text
+
+
+def test_carried_draughts_survive_a_descent():
+    """The inventory is the run's health reserve, not the floor's."""
+    state = start_run(NOXX, seed=1)
+    _give(state, "elixir")
+    state.player.position = state.stairs
+    perform_action(state, Action.DESCEND)
+    assert [item.name for item in state.inventory] == ["elixir"]
+
+
+# -- escaping ---------------------------------------------------------------
+def _walk_to_the_rift(state: GameState) -> None:
+    state.build_floor(ESCAPE_DEPTH)
+    state.player.position = state.exit_pos
+
+
+def test_a_floor_before_the_last_has_stairs_not_a_rift():
+    state = start_run(NOXX, seed=1)
+    assert state.stairs is not None
+    assert state.exit_pos == state.stairs
+    assert not state.at_the_rift
+
+
+def test_the_last_floor_has_a_rift_and_no_stairs():
+    """The bug this guards: ``stairs`` used to fall back to the player's own
+    position, which made ``on_stairs`` true everywhere on a floor with none --
+    and the last floor is exactly that floor."""
+    state = start_run(NOXX, seed=1)
+    _walk_to_the_rift(state)
+    assert state.stairs is None
+    assert state.exit_pos is not None
+    assert state.on_exit
+    assert state.at_the_rift
+    assert state.on_stairs is False
+
+
+def test_stepping_into_the_rift_wins_the_run():
+    state = start_run(NOXX, seed=1)
+    _walk_to_the_rift(state)
+    assert state.run_state is RunState.PLAYING
+
+    result = perform_action(state, Action.DESCEND)
+
+    assert state.run_state is RunState.ESCAPED
+    assert result.escaped
+    assert not result.died, "a win must not be reported as a death"
+    assert state.over
+    assert state.floors_cleared == 0, "the rift is not a floor cleared"
+
+
+def test_escaping_is_worth_more_than_dying_on_the_same_floor():
+    state = start_run(NOXX, seed=1)
+    _walk_to_the_rift(state)
+    died = state.score
+    perform_action(state, Action.DESCEND)
+    assert state.score == died + ESCAPE_BONUS
+
+
+def test_no_actions_are_accepted_after_escaping():
+    state = start_run(NOXX, seed=1)
+    _walk_to_the_rift(state)
+    perform_action(state, Action.DESCEND)
+
+    before = state.total_turns
+    result = perform_action(state, Action.MOVE_NORTH)
+
+    assert not result.consumed_turn
+    assert not result.died
+    assert result.escaped
+    assert state.total_turns == before
+
+
+def test_the_rift_refuses_you_away_from_it():
+    """Pressing the descend key elsewhere on the last floor must not end the run."""
+    state = start_run(NOXX, seed=1)
+    _walk_to_the_rift(state)
+    beside = (state.exit_pos[0] + 1, state.exit_pos[1])
+    state.player.position = beside
+    assert not state.on_exit
+
+    result = perform_action(state, Action.DESCEND)
+
+    assert state.run_state is RunState.PLAYING
+    assert not result.escaped
+    assert state.log[-1].text == "There is nothing here to take you out."
 
 
 # -- longer simulations ----------------------------------------------------

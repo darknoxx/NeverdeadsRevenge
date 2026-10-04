@@ -97,25 +97,63 @@ Screen {
 }
 
 #sidebar {
-    width: 28;
+    /* Wide enough for the longest legend line: "skeleton even 28hp 6-12d". */
+    width: 34;
     height: 1fr;
     border: round $panel;
     padding: 0 1;
+    layout: vertical;
 }
 
-/* The log and the legend share one row. 18 rows is what the full legend needs:
-   a heading, 1 for the player, 6 for the three monsters, 1 spacer, 6 terrain,
-   1 spacer, 1 hint, and slack for the borders. */
-#game-footer {
-    height: 18;
-}
-
+/* The log sits under the map, full width, at a fixed height. The map above it
+   takes whatever is left, which is why the legend lives in the sidebar instead
+   of beside the log: a bottom-row legend leaves the map about ten rows to work
+   with, and the map is the thing that needs the rows. */
 #message-log {
     width: 1fr;
-    height: 100%;
+    height: 7;
+    min-height: 4;
     border: round $panel;
     padding: 0 1;
     background: $surface;
+}
+
+/* -- help ---------------------------------------------------------------- */
+
+HelpScreen {
+    align: center middle;
+    background: $background 70%;
+}
+
+#help {
+    width: 76;
+    height: auto;
+    max-height: 80%;
+    padding: 1 2;
+    border: round $panel;
+    background: $surface;
+}
+
+#help-title {
+    width: 1fr;
+    height: auto;
+    margin: 0 0 1 0;
+    text-style: bold;
+    color: $accent;
+}
+
+#help-body {
+    width: 1fr;
+    height: auto;
+    color: $foreground;
+}
+
+#help-hint {
+    width: 1fr;
+    height: auto;
+    margin: 1 0 0 0;
+    content-align: center middle;
+    color: #6b6b6b;
 }
 
 /* -- prologue ------------------------------------------------------------ */

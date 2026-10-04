@@ -22,6 +22,7 @@ from textual.widgets import Footer, Static
 
 from ...game.actions import Action, perform_action
 from ...game.actors import HEROES
+from ...game.prologue import GOAL_HINT, terrain_help
 from ...game.state import GameState, start_run
 from ..widgets.hud import Hud
 from ..widgets.legend import Legend
@@ -57,6 +58,8 @@ KEY_BINDINGS: dict[str, Action] = {
     ".": Action.WAIT,
     "space": Action.WAIT,
     "g": Action.PICK_UP,
+    "i": Action.INVENTORY,
+    "q": Action.QUAFF,
     ">": Action.DESCEND,
     # Enter and return take the stairs too, for players who expect enter to
     # mean "interact with what is under me". Both keys, like ``>``, only work
@@ -65,12 +68,17 @@ KEY_BINDINGS: dict[str, Action] = {
     "return": Action.DESCEND,
 }
 
-HELP_TEXT = """\
+HELP_TEXT = f"""\
 [bold]movement   [/]w a s d  /  h j k l  /  arrows  /  y u b n   walk into a monster to attack
 [bold]wait       [/].  or  space
 [bold]pick up    [/]g
-[bold]descend    [/]>   or  enter /  return  while standing on the stairs
+[bold]drink      [/]q          [bold]carried [/]i
+[bold]stairs     [/]>   or  enter /  return  while standing on them
+[bold]the way out[/]  {GOAL_HINT}; step into it to win
 [bold]help       [/]?          [bold]menu[/]escape
+
+[bold]terrain[/]
+{terrain_help()}
 """
 
 
@@ -94,10 +102,10 @@ class GameScreen(Screen[None]):
         with Vertical(id="game-screen"):
             with Horizontal(id="game-body"):
                 yield MapView(id="map-view")
-                yield Hud(id="sidebar")
-            with Horizontal(id="game-footer"):
-                yield MessageLog(id="message-log")
-                yield Legend(id="legend")
+                with Vertical(id="sidebar"):
+                    yield Hud(id="hud")
+                    yield Legend(id="legend")
+            yield MessageLog(id="message-log")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -130,7 +138,6 @@ class GameScreen(Screen[None]):
         # so this only redraws the panel on an actual descent.
         self.query_one(Legend).depth = self.state.depth
         self._update_footer()
-
     # -- input --------------------------------------------------------------
     def on_key(self, event) -> None:
         """Turn a keypress into an action, if it maps to one.
@@ -158,14 +165,17 @@ class GameScreen(Screen[None]):
         result = perform_action(self.state, action)
         self._refresh_all()
 
-        if result.died:
-            self._game_over()
+        if result.died or result.escaped:
+            self._game_over(won=result.escaped)
 
-    def _game_over(self) -> None:
+    def _game_over(self, won: bool = False) -> None:
         assert self.state is not None
         state = self.state
         summary = Text(no_wrap=True)
-        summary.append(f"Floor reached  {state.depth}\n", style="bold cyan")
+        if won:
+            summary.append(f"Out of the dark on floor {state.depth}\n", style="bold bright_cyan")
+        else:
+            summary.append(f"Floor reached  {state.depth}\n", style="bold cyan")
         summary.append(f"Monsters slain  {state.kills}\n")
         summary.append(f"Turns taken     {state.total_turns}\n")
         summary.append(f"Cells walked    {state.player.steps}\n")
@@ -176,13 +186,14 @@ class GameScreen(Screen[None]):
                 summary=str(summary),
                 depth=state.depth,
                 score=state.score,
+                won=won,
             ),
             lambda _result: self.app.return_to_title(),
         )
 
     # -- actions ------------------------------------------------------------
     def action_help(self) -> None:
-        self.notify(HELP_TEXT, title="Controls", timeout=8)
+        self.app.push_screen("help")
 
     def action_menu(self) -> None:
         self.app.push_screen("pause", self._pause_result)

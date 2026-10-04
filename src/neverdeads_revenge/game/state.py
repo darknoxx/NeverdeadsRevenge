@@ -18,15 +18,18 @@ from neverdeads_revenge.core.rng import Rng
 from neverdeads_revenge.core.turn_queue import TurnQueue
 from neverdeads_revenge.world.fov import compute_fov_full
 from neverdeads_revenge.world.generator import GeneratedFloor, generate_floor
-from neverdeads_revenge.world.map import DungeonMap
+from neverdeads_revenge.world.map import DungeonMap, GroundItem
 from neverdeads_revenge.world.tiles import Tile
 
 from .actors import Actor, Hero, make_enemy, make_hero, pick_enemy_template
 
-__all__ = ["LogEntry", "LogKind", "RunState", "GameState", "VIEW_RADIUS"]
+__all__ = ["LogEntry", "LogKind", "RunState", "GameState", "VIEW_RADIUS", "ESCAPE_BONUS"]
 
 VIEW_RADIUS = 9
 """How far the player can see, in cells."""
+
+ESCAPE_BONUS = 5000
+"""Score awarded for leaving the dungeon alive instead of dying in it."""
 
 
 class LogKind(Enum):
@@ -77,6 +80,10 @@ class GameState:
     kills: int = 0
     revenge_stacks: int = 0
     floors_cleared: int = 0
+    #: Draughts carried, not drunk. Survives a descent: it is the run's health
+    #: reserve, and a floor that stripped it would make every descent a fresh
+    #: start rather than a cost.
+    inventory: list[GroundItem] = field(default_factory=list)
 
     # -- logging ------------------------------------------------------------
     def say(self, text: str, kind: LogKind = LogKind.PLAIN) -> None:
@@ -163,25 +170,68 @@ class GameState:
         self.player.speed_bonus = 0.0
 
         self.say(f"You descend to floor {depth}.", LogKind.SYSTEM)
+        if floor.is_final:
+            self.say("A rift tears the dark open, and beyond it: air.", LogKind.GOOD)
         if self.enemies:
             self.say(f"{len(self.enemies)} shapes move in the dark.", LogKind.PLAIN)
         return floor
 
     @property
-    def stairs(self) -> Pos:
-        """Where the stairs down currently are."""
+    def exit_pos(self) -> Pos | None:
+        """Where the way onward is, or ``None`` on a floor that has none.
+
+        Deliberately optional. The old version fell back to the player's own
+        position, which quietly turned ``on_stairs`` into "always true" on any
+        floor without a staircase -- and the final floor is exactly that floor.
+        """
+        for tile in (Tile.STAIRS_DOWN, Tile.RIFT):
+            found = self.dungeon_map.find_tile(tile)
+            if found:
+                return found[0]
+        return None
+
+    @property
+    def on_exit(self) -> bool:
+        """Standing on whatever takes you onward, stairs or rift alike."""
+        return self.exit_pos is not None and self.player.position == self.exit_pos
+
+    @property
+    def at_the_rift(self) -> bool:
+        """Standing on the rift, which ends the run rather than descends."""
+        return self.dungeon_map.tile_at(self.player.position) is Tile.RIFT
+
+    @property
+    def stairs(self) -> Pos | None:
+        """Where the stairs down are, if this floor has any."""
         found = self.dungeon_map.find_tile(Tile.STAIRS_DOWN)
-        return found[0] if found else self.player.position
+        return found[0] if found else None
 
     @property
     def on_stairs(self) -> bool:
-        return self.player.position == self.stairs
+        return self.stairs is not None and self.player.position == self.stairs
+
+    # -- endings ------------------------------------------------------------
+    def escape(self) -> None:
+        """Step through the rift and out of the dungeon.
+
+        The one ending that is not a death, and the answer to the question the
+        prologue asks. Kept here beside ``build_floor`` so both endings of a run
+        are set in one file.
+        """
+        self.run_state = RunState.ESCAPED
+        self.say("You step into the rift. The emptiness lets you go.", LogKind.GOOD)
 
     # -- scoring ------------------------------------------------------------
     @property
     def score(self) -> int:
-        """A rough run score, for the summary screen."""
-        return self.kills * 100 + self.floors_cleared * 250 + self.player.steps
+        """A rough run score, for the summary screen.
+
+        The escape bonus is larger than any plausible death score at the same
+        depth, so a screen full of numbers can never rank an escape below a run
+        that died on floor 10 one step from the rift.
+        """
+        base = self.kills * 100 + self.floors_cleared * 250 + self.player.steps
+        return base + (ESCAPE_BONUS if self.run_state is RunState.ESCAPED else 0)
 
 
 def start_run(hero: Hero, seed: int, upgrades: dict[str, int] | None = None) -> GameState:

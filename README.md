@@ -6,15 +6,27 @@ Built with [Textual](https://textual.textualize.io/).
 
 ## Status
 
-Milestone 1 — vertical slice. Playable from the title screen down to the death
-screen, with a prologue, a legend and a message log.
+Milestone 1 — vertical slice. Playable from the title screen to either ending: a
+death, or an escape.
 
-Enemy count scales with depth (`6 + depth`). Monster health and damage scale
-too — 15% per floor, capped at twice floor 1 from floor 8 — and wraiths get more
-common the deeper you go. Nothing in the dungeon ever acts faster than Noxx. The
-legend in the sidebar quotes the current floor's numbers, so it follows you down.
+**The goal is to get out.** The dungeon is ten floors deep, and the tenth holds a
+rift instead of stairs. Step into it and the run is won; die before that and the
+run is over. Both endings show the same summary screen.
 
-There is no win condition yet.
+Enemy count scales with depth (`6 + depth`). Monster health and damage scale too
+— 15% per floor, capped at twice floor 1 from floor 8 — and wraiths get more
+common the deeper you go. Nothing in the dungeon ever acts faster than Noxx, so
+his crit chance and his REVENGE speed stacking keep paying off all the way down.
+The legend in the sidebar quotes the current floor's numbers, so it follows you
+down.
+
+Noxx cannot heal on his own; potions and elixirs on the floor are the only way
+back up. A run's health is therefore a budget you spend across ten floors, and
+skipping loot to save time is a real trade.
+
+Measured with a greedy bot over 30 seeds (attack what is adjacent, drink when
+hurt, detour for nearby loot, otherwise beeline for the exit): mean depth 7.0,
+and it escapes 3 times in 30.
 
 ## Install
 
@@ -47,17 +59,22 @@ or, without the launcher:
 | --- | --- |
 | `w` `a` `s` `d` / `h` `j` `k` `l` / arrows | Move (walk into an enemy to attack) |
 | `.` or `space` | Wait a turn |
-| `g` | Pick up item |
-| `>` | Descend, from anywhere on the floor |
-| `enter` / `return` | Descend, while standing on the stairs |
-| `?` | Controls |
+| `g` | Pick up what is under you |
+| `q` | Drink a potion |
+| `i` | Show what you are carrying |
+| `>` | Take the stairs / step into the rift, from anywhere on the floor |
+| `enter` / `return` | Same, while standing on them |
+| `?` | Controls and the terrain reference |
 | `Esc` | Menu, `q` there to quit to title |
 
 ## Not implemented yet
 
-Loot, inventory, a talent tree, sound, saving mid-run. The game also has no win
-condition yet: there is no victory state, and `RunState.ESCAPED` is never set,
-so the only way a run ends is death.
+A talent tree, equipment, sound, saving mid-run, and the meta-progression the
+persistence layer is shaped for (`META_UPGRADES` is still an empty dict, and
+`state._apply_upgrades` is a no-op). There is no second hero yet.
+
+The prologue text is German while the rest of the game's text is English. That is
+a genuine inconsistency and needs a decision.
 
 ## Layout
 

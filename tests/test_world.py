@@ -6,7 +6,12 @@ import pytest
 
 from neverdeads_revenge.core.direction import Direction
 from neverdeads_revenge.core.rng import Rng
-from neverdeads_revenge.world.generator import Rect, _reachable, generate_floor
+from neverdeads_revenge.world.generator import (
+    ESCAPE_DEPTH,
+    Rect,
+    _reachable,
+    generate_floor,
+)
 from neverdeads_revenge.world.map import DungeonMap
 from neverdeads_revenge.world.tiles import Tile
 
@@ -40,6 +45,25 @@ def test_every_tile_has_glyph_colour_and_description():
 def test_glyphs_are_unique_so_the_map_stays_readable():
     glyphs = [tile.glyph for tile in Tile]
     assert len(set(glyphs)) == len(glyphs)
+
+
+def test_loot_and_monsters_do_not_share_a_glyph_with_terrain():
+    """The map draws actors, loot and terrain in the same cells.
+
+    Two things that look alike in the same square is the one readability bug a
+    glyph-based game cannot recover from: a potion you cannot tell from a patch
+    of grass is a potion you never pick up.
+    """
+    from neverdeads_revenge.game.actors import ENEMIES, HEROES
+    from neverdeads_revenge.world.items import ITEMS
+
+    terrain = {tile.glyph for tile in Tile}
+    actors = {t.glyph for t in ENEMIES.values()} | {h.glyph for h in HEROES.values()}
+    loot = {item.glyph for item in ITEMS.values()}
+
+    assert len(loot) == len(ITEMS), "two draughts share a glyph"
+    assert not (loot & terrain), f"loot shares a glyph with terrain: {loot & terrain}"
+    assert not (loot & actors), f"loot shares a glyph with an actor: {loot & actors}"
 
 
 # -- map container ---------------------------------------------------------
@@ -95,6 +119,9 @@ def test_generation_is_reproducible_from_a_seed():
     assert a.player_start == b.player_start
     assert a.stairs_down == b.stairs_down
     assert a.spawn_points == b.spawn_points
+    assert a.exit_tile is b.exit_tile
+    assert set(a.items) == set(b.items)
+    assert [i.name for i in a.items.values()] == [i.name for i in b.items.values()]
 
 
 def test_different_seeds_give_different_layouts():
@@ -189,3 +216,86 @@ def test_flood_fill_respects_walls():
     reachable = _reachable((0, 1), dungeon)
     assert (0, 1) in reachable
     assert (6, 1) not in reachable
+
+
+# -- the way out -----------------------------------------------------------
+def test_the_rift_only_appears_on_the_escape_floor():
+    """Every floor before the last holds stairs down, not a win condition.
+
+    A rift on floor 3 would end the run the moment the player found it, and the
+    player has no way of knowing that from the map.
+    """
+    for depth in range(1, ESCAPE_DEPTH):
+        floor = generate_floor(Rng(depth), depth=depth)
+        assert floor.exit_tile is Tile.STAIRS_DOWN
+        assert not floor.is_final
+        assert floor.map.tile_at(floor.stairs_down) is Tile.STAIRS_DOWN
+        assert not floor.map.find_tile(Tile.RIFT)
+
+
+def test_the_escape_floor_holds_a_rift_instead_of_stairs():
+    for depth in (ESCAPE_DEPTH, ESCAPE_DEPTH + 3):
+        floor = generate_floor(Rng(depth), depth=depth)
+        assert floor.exit_tile is Tile.RIFT
+        assert floor.is_final
+        assert floor.map.tile_at(floor.stairs_down) is Tile.RIFT
+        assert not floor.map.find_tile(Tile.STAIRS_DOWN)
+
+
+def test_the_rift_is_walkable_and_neither_hides_nor_hides_behind_anything():
+    assert not Tile.RIFT.blocks_movement
+    assert not Tile.RIFT.blocks_sight
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_the_rift_is_reachable(seed):
+    floor = generate_floor(Rng(seed), depth=ESCAPE_DEPTH)
+    assert floor.stairs_down in _reachable(floor.player_start, floor.map)
+
+
+# -- loot ------------------------------------------------------------------
+@pytest.mark.parametrize("seed", SEEDS)
+def test_loot_lands_on_open_ground_that_can_be_reached(seed):
+    for depth in (1, 5, ESCAPE_DEPTH):
+        floor = generate_floor(Rng(seed), depth=depth)
+        reachable = _reachable(floor.player_start, floor.map)
+        for pos, item in floor.items.items():
+            assert floor.map.tile_at(pos) is Tile.FLOOR, "loot landed on decor"
+            assert pos in reachable, "loot is walled off"
+            assert floor.map.item_at(pos) is item
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_loot_never_lands_on_the_players_room_or_the_exit(seed):
+    """An item you start on, or that sits on the stairs, is not a decision."""
+    floor = generate_floor(Rng(seed))
+    assert floor.player_start not in floor.items
+    assert floor.stairs_down not in floor.items
+
+
+def test_every_floor_holds_something_to_find():
+    """A floor with no loot at all makes the healing curve a lie."""
+    for depth in range(1, ESCAPE_DEPTH + 1):
+        for seed in range(10):
+            floor = generate_floor(Rng(seed), depth=depth)
+            assert floor.items, f"floor {depth} seed {seed} had no loot"
+
+
+def test_loot_gets_more_plentiful_deeper():
+    counts = [
+        len(generate_floor(Rng(11), depth=d).items)
+        for d in (1, 4, 7, ESCAPE_DEPTH)
+    ]
+    assert counts == sorted(counts)
+
+
+def test_the_elixir_becomes_more_common_deeper():
+    from neverdeads_revenge.world.items import ITEMS, roll_item, _weight_at
+
+    assert _weight_at(ITEMS["elixir"], 9) > _weight_at(ITEMS["elixir"], 1)
+    assert _weight_at(ITEMS["potion"], 9) == _weight_at(ITEMS["potion"], 1)
+
+    # And it shows up in the actual rolls, not just the weight table.
+    early = [roll_item(Rng(s), 1).key for s in range(400)]
+    deep = [roll_item(Rng(s), 9).key for s in range(400)]
+    assert deep.count("elixir") > early.count("elixir")

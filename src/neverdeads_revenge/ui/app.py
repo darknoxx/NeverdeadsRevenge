@@ -18,6 +18,7 @@ from textual.app import App
 
 from .screens.game import GameScreen
 from .screens.game_over import GameOverScreen
+from .screens.help import HelpScreen
 from .screens.hero_select import HeroSelectScreen
 from .screens.pause import PauseScreen
 from .screens.prologue import PrologueScreen
@@ -43,6 +44,7 @@ class NeverdeadsRevenge(App[None]):
         "pause": PauseScreen,
         "game_over": GameOverScreen,
         "prologue": PrologueScreen,
+        "help": HelpScreen,
     }
 
     BINDINGS = [("ctrl+q", "quit", "Quit")]

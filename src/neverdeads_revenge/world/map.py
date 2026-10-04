@@ -13,13 +13,19 @@ __all__ = ["GroundItem", "DungeonMap"]
 
 @dataclass(slots=True)
 class GroundItem:
-    """An item lying on the floor."""
+    """An item lying on the floor.
+
+    ``heal`` is the health a drink restores. Every item in the game is currently
+    a healing draught, so the field is named for what it does rather than for
+    some future general case: when a wand or a scroll exists it will need a real
+    effect, not this field stretched to fit it.
+    """
 
     item_id: str
     name: str
     glyph: str = "*"
     color: str = "yellow"
-    charges: int = 0
+    heal: int = 0
 
 
 @dataclass(slots=True)

@@ -18,6 +18,8 @@ import pytest
 from neverdeads_revenge.game.state import RunState
 from neverdeads_revenge.ui.app import NeverdeadsRevenge
 from neverdeads_revenge.ui.screens.game import GameScreen
+from neverdeads_revenge.ui.screens.game_over import GameOverScreen
+from neverdeads_revenge.ui.screens.title import TitleScreen
 from neverdeads_revenge.world.tiles import Tile
 
 from .test_ui import drive_to_game
@@ -32,13 +34,17 @@ async def autoplay(pilot, state, turns: int, seed: int, descend_every: int = 40)
     rng = random.Random(seed)
     for turn in range(turns):
         roll = rng.random()
-        if roll < 0.08:
+        if roll < 0.06:
             key = "."
-        elif roll < 0.14:
+        elif roll < 0.10:
             key = "g"
-        elif roll < 0.18:
+        elif roll < 0.13:
+            key = "q"
+        elif roll < 0.15:
+            key = "i"
+        elif roll < 0.19:
             key = ">"
-        elif roll < 0.20:
+        elif roll < 0.21:
             key = "?"
         else:
             key = rng.choice(MOVEMENT_KEYS)
@@ -49,10 +55,14 @@ async def autoplay(pilot, state, turns: int, seed: int, descend_every: int = 40)
         if state.run_state is not RunState.PLAYING:
             break
         if descend_every and turn and turn % descend_every == 0:
-            # Stand on the stairs and take them, to exercise floor changes.
-            state.player.position = state.dungeon_map.find_tile(Tile.STAIRS_DOWN)[0]
-            await pilot.press(">")
-            await pilot.pause()
+            # Stand on the stairs and take them, to exercise floor changes. Only
+            # where there are stairs: the last floor holds a rift instead, and
+            # taking that would end the run the test is trying to prolong.
+            found = state.dungeon_map.find_tile(Tile.STAIRS_DOWN)
+            if found:
+                state.player.position = found[0]
+                await pilot.press(">")
+                await pilot.pause()
 
 
 def assert_coherent(state) -> None:
@@ -68,8 +78,67 @@ def assert_coherent(state) -> None:
             assert enemy.position != player.position, "two actors share a cell"
     if state.run_state is RunState.PLAYING:
         assert player.stats.hp > 0
+    # Whatever the bot picked up, it is still holding it.
+    for item in state.inventory:
+        assert item.heal >= 0
     assert state.turn >= 0
     assert state.depth >= 1
+
+
+async def test_a_bot_that_escapes_finishes_the_run_cleanly():
+    """The victory path has to survive the same invariants as the death path.
+
+    An escape leaves the map in a state no other ending produces -- a live
+    player and a live floor under a finished run -- so it gets its own pass.
+    """
+    from neverdeads_revenge.world.generator import ESCAPE_DEPTH
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        assert state is not None
+
+        state.build_floor(ESCAPE_DEPTH)
+        assert state.at_the_rift is False, "the player spawns away from the rift"
+        state.player.position = state.exit_pos
+        assert state.at_the_rift
+
+        # Drink whatever is carried first, to exercise the quaff path in a real
+        # frame and make sure a win mid-turn is not mistaken for a death.
+        await pilot.press("q")
+        await pilot.pause()
+        await pilot.press(">")
+        await pilot.pause()
+
+        assert state.run_state is RunState.ESCAPED
+        assert isinstance(app.screen, GameOverScreen)
+        assert app.screen.won
+        assert getattr(app, "_exception", None) is None
+        assert state.player.alive, "escaping must not kill the hero"
+        assert_coherent(state)
+
+
+async def test_a_won_run_can_be_restarted():
+    """The title screen has to be reachable from a victory, not just a death."""
+    from neverdeads_revenge.world.generator import ESCAPE_DEPTH
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.build_floor(ESCAPE_DEPTH)
+        screen.state.player.position = screen.state.exit_pos
+        await pilot.press(">")
+        await pilot.pause()
+        await pilot.press(" ")
+        await pilot.pause()
+
+        assert isinstance(app.screen, TitleScreen)
+        await pilot.press("x")
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, GameScreen)
 
 
 @pytest.mark.parametrize("seed", [1, 7, 99])

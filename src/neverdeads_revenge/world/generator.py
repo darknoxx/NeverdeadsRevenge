@@ -12,15 +12,23 @@ way that could not possibly connect.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from neverdeads_revenge.core.direction import Pos
 from neverdeads_revenge.core.rng import Rng
 
-from .map import DungeonMap
+from .items import loot_count, make_item, roll_item
+from .map import DungeonMap, GroundItem
 from .tiles import Tile
 
-__all__ = ["GeneratedFloor", "generate_floor"]
+__all__ = ["GeneratedFloor", "generate_floor", "ESCAPE_DEPTH"]
+
+#: The floor that holds the way out instead of stairs down.
+#:
+#: A fixed depth rather than an unlocked one. A run has to have a shape the
+#: player can plan against -- "I need to reach ten" is a decision, "keep going
+#: until you die" is not.
+ESCAPE_DEPTH = 10
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +88,15 @@ class GeneratedFloor:
     stairs_down: Pos
     spawn_points: list[Pos]
     depth: int
+    #: Which tile marks the exit. ``STAIRS_DOWN`` everywhere but the last floor,
+    #: where it is ``RIFT`` and taking it wins the run instead of continuing it.
+    exit_tile: Tile = Tile.STAIRS_DOWN
+    #: Where the loot ended up, for tests and for the map to draw.
+    items: dict[Pos, GroundItem] = field(default_factory=dict)
+
+    @property
+    def is_final(self) -> bool:
+        return self.exit_tile is Tile.RIFT
 
 
 # -- layout ----------------------------------------------------------------
@@ -221,8 +238,10 @@ def generate_floor(
         raise RuntimeError("exit room is not reachable from the entrance")
 
     player_start = start_room.center
-    stairs_down = exit_room.center
-    dungeon_map.set_tile(stairs_down, Tile.STAIRS_DOWN)
+    exit_pos = exit_room.center
+    # The deepest floor holds the way out rather than a way further in.
+    exit_tile = Tile.RIFT if depth >= ESCAPE_DEPTH else Tile.STAIRS_DOWN
+    dungeon_map.set_tile(exit_pos, exit_tile)
 
     # Spawn candidates: interior floor of every room, minus the player's room so
     # nothing materialises on top of you.
@@ -230,7 +249,7 @@ def generate_floor(
         pos
         for room in rooms[1:]
         for pos in room.inner_positions
-        if pos != stairs_down
+        if pos != exit_pos
     ]
     # Never hand out fewer spawn points than we need; a cramped floor is fine.
     if enemy_budget is None:
@@ -239,10 +258,43 @@ def generate_floor(
 
     _scatter_decor(rng, dungeon_map, rooms, count=len(dungeon_map.walkable_positions()) // 18)
 
+    # Loot last, and on whatever is still plain floor. Placing it after the decor
+    # means an item can never be swallowed by a patch of grass.
+    items = _scatter_loot(rng, dungeon_map, candidates, depth)
+
     return GeneratedFloor(
         map=dungeon_map,
         player_start=player_start,
-        stairs_down=stairs_down,
+        stairs_down=exit_pos,
         spawn_points=spawn_points,
         depth=depth,
+        exit_tile=exit_tile,
+        items=items,
     )
+
+
+def _scatter_loot(
+    rng: Rng,
+    dungeon_map: DungeonMap,
+    candidates: list[Pos],
+    depth: int,
+) -> dict[Pos, GroundItem]:
+    """Drop a few draughts on the floor.
+
+    Items may land under a monster. That is deliberate: a potion you have to
+    fight for is more interesting than one lying in an empty room, and the
+    player can always kill the occupant and come back. What they may *not* do is
+    land on the player's own room -- ``candidates`` already excludes it -- or on
+    the exit.
+    """
+    placed: dict[Pos, GroundItem] = {}
+    open_floor = [pos for pos in candidates if dungeon_map.tile_at(pos) is Tile.FLOOR]
+    if not open_floor:
+        return placed
+
+    count = min(loot_count(depth), len(open_floor))
+    for pos in rng.shuffled(open_floor)[:count]:
+        item = make_item(roll_item(rng, depth))
+        dungeon_map.add_item(pos, item)
+        placed[pos] = item
+    return placed

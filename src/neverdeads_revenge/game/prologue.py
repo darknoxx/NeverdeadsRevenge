@@ -14,9 +14,27 @@ to work without being told again.
 from __future__ import annotations
 
 from ..game.actors import ENEMIES, HEROES, scale_template
+from ..world.generator import ESCAPE_DEPTH
+from ..world.items import ITEMS
 from ..world.tiles import Tile
 
-__all__ = ["PROLOGUE", "PROLOGUE_TITLE", "terrain_legend", "enemy_legend", "legend_rows"]
+__all__ = [
+    "PROLOGUE",
+    "PROLOGUE_TITLE",
+    "GOAL_HINT",
+    "terrain_legend",
+    "terrain_help",
+    "enemy_legend",
+    "item_legend",
+    "legend_rows",
+]
+
+#: The one line a player must never have to guess at.
+#:
+#: The prologue asks whether there is a way out; this answers it and says where,
+#: in the panel that is on screen at every moment. Kept here rather than in the
+#: widget so the width test can measure it like any other legend line.
+GOAL_HINT = f"the way out is on floor {ESCAPE_DEPTH}"
 
 #: Shown on the title screen, before a run exists. Kept short on purpose.
 PROLOGUE_TITLE = "Der Tod ist nicht das Ende. Das war dir nicht vergönnt."
@@ -37,20 +55,33 @@ PROLOGUE: tuple[str, ...] = (
 
 #: Terrain worth explaining. VOID and FLOOR are omitted on purpose: void is
 #: "not yet seen", which the player learns from the dimming, and floor is the
-#: default the eye assumes. Both would only add noise.
+#: default the eye assumes. GRASS and WATER are omitted too: they are pure
+#: decoration, and the panel has to stay short enough to fit the sidebar without
+#: the bottom of it -- the loot and the goal -- falling off the screen.
 LEGEND_TERRAIN: tuple[Tile, ...] = (
     Tile.WALL,
-    Tile.STAIRS_DOWN,
     Tile.DOOR,
     Tile.RUBBLE,
-    Tile.GRASS,
-    Tile.WATER,
+    Tile.STAIRS_DOWN,
+    Tile.RIFT,
 )
 
 
 def terrain_legend() -> list[tuple[str, str]]:
     """``(glyph, meaning)`` for every terrain type worth naming."""
     return [(tile.glyph, tile.description) for tile in LEGEND_TERRAIN]
+
+
+def item_legend() -> list[tuple[str, str]]:
+    """``(glyph, meaning)`` for what can be picked up.
+
+    Read from ``ITEMS``, so a new draught, or a change to one, shows up here
+    without a second edit.
+    """
+    return [
+        (template.glyph, f"{template.name}, heals {template.heal}")
+        for template in ITEMS.values()
+    ]
 
 
 def enemy_legend(depth: int = 1) -> list[tuple[str, str]]:
@@ -74,25 +105,38 @@ def enemy_legend(depth: int = 1) -> list[tuple[str, str]]:
         low, high = scaled.stats.damage
         speed = scaled.stats.speed
         pace = "slow" if speed < 0.85 else "even" if speed < 1.15 else "fast"
-        # Two lines per monster: the numbers on one, so the panel does not need
-        # a width that fits "skeleton, even (1.0)" and its stats on one row.
-        rows.append(
-            (template.glyph, f"{template.name}, {pace} ({speed:.1f})"),
-        )
+        # One line per monster, abbreviated. The panel lives in the sidebar next
+        # to the map, and the map needs the rows more than the prose does: full
+        # sentences cost two lines per monster and push the terrain half, which
+        # is the half a new player actually needs, off the bottom.
         rows.append(
             (
-                "",
-                f"{scaled.stats.max_hp} hp, {low}-{high} dmg, "
-                f"{template.behaviour}",
+                template.glyph,
+                f"{template.name} {pace} {scaled.stats.max_hp}hp {low}-{high}d",
             )
         )
     return rows
 
 
 def legend_rows(depth: int = 1) -> list[tuple[str, str]]:
-    """The full legend: you, the monsters, then the terrain.
+    """The always-on legend: you, the monsters, then the loot.
 
-    A row with an empty glyph is a continuation or a spacer; the widget decides
-    how to render it.
+    Terrain is deliberately *not* here. ``LEGEND_TERRAIN`` is static -- a wall is
+    a wall on every floor -- while the monsters' numbers change every descent and
+    the loot is what keeps a run alive. Only the second kind earns a permanent
+    place next to the map; the first is a reference you look up once, and it lives
+    in the help text where there is room for it.
+
+    That split is not just tidiness. The panel is clipped rather than scrolled,
+    and every row spent on "patchy grass" is a row that could push the rift --
+    the thing the whole run is for -- off the bottom of the sidebar.
+
+    A row with an empty glyph is a section break, or a continuation line when it
+    carries text of its own; the widget decides how to render it.
     """
-    return [*enemy_legend(depth), ("", ""), *terrain_legend()]
+    return [*enemy_legend(depth), ("", ""), *item_legend()]
+
+
+def terrain_help() -> str:
+    """The static terrain reference, formatted for the help text."""
+    return "\n".join(f"[bold]{tile.glyph}[/] {tile.description}" for tile in LEGEND_TERRAIN)

@@ -51,6 +51,129 @@ async def drive_to_game(app: NeverdeadsRevenge, pilot) -> GameScreen:
     return app.screen
 
 
+async def test_legend_lists_the_rift_and_the_loot():
+    """The way out and the draughts have to be in the panel too.
+
+    A player who cannot look up what ``!`` is will walk past the thing that keeps
+    them alive, and one who cannot look up ``%`` will not know what they are
+    looking for.
+    """
+    from neverdeads_revenge.game.prologue import GOAL_HINT
+    from neverdeads_revenge.ui.widgets.legend import Legend
+    from neverdeads_revenge.world.items import ITEMS
+    from neverdeads_revenge.world.tiles import Tile
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        shown = screen.query_one(Legend).render().plain
+
+        assert Tile.RIFT.glyph in shown, "the way out is not on the legend"
+        for item in ITEMS.values():
+            assert item.glyph in shown, f"{item.key} missing from legend"
+            assert f"heals {item.heal}" in shown
+        assert GOAL_HINT in shown, "the goal is not stated anywhere on screen"
+
+
+async def test_hud_shows_how_deep_the_run_has_to_go():
+    """The goal, as a number the player can plan against."""
+    from neverdeads_revenge.ui.widgets.hud import Hud
+    from neverdeads_revenge.world.generator import ESCAPE_DEPTH
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        shown = screen.query_one(Hud).render().plain
+        assert f"Floor 1/{ESCAPE_DEPTH}" in shown
+
+
+async def test_hud_counts_the_draughts_you_are_carrying():
+    from neverdeads_revenge.ui.widgets.hud import Hud
+    from neverdeads_revenge.world.items import ITEMS, make_item
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        assert state is not None
+
+        assert "Draughts 0" in screen.query_one(Hud).render().plain
+
+        state.inventory.append(make_item(ITEMS["elixir"]))
+        await pilot.press(".")
+        await pilot.pause()
+
+        assert "Draughts 1" in screen.query_one(Hud).render().plain
+
+
+async def test_pressing_q_drinks_and_g_picks_up():
+    """The two new keys have to reach the game layer, not just the state."""
+    from neverdeads_revenge.world.items import ITEMS, make_item
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        assert state is not None
+        state.player.stats.hp = 10
+
+        # An elixir on the floor, under the player.
+        state.dungeon_map.add_item(state.player.position, make_item(ITEMS["elixir"]))
+        await pilot.press("g")
+        await pilot.pause()
+        assert [item.name for item in state.inventory] == ["elixir"]
+
+        await pilot.press("q")
+        await pilot.pause()
+        assert state.player.hp == state.player.max_hp
+        assert state.inventory == []
+
+
+# -- winning ----------------------------------------------------------------
+async def test_stepping_into_the_rift_shows_victory_not_death():
+    """The ending the whole run exists for, end to end through the UI."""
+    from neverdeads_revenge.ui.screens.game_over import GameOverScreen
+    from neverdeads_revenge.world.generator import ESCAPE_DEPTH
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        assert state is not None
+
+        state.build_floor(ESCAPE_DEPTH)
+        state.player.position = state.exit_pos
+        await pilot.press(">")
+        await pilot.pause()
+
+        assert isinstance(app.screen, GameOverScreen)
+        assert app.screen.won, "the rift ended the run as a death"
+        assert "VICTORY" in str(app.screen.query_one("#game-over-title").render())
+        assert state.run_state is RunState.ESCAPED
+
+        # And it returns to the title like every other ending.
+        await pilot.press(" ")
+        await pilot.pause()
+        assert isinstance(app.screen, TitleScreen)
+
+
+async def test_the_rift_does_not_win_the_run_early():
+    """Descending on floor 1 must still be a descent, not an escape."""
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        assert state is not None
+
+        state.player.position = state.stairs
+        await pilot.press(">")
+        await pilot.pause()
+
+        assert state.depth == 2
+        assert state.run_state is RunState.PLAYING
+        assert isinstance(app.screen, GameScreen)
+
+
 # -- prologue ---------------------------------------------------------------
 async def test_prologue_appears_on_the_first_run_only():
     """The premise is stated once per session, not once per run.
@@ -376,15 +499,15 @@ async def test_map_view_renders_around_the_player():
 
 
 # -- legend ------------------------------------------------------------------
-async def test_legend_lists_every_monster_and_useful_terrain():
+async def test_legend_lists_every_monster_and_every_draught():
     """The legend is generated from the game data, so it cannot drift.
 
-    Terrain and enemies are read from ``tiles.py`` and ``actors.py`` at render
+    Monsters are read from ``actors.py`` and loot from ``items.py`` at render
     time. Adding either without touching the UI has to show up here.
     """
     from neverdeads_revenge.game.actors import ENEMIES
-    from neverdeads_revenge.game.prologue import LEGEND_TERRAIN
     from neverdeads_revenge.ui.widgets.legend import Legend
+    from neverdeads_revenge.world.items import ITEMS
 
     app = NeverdeadsRevenge()
     async with app.run_test(size=SIZE) as pilot:
@@ -395,9 +518,88 @@ async def test_legend_lists_every_monster_and_useful_terrain():
         for template in ENEMIES.values():
             assert template.glyph in shown, f"{template.key} missing from legend"
             assert template.name in shown
+        for item in ITEMS.values():
+            assert item.glyph in shown, f"{item.key} missing from legend"
+            assert item.name in shown
+
+
+async def test_the_terrain_reference_lives_in_the_help_screen():
+    """Static terrain is looked up once, so it belongs in the help, not the panel.
+
+    Every row spent on decoration in the always-on legend is a row that can push
+    the goal off the bottom of the sidebar.
+    """
+    from neverdeads_revenge.game.prologue import LEGEND_TERRAIN
+    from neverdeads_revenge.ui.screens.help import HelpScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        await pilot.press("?")
+        await pilot.pause()
+
+        assert isinstance(app.screen, HelpScreen)
+        shown = str(app.screen.query_one("#help-body").render())
+        assert "terrain" in shown.lower()
         for tile in LEGEND_TERRAIN:
-            assert tile.glyph in shown, f"{tile.name} missing from legend"
-            assert tile.description in shown
+            assert tile.glyph in shown, f"{tile.name} missing from the help"
+            assert tile.description in shown, f"{tile.name} missing from the help"
+
+
+async def test_the_help_screen_closes_on_any_key():
+    """A reference you cannot get out of is a trap, not a reference."""
+    from neverdeads_revenge.ui.screens.help import HelpScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        assert state is not None
+
+        await pilot.press("?")
+        await pilot.pause()
+        assert isinstance(app.screen, HelpScreen)
+
+        await pilot.press("q")
+        await pilot.pause()
+        assert isinstance(app.screen, GameScreen)
+        assert state.turn == 0, "closing the help must not cost a turn"
+        assert state.inventory == [], "the key was swallowed by the game instead"
+
+
+async def test_the_help_screen_does_not_clip_its_reference():
+    """It scrolls, so a short terminal shows a window rather than losing the end.
+
+    The terrain half was moved out of the legend because the sidebar had no room
+    for it. A box that silently cut it off would have been the same problem in a
+    different place.
+    """
+    from neverdeads_revenge.ui.screens.help import HelpScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await drive_to_game(app, pilot)
+        await pilot.press("f1")
+        await pilot.pause()
+
+        body = app.screen.query_one("#help-body")
+        assert isinstance(app.screen, HelpScreen)
+        assert body.size.height >= body.content_size.height or body.is_vertical_scroll_end, (
+            "the help body is taller than its box and cannot be scrolled to the end"
+        )
+
+
+async def test_the_legend_does_not_waste_rows_on_decoration():
+    """Grass and water have no rules attached, so they need no legend row."""
+    from neverdeads_revenge.ui.widgets.legend import Legend
+    from neverdeads_revenge.world.tiles import Tile
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        shown = screen.query_one(Legend).render().plain
+        assert Tile.GRASS.description not in shown
+        assert Tile.WATER.description not in shown
 
 
 async def test_legend_fits_its_panel_without_wrapping():
@@ -408,9 +610,13 @@ async def test_legend_fits_its_panel_without_wrapping():
     depths, because the monster numbers are the part that grows.
     """
     from neverdeads_revenge.game.prologue import legend_rows
-    from neverdeads_revenge.ui.widgets.legend import PANEL_WIDTH, USABLE_WIDTH
+    from neverdeads_revenge.ui.widgets.legend import (
+        SIDEBAR_CHROME,
+        PANEL_WIDTH,
+        USABLE_WIDTH,
+    )
 
-    assert USABLE_WIDTH == PANEL_WIDTH - 4, "padding and borders accounted for"
+    assert USABLE_WIDTH == PANEL_WIDTH - SIDEBAR_CHROME - 1, "border, padding, indent"
     for depth in range(1, 20):
         for glyph, meaning in legend_rows(depth):
             # 2 columns for the glyph and its trailing space, 1 for the indent
@@ -422,7 +628,7 @@ async def test_legend_fits_its_panel_without_wrapping():
 
 
 async def test_legend_shows_monster_numbers():
-    """HP, damage and pace are what a player needs mid-fight."""
+    """Health, damage and pace are what a player needs mid-fight."""
     from neverdeads_revenge.game.actors import ENEMIES
     from neverdeads_revenge.ui.widgets.legend import Legend
 
@@ -432,9 +638,9 @@ async def test_legend_shows_monster_numbers():
         shown = screen.query_one(Legend).render().plain
 
         ghoul = ENEMIES["ghoul"]
-        assert f"{ghoul.stats.max_hp} hp" in shown
+        assert f"{ghoul.stats.max_hp}hp" in shown
         low, high = ghoul.stats.damage
-        assert f"{low}-{high} dmg" in shown
+        assert f"{low}-{high}d" in shown
         assert "slow" in shown, "ghoul is slower than the player"
 
 
@@ -458,7 +664,7 @@ async def test_legend_follows_the_player_down_the_floors():
 
         # Floor 1 is where the legend starts, so the map and the panel agree.
         first = scale_template(ENEMIES["ghoul"], 1).stats.damage
-        assert f"{first[0]}-{first[1]} dmg" in legend.render().plain
+        assert f"{first[0]}-{first[1]}d" in legend.render().plain
 
         state.build_floor(8)
         await pilot.press(".")
@@ -468,8 +674,65 @@ async def test_legend_follows_the_player_down_the_floors():
         deep = scale_template(ENEMIES["ghoul"], 8).stats.damage
         assert deep != first, "the test is not looking at a floor that scales"
         shown = legend.render().plain
-        assert f"{deep[0]}-{deep[1]} dmg" in shown
-        assert f"{first[0]}-{first[1]} dmg" not in shown
+        assert f"{deep[0]}-{deep[1]}d" in shown
+        assert f"{first[0]}-{first[1]}d" not in shown
+
+
+async def test_the_whole_legend_fits_the_sidebar_without_being_cut_off():
+    """The panel is clipped, not scrolled, so every line has to fit.
+
+    This is the failure that is invisible in a unit test and obvious to a player:
+    the loot and the goal live at the bottom of the panel, and they are exactly
+    what falls off the screen first. Checked with REVENGE active, because that is
+    when the HUD above the legend is at its tallest.
+    """
+    from neverdeads_revenge.ui.widgets.legend import Legend
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        assert state is not None
+
+        # The worst case: five stacks of REVENGE add two lines to the HUD.
+        state.revenge_stacks = 5
+        await pilot.press(".")
+        await pilot.pause()
+
+        legend = screen.query_one(Legend)
+        lines = str(legend.render()).splitlines()
+        assert legend.content_size.height >= len(lines), (
+            f"legend needs {len(lines)} rows, the sidebar gives it "
+            f"{legend.content_size.height}: the bottom of the panel is cut off"
+        )
+
+
+async def test_every_hud_line_fits_the_sidebar_without_wrapping():
+    """A wrapped HUD line eats a legend row and pushes the goal off the bottom.
+
+    The sidebar does not scroll, so the two panels are competing for a fixed
+    number of rows, and a line that silently wraps costs both of them.
+    """
+    from neverdeads_revenge.ui.widgets.hud import Hud
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        assert state is not None
+
+        # Longest realistic state: a speed bonus, five stacks, a full score.
+        state.player.speed_bonus = 1.5
+        state.revenge_stacks = 5
+        state.kills = 99
+        state.total_turns = 9999
+        await pilot.press(".")
+        await pilot.pause()
+
+        hud = screen.query_one(Hud)
+        width = hud.content_size.width
+        for line in str(hud.render()).splitlines():
+            assert len(line) <= width, f"HUD line wraps ({len(line)}>{width}): {line!r}"
 
 
 # -- theming -----------------------------------------------------------------

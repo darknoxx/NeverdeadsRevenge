@@ -92,20 +92,30 @@ class MapView(Widget):
         return Text("\n").join(lines)
 
     def _cell(self, position, state: GameState) -> Text:
-        """One map cell: an actor if there is one, otherwise terrain."""
+        """One map cell: an actor if there is one, otherwise loot, else terrain."""
         dungeon = state.dungeon_map
+        visible = dungeon.is_visible(position)
 
         actor = state.actor_at(position)
-        if actor is not None and dungeon.is_visible(position):
+        if actor is not None and visible:
             style = f"bold {actor.color}" if not actor.is_player else actor.color
             return Text(actor.glyph, style=style)
 
+        # Loot sits on the ground, so it is drawn over the terrain and under any
+        # monster standing on it -- which is exactly the choice the player has to
+        # make about whether the potion is worth the fight.
+        item = dungeon.item_at(position)
+        if item is not None and visible:
+            return Text(item.glyph, style=f"bold {item.color}")
+
         tile = dungeon.tile_at(position)
-        if dungeon.is_visible(position):
+        if visible:
             return Text(tile.glyph, style=tile.color)
 
         if dungeon.is_explored(position) and self._stays_legible(tile):
-            # Remembered ground: walls and stairs stay readable, the rest fades.
+            # Remembered ground: walls and the way onward stay readable, the
+            # rest fades. Remembered loot is deliberately not drawn: you know
+            # the room, not what is still lying in it.
             return Text(tile.glyph, style=MEMORY_COLOR)
 
         return Text(" ", style=UNSEEN_COLOR)
@@ -114,7 +124,7 @@ class MapView(Widget):
     def _stays_legible(tile: Tile) -> bool:
         """Whether dimmed terrain should still be drawn.
 
-        Walls and stairs give the player their mental map. Remembering the colour
-        of floor tiles is noise.
+        Walls and the exits give the player their mental map. Remembering the
+        colour of floor tiles is noise.
         """
-        return tile.blocks_movement or tile is Tile.STAIRS_DOWN
+        return tile.blocks_movement or tile in (Tile.STAIRS_DOWN, Tile.RIFT)

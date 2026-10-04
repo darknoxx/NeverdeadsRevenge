@@ -14,29 +14,45 @@ from rich.text import Text
 from textual.reactive import reactive
 from textual.widgets import Static
 
-from ...game.prologue import legend_rows
+from ...game.prologue import GOAL_HINT, legend_rows
+from ...world.tiles import Tile
 
-__all__ = ["Legend", "PANEL_WIDTH", "USABLE_WIDTH"]
+__all__ = ["Legend", "PANEL_WIDTH", "USABLE_WIDTH", "SIDEBAR_CHROME"]
 
-#: Width of the panel, set in ``app.tcss``. Named here so the fitting test has
-#: something to check against instead of a magic number.
-PANEL_WIDTH = 32
+#: Width of the sidebar the panel lives in, set in ``app.tcss``. Named here so
+#: the fitting test has something to check against instead of a magic number.
+PANEL_WIDTH = 34
 
-#: What is left of that once the border and the horizontal padding are gone.
-USABLE_WIDTH = PANEL_WIDTH - 4
+#: Columns the sidebar itself spends on its border (2) and padding (2). Not the
+#: panel's business, but the panel has to account for it.
+SIDEBAR_CHROME = 4
+
+#: What a legend line may actually occupy: the sidebar's content box, minus this
+#: panel's own left padding.
+USABLE_WIDTH = PANEL_WIDTH - SIDEBAR_CHROME - 1
 
 
 class Legend(Static):
-    """What every glyph on the map means.
+    """What you have to act on: the goal, the monsters, and the loot.
 
-    The height is set by ``#game-footer`` in the stylesheet, not here: the log
-    and this panel share one row, and the number of legend lines has to fit
-    inside whatever the log gets.
+    Lives in the sidebar, under the HUD, rather than in a row of its own at the
+    bottom. The map is the thing that needs height, and a bottom legend competes
+    with it for every row. Beside the map it costs width the sidebar was already
+    spending.
+
+    Terrain is not shown here, only in the help screen. This panel is clipped
+    rather than scrolled -- the sidebar has a fixed height and the map will not
+    give any up -- so a row spent on something static is a row that can push the
+    goal off the bottom. Everything here is either a number that changes every
+    descent or a glyph you act on.
     """
 
     DEFAULT_CSS = """
     Legend {
-        width: 32;  /* PANEL_WIDTH */
+        width: 100%;
+        height: 1fr;
+        border-top: solid $panel;
+        padding: 0 0 0 1;
         background: $surface;
     }
     """
@@ -68,6 +84,12 @@ class Legend(Static):
         out = Text(no_wrap=True)
         out.append("LEGEND\n", style="bold")
 
+        # The goal first, directly under the heading. It is the one line that
+        # must never be the thing that gets clipped off the bottom when the
+        # sidebar runs short.
+        out.append(f"{Tile.RIFT.glyph} ", style="bold bright_cyan")
+        out.append(f"{GOAL_HINT}\n", style="bold")
+
         for glyph, meaning in legend_rows(self.depth):
             if not glyph:
                 # An empty meaning is a section break; an empty glyph with text
@@ -83,13 +105,13 @@ class Legend(Static):
             # there instead of silently wrapping here.
             out.append(f"{meaning[:USABLE_WIDTH - 2]}\n", style="bold")
 
-        out.append("\n? controls", style="dim")
         self.update(out)
 
 
 def _glyph_style(glyph: str) -> str:
     """Colour a legend entry the way the map colours the same glyph."""
     from ...game.actors import ENEMIES, HEROES
+    from ...world.items import ITEMS
     from ...world.tiles import Tile
 
     if glyph == HEROES["noxx"].glyph:
@@ -97,6 +119,9 @@ def _glyph_style(glyph: str) -> str:
     for template in ENEMIES.values():
         if template.glyph == glyph:
             return template.color
+    for item in ITEMS.values():
+        if item.glyph == glyph:
+            return f"bold {item.color}"
     for tile in Tile:
         if tile.glyph == glyph:
             return tile.color
