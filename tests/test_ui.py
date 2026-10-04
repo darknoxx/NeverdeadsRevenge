@@ -329,6 +329,105 @@ async def test_the_victory_screen_answers_the_prologue():
         assert "Floor reached" in body
 
 
+# -- title ------------------------------------------------------------------
+def test_the_title_font_can_spell_the_whole_name():
+    """Every character of the name has a glyph.
+
+    A title that quietly drops a letter is the failure mode this file was
+    rewritten to fix, so the alphabet it needs is asserted rather than assumed.
+    """
+    from neverdeads_revenge.ui.screens.title import BLOCK
+
+    for char in "NEVERDEAD'S REVENGE":
+        if char == " ":
+            continue
+        assert char in BLOCK, f"the title font has no glyph for {char!r}"
+
+
+def test_every_title_glyph_is_the_same_height():
+    """Ragged glyphs would make the block art shear on its baseline."""
+    from neverdeads_revenge.ui.screens.title import BLOCK, ROWS
+
+    for char, glyph in BLOCK.items():
+        assert len(glyph) == ROWS, f"{char!r} is {len(glyph)} rows, not {ROWS}"
+        assert all(isinstance(row, str) for row in glyph), char
+
+
+def test_rendering_a_word_lines_the_glyphs_up():
+    """One string per row, all the same width -- that is what makes it a block."""
+    from neverdeads_revenge.ui.screens.title import ROWS, render_word
+
+    rows = render_word("NEVERDEAD")
+    assert len(rows) == ROWS
+    assert len(set(map(len, rows))) == 1, "the block art is not square"
+
+
+def test_the_title_art_is_solid_blocks_and_nothing_else():
+    """The old art's problem was `_|/\\`, not its size.
+
+    Anything other than blocks and spaces in here is a character that turns
+    letterforms into noise at five rows.
+    """
+    from neverdeads_revenge.ui.screens.title import TITLE_ART
+
+    assert set(TITLE_ART) <= {"█", " ", "\n"}, "the title uses non-block characters"
+
+
+def test_unknown_characters_are_skipped_rather_than_crashing():
+    """A font that raises on an unknown letter takes the title screen with it."""
+    from neverdeads_revenge.ui.screens.title import render_word
+
+    assert render_word("N?E") == render_word("NE")
+    assert render_word("123") == []
+    assert render_word("") == []
+
+
+async def test_the_title_screen_draws_the_block_art_when_it_fits():
+    from neverdeads_revenge.ui.screens.title import TITLE_ART
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, TitleScreen)
+        shown = str(app.screen.query_one("#title-art").render())
+        assert shown == TITLE_ART
+        assert "█" in shown
+
+
+async def test_the_title_falls_back_to_plain_text_when_it_is_too_narrow():
+    """A wrapped block font is less readable than no block font.
+
+    This is the exact complaint the rewrite answers, so the screen is checked at
+    a width that cannot hold the art rather than only at the size it was
+    designed for.
+    """
+    from neverdeads_revenge.ui.screens.title import ART_MIN_WIDTH, PLAIN_TITLE
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=(ART_MIN_WIDTH - 8, 16)) as pilot:
+        await pilot.pause()
+        shown = str(app.screen.query_one("#title-art").render())
+        assert shown == PLAIN_TITLE
+        assert "█" not in shown
+        # The name is still readable, just smaller.
+        assert "N E V E R D E A D ' S" in shown
+        assert "R E V E N G E" in shown
+
+
+async def test_the_title_becomes_the_block_art_when_the_terminal_grows():
+    """Width is not fixed at start-up: a resize has to redraw it."""
+    from neverdeads_revenge.ui.screens.title import ART_MIN_WIDTH, PLAIN_TITLE, TITLE_ART
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=(ART_MIN_WIDTH - 8, 16)) as pilot:
+        await pilot.pause()
+        assert str(app.screen.query_one("#title-art").render()) == PLAIN_TITLE
+
+        await pilot.resize_terminal(ART_MIN_WIDTH + 20, 24)
+        await pilot.pause()
+        assert str(app.screen.query_one("#title-art").render()) == TITLE_ART
+
+
 # -- prologue ---------------------------------------------------------------
 async def test_prologue_appears_on_the_first_run_only():
     """The premise is stated once per session, not once per run.
