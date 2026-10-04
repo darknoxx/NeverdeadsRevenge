@@ -5,8 +5,8 @@ The N is taken from the game's own block font in ``ui/screens/title.py``, so the
 icon cannot drift from the title screen: change the letterform once and both
 follow. Everything else here is geometry.
 
-    python3 tools/make_icon.py                  # writes assets/*.svg
-    python3 tools/make_icon.py --motive c       # the rift instead of the hero
+    python3 tools/make_icon.py                  # the skull (default)
+    python3 tools/make_icon.py --motive a       # the block N instead
     python3 tools/make_icon.py --png 256 48     # also rasterise, for previews
 
 The rasteriser is here because an icon is judged by eye and this repository has
@@ -34,8 +34,61 @@ BACKGROUND = "#121212"
 RIM = "#2a2a2a"
 PURPLE = "#a855f7"
 CYAN = "#00e5ff"
+BONE = "#e8e4dc"
 
-MOTIVES = ("a", "b", "c")
+#: A 16x16 skull. ``#`` bone, ``o`` a glowing socket, ``.`` nothing.
+#:
+#: Drawn on a grid rather than as curves because the whole game is blocks: the
+#: title screen is a five-by-five block font and the map is one character per
+#: cell. A smooth vector skull would be the only soft edge in the project.
+SKULL = (
+    "....########....",
+    "..############..",
+    ".##############.",
+    "################",
+    "################",
+    "##ooo######ooo##",
+    "##ooo######ooo##",
+    "##ooo######ooo##",
+    "################",
+    "#######..#######",
+    "#######..#######",
+    ".##############.",
+    "..############..",
+    "..############..",
+    "..##.#.##.#.##..",
+    "..##.#.##.#.##..",
+)
+
+#: Width of the skull grid, in pixels of sprite.
+SKULL_CELLS = 16
+
+MOTIVES = ("skull", "a", "b", "c")
+
+
+def sprite_rects(
+    sprite: tuple[str, ...], char: str, cell: float, ox: float, oy: float
+) -> list[tuple[float, float, float, float]]:
+    """Filled rectangles for one sprite character, merging runs along each row.
+
+    Merging matters: a rectangle per pixel would be a two-hundred-line SVG for a
+    sixteen-by-sixteen drawing, and the whole point of shipping the generator
+    rather than the drawing is that the file stays readable.
+    """
+    rects = []
+    for row, line in enumerate(sprite):
+        col = 0
+        while col < len(line):
+            if line[col] != char:
+                col += 1
+                continue
+            start = col
+            while col < len(line) and line[col] == char:
+                col += 1
+            rects.append(
+                (ox + start * cell, oy + row * cell, (col - start) * cell, cell)
+            )
+    return rects
 
 
 def blocks_n(cell: float, ox: float, oy: float) -> list[tuple[float, float, float, float]]:
@@ -48,29 +101,39 @@ def blocks_n(cell: float, ox: float, oy: float) -> list[tuple[float, float, floa
     return rects
 
 
-def geometry(motive: str) -> tuple[list[tuple[float, float, float, float]], list[tuple]]:
-    """``(purple rects, cyan shapes)`` for one motive, in the 256-unit square."""
-    purple: list[tuple[float, float, float, float]] = []
-    cyan: list[tuple] = []
+def geometry(motive: str) -> tuple[list[tuple[str, list]], list[tuple]]:
+    """``(fills, shapes)`` for one motive, in the 256-unit square.
+
+    ``fills`` are painted in order, so a later one covers an earlier one.
+    """
+    fills: list[tuple[str, list]] = []
+    shapes: list[tuple] = []
+
+    if motive == "skull":
+        cell = 13
+        span = cell * SKULL_CELLS
+        offset = (SIZE - span) / 2
+        fills.append((BONE, sprite_rects(SKULL, "#", cell, offset, offset)))
+        fills.append((PURPLE, sprite_rects(SKULL, "o", cell, offset, offset)))
 
     if motive in ("a", "b"):
         cell = 30 if motive == "a" else 26
         span = cell * 5
         offset = (SIZE - span) / 2
-        purple = blocks_n(cell, offset, offset)
+        fills.append((PURPLE, blocks_n(cell, offset, offset)))
         if motive == "b":
-            cyan.append(("line", 150, 232, 236, 150, 14))
+            shapes.append(("line", 150, 232, 236, 150, 14))
 
     if motive == "c":
-        cyan.append(("ring", 88, 88, 30, 26))
-        cyan.append(("ring", 168, 168, 30, 26))
-        cyan.append(("line", 58, 198, 198, 58, 26))
+        shapes.append(("ring", 88, 88, 30, 26))
+        shapes.append(("ring", 168, 168, 30, 26))
+        shapes.append(("line", 58, 198, 198, 58, 26))
 
-    return purple, cyan
+    return fills, shapes
 
 
 def to_svg(motive: str) -> str:
-    purple, cyan = geometry(motive)
+    fills, shapes = geometry(motive)
     parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {SIZE} {SIZE}"'
@@ -80,9 +143,12 @@ def to_svg(motive: str) -> str:
         f'  <rect x="9.5" y="9.5" width="237" height="237" rx="50.5"'
         f' fill="none" stroke="{RIM}" stroke-width="3"/>',
     ]
-    for x, y, w, h in purple:
-        parts.append(f'  <rect x="{x:g}" y="{y:g}" width="{w:g}" height="{h:g}" fill="{PURPLE}"/>')
-    for shape in cyan:
+    for colour, rects in fills:
+        for x, y, w, h in rects:
+            parts.append(
+                f'  <rect x="{x:g}" y="{y:g}" width="{w:g}" height="{h:g}" fill="{colour}"/>'
+            )
+    for shape in shapes:
         if shape[0] == "line":
             _, ax, ay, bx, by, width = shape
             parts.append(
@@ -125,7 +191,12 @@ def _ring(x, y, cx, cy, radius, half) -> bool:
 def rasterise(motive: str, size: int, supersample: int = 4) -> bytearray:
     hi = size * supersample
     k = hi / SIZE
-    purple, cyan = geometry(motive)
+    fills, shapes = geometry(motive)
+    palette = {
+        BONE: (232, 228, 220, 255),
+        PURPLE: (168, 85, 247, 255),
+        CYAN: (0, 229, 255, 255),
+    }
 
     buf = bytearray(hi * hi * 4)
     for y in range(hi):
@@ -135,10 +206,11 @@ def rasterise(motive: str, size: int, supersample: int = 4) -> bytearray:
                 colour = (18, 18, 18, 255)
                 if not _rounded_rect(x, y, 11 * k, 11 * k, 245 * k, 245 * k, 49 * k):
                     colour = (42, 42, 42, 255)
-            for rx, ry, rw, rh in purple:
-                if rx * k <= x < (rx + rw) * k and ry * k <= y < (ry + rh) * k:
-                    colour = (168, 85, 247, 255)
-            for shape in cyan:
+            for fill_colour, rects in fills:
+                for rx, ry, rw, rh in rects:
+                    if rx * k <= x < (rx + rw) * k and ry * k <= y < (ry + rh) * k:
+                        colour = palette[fill_colour]
+            for shape in shapes:
                 hit = False
                 if shape[0] == "line":
                     _, ax, ay, bx, by, width = shape
@@ -186,7 +258,7 @@ def write_png(path: Path, size: int, rgba: bytearray) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--motive", choices=MOTIVES, default="a")
+    parser.add_argument("--motive", choices=MOTIVES, default="skull")
     parser.add_argument("--out", type=Path, default=ROOT / "assets")
     parser.add_argument(
         "--png", type=int, nargs="*", default=None, metavar="SIZE",

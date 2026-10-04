@@ -103,15 +103,26 @@ sidebar gets cramped below about 30 rows.
 
 ## The icon
 
-`assets/neverdeads-revenge.svg` is generated, not drawn by hand:
+A pixel skull: bone `#e8e4dc`, sockets lit purple `#a855f7`, on the game's own
+`#121212`. Drawn on a 16×16 grid because everything else in the project is
+blocks — the title screen is a block font and the map is one character per cell,
+so a smooth vector skull would be the only soft edge in it.
+
+It is generated, not drawn by hand:
 
 ```bash
-python3 tools/make_icon.py --motive a     # a: the hero, b: hero + rift, c: rift
-python3 tools/make_icon.py --png 256 48   # also rasterise, for looking at
+python3 tools/make_icon.py                  # the skull
+python3 tools/make_icon.py --motive a       # the block N from the title screen
+python3 tools/make_icon.py --motive b       # the N with a rift crack
+python3 tools/make_icon.py --motive c       # the rift alone
+python3 tools/make_icon.py --png 256 48     # also rasterise, for looking at
 ```
 
-The N is taken from the game's own block font, so the icon cannot drift from the
-title screen. A test regenerates it and fails if the committed file disagrees.
+The generator writes the SVG with run-length-merged rectangles, so a
+sixteen-by-sixteen drawing is 44 lines rather than two hundred. A test
+regenerates the icon and fails if the committed file disagrees, and another
+checks the skull is left-right symmetric — a skull that is not reads as a
+mistake rather than a style.
 
 ## Controls
 

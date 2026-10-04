@@ -156,15 +156,16 @@ def test_the_icon_is_well_formed_svg():
     assert root.get("viewBox") == "0 0 256 256"
 
 
-def test_the_icon_draws_the_hero_glyph_from_the_title_font():
-    """The N on the icon is the N on the title screen, cell for cell.
+def test_the_block_motive_draws_the_hero_glyph_from_the_title_font(tmp_path):
+    """Motive ``a`` is the N on the title screen, cell for cell.
 
     Derived rather than redrawn: a block letter duplicated by hand is a block
     letter that eventually disagrees with itself.
     """
     from neverdeads_revenge.ui.screens.title import BLOCK
 
-    root = ET.fromstring(ICON.read_text())
+    generated = _generate(tmp_path, "--motive", "a")
+    root = ET.fromstring(generated.read_text())
     filled = {
         (round(float(r.get("x"))), round(float(r.get("y"))))
         for r in root.findall(f"{SVG_NS}rect")
@@ -174,9 +175,7 @@ def test_the_icon_draws_the_hero_glyph_from_the_title_font():
 
     cell = 30
     origin = min(x for x, _ in filled)
-    grid = {
-        ((x - origin) // cell, (y - origin) // cell) for x, y in filled
-    }
+    grid = {((x - origin) // cell, (y - origin) // cell) for x, y in filled}
     expected = {
         (col, row)
         for row, line in enumerate(BLOCK["N"])
@@ -186,7 +185,64 @@ def test_the_icon_draws_the_hero_glyph_from_the_title_font():
     assert grid == expected
 
 
-@pytest.mark.parametrize("motive", ["a", "b", "c"])
+# -- the skull --------------------------------------------------------------
+def test_the_skull_sprite_is_a_rectangle():
+    """Ragged rows would shear the drawing, and a sheared skull is not one."""
+    from tools.make_icon import SKULL, SKULL_CELLS
+
+    assert len(SKULL) == SKULL_CELLS
+    for row, line in enumerate(SKULL):
+        assert len(line) == SKULL_CELLS, f"row {row} is {len(line)} wide"
+
+
+def test_the_skull_sprite_uses_only_known_characters():
+    """The renderer ignores anything it does not know, so a typo is silent."""
+    from tools.make_icon import SKULL
+
+    allowed = {"#", "o", "."}
+    for row, line in enumerate(SKULL):
+        assert set(line) <= allowed, f"row {row} has {set(line) - allowed}"
+
+
+def test_the_skull_is_left_right_symmetric():
+    """A skull that is not symmetric reads as a mistake, not a style.
+
+    Cheap to check and impossible to unsee once it is wrong, so it is checked.
+    """
+    from tools.make_icon import SKULL
+
+    for row, line in enumerate(SKULL):
+        assert line == line[::-1], f"row {row} is not symmetric: {line!r}"
+
+
+def test_the_skull_has_two_matching_eye_sockets():
+    """Two sockets, the same size, on every row that has any."""
+    from tools.make_icon import SKULL
+
+    rows = [row for row, line in enumerate(SKULL) if "o" in line]
+    assert rows, "the skull has no eye sockets"
+    assert rows == list(range(min(rows), max(rows) + 1)), "the sockets have gaps"
+
+    for row in rows:
+        runs = re.findall(r"o+", SKULL[row])
+        assert len(runs) == 2, f"row {row} has {len(runs)} sockets"
+        assert runs[0] == runs[1], f"row {row} has mismatched sockets: {runs}"
+
+
+def test_the_committed_icon_is_the_skull(tmp_path):
+    """The shipped icon uses bone and glowing sockets, not the block N."""
+    from tools.make_icon import BONE, PURPLE
+
+    root = ET.fromstring(ICON.read_text())
+    colours = {r.get("fill") for r in root.findall(f"{SVG_NS}rect")}
+    assert BONE in colours, "the icon has no bone in it"
+    assert PURPLE in colours, "the eye sockets are not lit"
+
+    generated = _generate(tmp_path)  # default motive
+    assert generated.read_text() == ICON.read_text()
+
+
+@pytest.mark.parametrize("motive", ["skull", "a", "b", "c"])
 def test_every_motive_generates_a_usable_icon(tmp_path, motive):
     generated = _generate(tmp_path, "--motive", motive)
     root = ET.fromstring(generated.read_text())
