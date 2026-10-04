@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "neverdeads-revenge"
+version = "0.1.0"
+description = "A terminal roguelite about Noxx and his revenge."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "darknoxx" }]
+keywords = ["roguelite", "terminal", "tui", "textual", "game"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Topic :: Games/Entertainment :: Role-Playing",
+]
+
+dependencies = ["textual>=8.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=9.0"]
+
+[project.scripts]
+ndr = "neverdeads_revenge.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/neverdeads_revenge"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
