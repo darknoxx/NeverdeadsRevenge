@@ -272,7 +272,11 @@ NOXX = Hero(
         crit_chance=0.25,
         crit_multiplier=2.2,
         accuracy=1,
-        evasion=4,
+        # Five, not four. Evasion is worth 10 points of enemy hit chance each,
+        # and the hit chance floor is 30%: at 5 a ghoul is down to 35%, at 6 it
+        # would be 25% and clamped, so the sixth point is partly paid for and
+        # not received. Five is the last value that fully counts.
+        evasion=5,
         armor=1,
     ),
     # REVENGE makes him faster still, which is the same joke his whole kit tells:

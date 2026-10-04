@@ -238,9 +238,41 @@ async def test_descend_keys_do_nothing_away_from_the_stairs():
         assert state.total_turns == 0, "a refused descent costs no turn"
 
 
-async def test_waiting_does_not_kill_an_untouched_player():
-    """A bot that only waits must survive: enemies cannot act unseen."""
+async def test_waiting_alone_costs_turns_and_no_health():
+    """A bot that only waits must survive.
+
+    The enemies are cleared first, and that is not cheating the test: the floor
+    is generated from system randomness, and on roughly one seed in seventy an
+    enemy can *see* the player down a corridor at spawn, walk over and attack.
+    That is correct behaviour and not what this is about -- the rule that unseen
+    enemies hold position has its own test in ``test_game.py``. What this covers
+    is that the world does not tick on its own while the player stands still.
+    """
     app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        assert state is not None
+
+        state.enemies = []
+        state.turn_queue = type(state.turn_queue)([state.player])
+
+        start_hp = state.player.stats.hp
+        for _ in range(30):
+            await pilot.press(".")
+            await pilot.pause()
+
+        assert state.player.stats.hp == start_hp
+        assert state.turn == 30
+
+
+async def test_a_monster_that_can_see_you_will_come_and_hit_you():
+    """The counterpart, on a fixed floor so it cannot be a coin flip.
+
+    This is the behaviour the test above has to work around, pinned down rather
+    than left as a source of intermittent failure.
+    """
+    app = NeverdeadsRevenge(seed=80)  # a seed where one walks over
     async with app.run_test(size=SIZE) as pilot:
         screen = await drive_to_game(app, pilot)
         state = screen.state
@@ -251,8 +283,7 @@ async def test_waiting_does_not_kill_an_untouched_player():
             await pilot.press(".")
             await pilot.pause()
 
-        assert state.player.stats.hp == start_hp
-        assert state.turn == 30
+        assert state.player.stats.hp < start_hp, "nothing came for a stationary player"
 
 
 async def test_killing_a_monster_stacks_revenge():

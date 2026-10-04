@@ -49,6 +49,15 @@ class NeverdeadsRevenge(App[None]):
 
     BINDINGS = [("ctrl+q", "quit", "Quit")]
 
+    def __init__(self, seed: int | None = None) -> None:
+        super().__init__()
+        #: Fixes the dungeon for every run this app starts. Without it a run is
+        #: seeded from system randomness, which makes any test that asserts on
+        #: the floor a coin flip -- one of them was failing about once in
+        #: seventy, on the seeds where an enemy can see the player from across a
+        #: corridor at spawn.
+        self.run_seed = seed
+
     def on_mount(self) -> None:
         self.push_screen("title")
 
@@ -81,7 +90,7 @@ class NeverdeadsRevenge(App[None]):
         # hero_key)`` silently passed the hero key as a callback and the screen
         # fell back to its default hero. That was invisible for as long as the
         # roster held exactly one.
-        self.push_screen(GameScreen(hero_key))
+        self.push_screen(GameScreen(hero_key, seed=self.run_seed))
 
     def return_to_title(self) -> None:
         """Drop every screen above the base screen and show the title.

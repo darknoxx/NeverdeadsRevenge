@@ -5,9 +5,13 @@ result object rather than mutating the world silently, so the caller can report
 exactly what happened and tests can assert on it.
 
 The hit chance is a flat base nudged by the accuracy/evasion difference. Noxx's
-evasion 4 against a ghoul's accuracy 0 puts him at roughly 45% -- being hard to
-pin down is half of what makes him work, and the other half is that he gets to
-attack more often.
+evasion 5 against a ghoul's accuracy 0 puts him at 35% -- being hard to pin down
+is half of what makes him work, and the other half is that he gets to attack
+more often.
+
+Evasion is worth ten points of hit chance per point, which makes 5 the natural
+ceiling for any hero: the floor is 30%, so a sixth point against a monster with
+accuracy 0 is partly paid for and not received.
 """
 
 from __future__ import annotations

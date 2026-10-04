@@ -40,17 +40,23 @@ No hero can heal on their own; potions and elixirs on the floor are the only way
 back up. A run's health is therefore a budget you spend across ten floors, and
 skipping loot to save time is a real trade.
 
-Measured with a greedy bot over 30 seeds each (attack what is adjacent, drink
-when hurt, detour for nearby loot, otherwise beeline for the exit):
+Measured with two bots over 30 seeds each, because the choice of bot turned out
+to matter more than the hero:
 
-| hero | escapes | mean depth |
+* **trade** — attack whatever is adjacent, always.
+* **kite** — break contact and drink when badly hurt.
+
+| hero | trade | kite |
 | --- | --- | --- |
-| Noxx | 3/30 | 7.0 |
-| Yeti | 7/30 | 8.7 |
-| Walkyrion | 8/30 | 7.9 |
+| Noxx | 4/30 | **10/30** |
+| Yeti | **7/30** | 1/30 |
+| Walkyrion | **8/30** | 2/30 |
 
-The bot plays "always trade" and cannot kite, so it underrates Noxx and flatters
-the armoured heroes. It is a rough instrument, not a verdict.
+Each hero played to its own strength — Noxx kites, the armoured two trade — Noxx
+is the strongest, which is what a speed-and-crit hero should be. The single
+trade-only bot used to report the opposite, and it was the instrument: it cannot
+express disengaging, so it flattered the heroes who survive by standing still.
+The numbers above are a rough read, not a verdict; 30 runs is a small sample.
 
 ## Install
 

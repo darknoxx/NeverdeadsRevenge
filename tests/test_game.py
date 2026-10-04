@@ -460,7 +460,7 @@ def test_hit_chance_stays_in_bounds():
 
 
 def test_noxx_evades_much_of_what_throws_at_him():
-    """Evasion 4 is half the reason he works; assert it actually pays."""
+    """Evasion 5 is half the reason he works; assert it actually pays."""
     hero = make_hero(NOXX, (0, 0))
     ghoul = make_enemy(ENEMIES["ghoul"], (1, 0))
     rng = Rng(5)
@@ -469,7 +469,32 @@ def test_noxx_evades_much_of_what_throws_at_him():
         for _ in range(4000)
         if attack(ghoul, hero, rng).hit
     )
-    assert 1200 < hits < 2400  # roughly 35-60%
+    # 35% by the formula, with room for the sample.
+    assert 1200 < hits < 1600, f"the ghoul landed {hits / 4000:.0%} of its swings"
+
+
+def test_evasion_five_is_the_last_point_that_counts():
+    """The ceiling is arithmetic, not taste.
+
+    Hit chance bottoms out at 30%. Every point of evasion is worth ten, so a
+    sixth point against anything with accuracy 0 is paid for and not received --
+    which is why five is the most any hero should carry, and why Noxx carries
+    exactly five.
+    """
+    for evasion in range(0, 12):
+        hero = make_hero(
+            NOXX, (0, 0)
+        )
+        hero.stats.evasion = evasion
+        ghoul = make_enemy(ENEMIES["ghoul"], (1, 0))  # accuracy 0
+        chance = hit_chance(ghoul, hero)
+
+        if evasion <= 5:
+            assert chance == pytest.approx(0.85 - 0.1 * evasion), evasion
+        else:
+            assert chance == MIN_HIT_CHANCE, evasion
+
+    assert NOXX.stats.evasion == 5
 
 
 def test_crit_rate_is_about_right():
