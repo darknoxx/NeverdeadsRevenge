@@ -25,6 +25,7 @@ from neverdeads_revenge.game.actors import (
     make_enemy,
     make_hero,
     pick_enemy_template,
+    scale_template,
 )
 from neverdeads_revenge.game.combat import (
     MAX_HIT_CHANCE,
@@ -32,6 +33,12 @@ from neverdeads_revenge.game.combat import (
     attack,
     hit_chance,
     apply_revenge,
+)
+from neverdeads_revenge.game.difficulty import (
+    MAX_ENEMY_SPEED,
+    MAX_POTENCY,
+    potency,
+    weight_at_depth,
 )
 from neverdeads_revenge.game.state import GameState, LogKind, RunState, start_run
 
@@ -78,6 +85,29 @@ def test_noxx_is_materially_faster_than_every_enemy():
         assert NOXX.stats.speed > template.stats.speed, template.key
 
 
+def test_noxx_stays_the_fastest_thing_in_the_dungeon_at_any_depth():
+    """The one balance constraint that must never bend.
+
+    Noxx's crit chance and his REVENGE speed stacking both pay off because he
+    gets more actions than anything around him. A single monster that outruns
+    him turns both of those into decoration, so the speed cap in
+    ``game.difficulty`` is load-bearing and gets its own test rather than
+    riding along with the potency ones.
+    """
+    for depth in range(1, 40):
+        for template in ENEMIES.values():
+            scaled = scale_template(template, depth)
+            assert scaled.stats.speed < NOXX.stats.speed, (
+                f"{template.key} at depth {depth} is as fast as the hero"
+            )
+
+
+def test_no_monster_ever_exceeds_the_documented_speed_cap():
+    for depth in range(1, 60):
+        for template in ENEMIES.values():
+            assert scale_template(template, depth).stats.speed <= MAX_ENEMY_SPEED
+
+
 def test_making_a_hero_does_not_mutate_the_template():
     actor = make_hero(NOXX, (3, 4))
     actor.stats.hp -= 10
@@ -119,6 +149,175 @@ def test_enemy_spawn_weights_are_respected():
 
 def test_heroes_registry_is_populated():
     assert HEROES["noxx"] is NOXX
+
+
+# -- difficulty by depth ----------------------------------------------------
+DEPTHS = range(1, 13)
+
+
+def test_potency_is_one_on_the_first_floor():
+    """``ENEMIES`` describes floor 1 exactly as written.
+
+    If this breaks, every other test that builds a monster from a bare template
+    is quietly testing a floor that no longer exists.
+    """
+    assert potency(1) == 1.0
+    for template in ENEMIES.values():
+        assert scale_template(template, 1) is template
+
+
+def test_potency_rises_and_then_stops():
+    """Monotonically up, capped, and never below 1."""
+    values = [potency(d) for d in DEPTHS]
+    assert values == sorted(values)
+    assert values[0] == 1.0
+    assert max(values) <= MAX_POTENCY
+    assert potency(999) == MAX_POTENCY
+    # Depth is not a difficulty slider into negative numbers.
+    assert potency(0) == 1.0
+
+
+def test_monsters_only_ever_get_tougher():
+    """Health, damage and speed never go down, for any kind, on any floor.
+
+    Without this, a rounding slip could make floor 3 weaker than floor 2 and the
+    curve would stop being a curve.
+    """
+    for template in ENEMIES.values():
+        previous = scale_template(template, 1).stats
+        for depth in DEPTHS:
+            current = scale_template(template, depth).stats
+            assert current.max_hp >= previous.max_hp, (template.key, depth)
+            assert current.damage[0] >= previous.damage[0], (template.key, depth)
+            assert current.damage[1] >= previous.damage[1], (template.key, depth)
+            assert current.speed >= previous.speed, (template.key, depth)
+            previous = current
+
+
+def test_scaled_monsters_are_actually_harder_by_the_top_floors():
+    """A potency of 2.0 has to mean twice the health and twice the damage.
+
+    Asserting the constant alone would pass even if the scaling were never
+    applied to the stats that matter.
+    """
+    deep = scale_template(ENEMIES["ghoul"], 12)
+    base = ENEMIES["ghoul"]
+    assert potency(12) == MAX_POTENCY
+    assert deep.stats.max_hp == round(base.stats.max_hp * MAX_POTENCY)
+    assert deep.stats.damage[1] == round(base.stats.damage[1] * MAX_POTENCY)
+
+
+def test_scaling_never_produces_a_zero_damage_roll():
+    """A minimum of 0 would make a monster harmless half the time."""
+    for template in ENEMIES.values():
+        for depth in DEPTHS:
+            low, high = scale_template(template, depth).stats.damage
+            assert low >= 1
+            assert high >= low
+
+
+def test_a_newly_spawned_monster_starts_at_full_health():
+    """Scaling raises ``max_hp``, and ``hp`` has to follow it.
+
+    Easy to get wrong: raise ``max_hp`` alone and every deep-floor monster spawns
+    already wounded, which reads as the curve being far harsher than it is.
+    """
+    for template in ENEMIES.values():
+        for depth in DEPTHS:
+            stats = scale_template(template, depth).stats
+            assert stats.hp == stats.max_hp
+
+
+def test_scaling_does_not_mutate_the_template():
+    """``ENEMIES`` outlives every actor, so it has to survive scaling untouched."""
+    fields = ("max_hp", "damage", "speed")
+    before = {k: tuple(getattr(t.stats, f) for f in fields) for k, t in ENEMIES.items()}
+    for template in ENEMIES.values():
+        for depth in DEPTHS:
+            scale_template(template, depth)
+    after = {k: tuple(getattr(t.stats, f) for f in fields) for k, t in ENEMIES.items()}
+    assert before == after
+
+
+def test_armour_and_evasion_are_not_scaled():
+    """Doubling armour takes more off each hit than doubling damage adds."""
+    for template in ENEMIES.values():
+        for depth in DEPTHS:
+            scaled = scale_template(template, depth).stats
+            assert scaled.armor == template.stats.armor, (template.key, depth)
+            assert scaled.evasion == template.stats.evasion, (template.key, depth)
+            assert scaled.accuracy == template.stats.accuracy, (template.key, depth)
+
+
+# -- the enemy mix drifts as well as the numbers ----------------------------
+def _share(key: str, depth: int) -> float:
+    """Fraction of a floor's spawns taken by ``key`` at ``depth``."""
+    target = ENEMIES[key]
+    total = sum(
+        weight_at_depth(t.weight, t.weight_growth, depth) for t in ENEMIES.values()
+    )
+    return weight_at_depth(target.weight, target.weight_growth, depth) / total
+
+
+def test_only_the_wraith_becomes_more_common():
+    """The mix has to drift, or every floor is the same fight.
+
+    Note what is and is not asserted. The ghoul's and skeleton's *weights* stay
+    put, but their *shares* fall, because the wraith is eating a bigger slice of
+    a pool whose total grows. Asserting the share would have been the more
+    obvious test and it would have been the wrong one: a weight that drifts while
+    its share does not is not a drifting weight.
+    """
+    for steady in ("ghoul", "bone"):
+        template = ENEMIES[steady]
+        assert weight_at_depth(template.weight, template.weight_growth, 8) == template.weight
+        assert _share(steady, 8) < _share(steady, 1)
+
+    assert _share("wraith", 8) > _share("wraith", 1) * 1.5
+
+
+def test_spawn_weights_at_a_depth_are_still_valid():
+    """Every floor has to be able to spawn something."""
+    for depth in DEPTHS:
+        weights = [
+            weight_at_depth(t.weight, t.weight_growth, depth) for t in ENEMIES.values()
+        ]
+        assert all(w > 0 for w in weights)
+        assert sum(weights) > 0
+
+
+def test_picking_an_enemy_at_depth_returns_a_depth_sized_one():
+    rng = Rng(3)
+    smallest_on_floor_one = min(t.stats.max_hp for t in ENEMIES.values())
+    for depth in (4, 9):
+        picked = [pick_enemy_template(rng, depth) for _ in range(200)]
+        assert min(t.stats.max_hp for t in picked) > smallest_on_floor_one
+
+
+def test_a_deep_floor_is_actually_populated_with_bigger_monsters():
+    """End to end: the curve has to reach the dungeon, not just the helper."""
+    state = start_run(NOXX, seed=4)
+    weak = sum(e.stats.max_hp for e in state.enemies)
+
+    state.build_floor(10)
+    assert state.depth == 10
+    assert state.enemies
+    # Floor 10 spawns more monsters *and* bigger ones, so comparing sums is
+    # enough; the exact per-monster numbers are covered above.
+    assert sum(e.stats.max_hp for e in state.enemies) > weak
+
+
+def test_descending_does_not_make_monsters_weaker():
+    """Cheap guard against the sign of the scaling being inverted."""
+    state = start_run(NOXX, seed=8)
+    for depth in range(2, 8):
+        before = sum(e.stats.max_hp for e in state.enemies)
+        state.build_floor(depth)
+        after = sum(e.stats.max_hp for e in state.enemies)
+        # Not a strict comparison: the enemy count grows too, and a floor can
+        # roll all-ghouls right after an all-skeletons one. It only has to not
+        # collapse, and every monster's own stats are covered above.
+        assert after >= before * 0.5, f"floor {depth} got weaker"
 
 
 # -- combat maths ----------------------------------------------------------

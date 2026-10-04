@@ -404,16 +404,21 @@ async def test_legend_fits_its_panel_without_wrapping():
     """Every legend line has to fit the panel width.
 
     A line that wraps pushes the rest of the legend down and quietly truncates
-    the terrain half, which is the half a new player needs.
+    the terrain half, which is the half a new player needs. Checked across
+    depths, because the monster numbers are the part that grows.
     """
     from neverdeads_revenge.game.prologue import legend_rows
     from neverdeads_revenge.ui.widgets.legend import PANEL_WIDTH, USABLE_WIDTH
 
     assert USABLE_WIDTH == PANEL_WIDTH - 4, "padding and borders accounted for"
-    for glyph, meaning in legend_rows():
-        # 2 columns for the glyph and its trailing space.
-        line = len(meaning) + (2 if glyph else 1)
-        assert line <= USABLE_WIDTH, f"legend line too long ({line}): {glyph} {meaning}"
+    for depth in range(1, 20):
+        for glyph, meaning in legend_rows(depth):
+            # 2 columns for the glyph and its trailing space, 1 for the indent
+            # on a continuation line.
+            line = len(meaning) + (2 if glyph else 1)
+            assert line <= USABLE_WIDTH, (
+                f"legend line too long at floor {depth} ({line}): {glyph} {meaning}"
+            )
 
 
 async def test_legend_shows_monster_numbers():
@@ -431,6 +436,40 @@ async def test_legend_shows_monster_numbers():
         low, high = ghoul.stats.damage
         assert f"{low}-{high} dmg" in shown
         assert "slow" in shown, "ghoul is slower than the player"
+
+
+async def test_legend_follows_the_player_down_the_floors():
+    """Monster numbers on the legend have to describe the current floor.
+
+    A sidebar that kept quoting floor-1 damage next to a floor-8 ghoul would be
+    lying at exactly the moment the player needs the truth.
+    """
+    from neverdeads_revenge.game.actors import ENEMIES, scale_template
+    from neverdeads_revenge.ui.widgets.legend import Legend
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        assert state is not None
+
+        legend = screen.query_one(Legend)
+        assert legend.depth == 1
+
+        # Floor 1 is where the legend starts, so the map and the panel agree.
+        first = scale_template(ENEMIES["ghoul"], 1).stats.damage
+        assert f"{first[0]}-{first[1]} dmg" in legend.render().plain
+
+        state.build_floor(8)
+        await pilot.press(".")
+        await pilot.pause()
+
+        assert legend.depth == 8
+        deep = scale_template(ENEMIES["ghoul"], 8).stats.damage
+        assert deep != first, "the test is not looking at a floor that scales"
+        shown = legend.render().plain
+        assert f"{deep[0]}-{deep[1]} dmg" in shown
+        assert f"{first[0]}-{first[1]} dmg" not in shown
 
 
 # -- theming -----------------------------------------------------------------

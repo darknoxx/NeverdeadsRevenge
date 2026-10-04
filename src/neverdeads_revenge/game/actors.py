@@ -13,6 +13,8 @@ from enum import Enum
 from neverdeads_revenge.core.direction import Pos, chebyshev
 from neverdeads_revenge.core.rng import Rng
 
+from .difficulty import MAX_ENEMY_SPEED, potency, weight_at_depth
+
 __all__ = [
     "Stats",
     "ActorKind",
@@ -24,6 +26,7 @@ __all__ = [
     "ENEMIES",
     "make_hero",
     "make_enemy",
+    "scale_template",
     "pick_enemy_template",
 ]
 
@@ -210,6 +213,11 @@ class EnemyTemplate:
     behaviour: str = "aggressive"
     #: Relative chance of being picked when populating a floor.
     weight: float = 1.0
+    #: How much ``weight`` grows per floor descended. ``1.0`` keeps the monster
+    #: as common as on floor 1; higher values make it steadily more likely, and
+    #: that is how the enemy *mix* shifts rather than just the enemy *numbers*.
+    #: See :mod:`game.difficulty`.
+    weight_growth: float = 1.0
 
 
 ENEMIES: dict[str, EnemyTemplate] = {
@@ -239,6 +247,11 @@ ENEMIES: dict[str, EnemyTemplate] = {
         behaviour="hunter",
         stats=Stats(max_hp=7, hp=7, speed=1.3, damage=(2, 5), evasion=3),
         weight=1.5,
+        # The only monster that gets more common as you descend. It is fast and
+        # evasive, which is exactly the thing that makes a floor feel unfair if
+        # the player cannot simply out-trade it -- so the deeper floors are
+        # floors where out-trading is no longer the whole answer.
+        weight_growth=1.14,
     ),
 }
 
@@ -257,6 +270,46 @@ def make_enemy(template: EnemyTemplate, position: Pos) -> Actor:
     )
 
 
-def pick_enemy_template(rng: Rng) -> EnemyTemplate:
-    """Choose an enemy to populate a floor with, honouring spawn weights."""
-    return rng.choice_weighted([(t, t.weight) for t in ENEMIES.values()])
+def scale_template(template: EnemyTemplate, depth: int) -> EnemyTemplate:
+    """Return ``template`` as it appears on ``depth``.
+
+    Health and damage scale with :func:`~game.difficulty.potency`; speed scales
+    too but is clamped to :data:`~game.difficulty.MAX_ENEMY_SPEED` so nothing in
+    the dungeon ever acts more often than the hero does. Armour, evasion and
+    accuracy stay put: they are small integers, and doubling an armour value
+    would subtract more from every hit than doubling damage adds.
+
+    At ``depth == 1`` the template comes back unchanged, which is what lets
+    ``ENEMIES`` double as the floor-1 reference.
+    """
+    factor = potency(depth)
+    if factor == 1.0:
+        return template
+
+    low, high = template.stats.damage
+    stats = replace(
+        template.stats,
+        max_hp=round(template.stats.max_hp * factor),
+        hp=round(template.stats.max_hp * factor),
+        damage=(
+            max(1, round(low * factor)),
+            max(1, round(high * factor)),
+        ),
+        # The clamp is the point: potency alone would hand a deep-floor wraith
+        # speed 2.6, faster than Noxx, and the hero would stop being the fast one.
+        speed=min(template.stats.speed * factor, MAX_ENEMY_SPEED),
+    )
+    return replace(template, stats=stats)
+
+
+def pick_enemy_template(rng: Rng, depth: int = 1) -> EnemyTemplate:
+    """Choose an enemy for a floor at ``depth``, honouring spawn weights.
+
+    Both the weights (via ``weight_growth``) and the returned stats are depth
+    dependent, so this is the only place a floor's population is decided.
+    """
+    weights = [
+        (t, weight_at_depth(t.weight, t.weight_growth, depth))
+        for t in ENEMIES.values()
+    ]
+    return scale_template(rng.choice_weighted(weights), depth)

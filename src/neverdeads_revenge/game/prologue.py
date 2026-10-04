@@ -13,7 +13,7 @@ to work without being told again.
 
 from __future__ import annotations
 
-from ..game.actors import ENEMIES, HEROES
+from ..game.actors import ENEMIES, HEROES, scale_template
 from ..world.tiles import Tile
 
 __all__ = ["PROLOGUE", "PROLOGUE_TITLE", "terrain_legend", "enemy_legend", "legend_rows"]
@@ -53,42 +53,46 @@ def terrain_legend() -> list[tuple[str, str]]:
     return [(tile.glyph, tile.description) for tile in LEGEND_TERRAIN]
 
 
-def enemy_legend() -> list[tuple[str, str]]:
+def enemy_legend(depth: int = 1) -> list[tuple[str, str]]:
     """``(glyph, meaning)`` for the player's own marker and every enemy.
 
     Built from the live templates, so adding a monster to ``ENEMIES`` adds it
     here without a second edit. The numbers are the ones that matter when a
     fight goes wrong: how fast it moves and how hard it hits.
+
+    ``depth`` matters. Monsters get tougher as the run goes down, and a sidebar
+    that kept quoting floor-1 numbers next to a floor-8 map would be lying to the
+    player at exactly the moment they need the truth. The kinds listed stay the
+    same at every depth -- a monster that only appears from floor 6 would need a
+    different panel, not a longer one.
     """
     rows: list[tuple[str, str]] = [
         (HEROES["noxx"].glyph, "you"),
     ]
-    for key in ("ghoul", "bone", "wraith"):
-        template = ENEMIES.get(key)
-        if template is None:
-            continue
-        low, high = template.stats.damage
-        speed = template.stats.speed
+    for template in ENEMIES.values():
+        scaled = scale_template(template, depth)
+        low, high = scaled.stats.damage
+        speed = scaled.stats.speed
         pace = "slow" if speed < 0.85 else "even" if speed < 1.15 else "fast"
         # Two lines per monster: the numbers on one, so the panel does not need
-        # a width that fits "skeleton: 14 hp, 3-6 dmg, even" on a single row.
+        # a width that fits "skeleton, even (1.0)" and its stats on one row.
         rows.append(
             (template.glyph, f"{template.name}, {pace} ({speed:.1f})"),
         )
         rows.append(
             (
                 "",
-                f"{template.stats.max_hp} hp, {low}-{high} dmg, "
+                f"{scaled.stats.max_hp} hp, {low}-{high} dmg, "
                 f"{template.behaviour}",
             )
         )
     return rows
 
 
-def legend_rows() -> list[tuple[str, str]]:
+def legend_rows(depth: int = 1) -> list[tuple[str, str]]:
     """The full legend: you, the monsters, then the terrain.
 
     A row with an empty glyph is a continuation or a spacer; the widget decides
     how to render it.
     """
-    return [*enemy_legend(), ("", ""), *terrain_legend()]
+    return [*enemy_legend(depth), ("", ""), *terrain_legend()]

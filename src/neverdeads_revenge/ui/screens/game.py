@@ -126,6 +126,9 @@ class GameScreen(Screen[None]):
         self.query_one(MapView).refresh()
         self.query_one(Hud).redraw()
         self.query_one(MessageLog).show_new(self.state)
+        # The legend quotes monster stats, which get worse every floor. Reactive,
+        # so this only redraws the panel on an actual descent.
+        self.query_one(Legend).depth = self.state.depth
         self._update_footer()
 
     # -- input --------------------------------------------------------------

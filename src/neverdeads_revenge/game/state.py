@@ -149,7 +149,7 @@ class GameState:
             self.player.steps = 0
 
         self.enemies = [
-            make_enemy(pick_enemy_template(self.rng), pos)
+            make_enemy(pick_enemy_template(self.rng, depth), pos)
             for pos in floor.spawn_points
         ]
         self.turn_queue = TurnQueue([self.player, *self.enemies])

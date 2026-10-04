@@ -9,8 +9,12 @@ Built with [Textual](https://textual.textualize.io/).
 Milestone 1 — vertical slice. Playable from the title screen down to the death
 screen, with a prologue, a legend and a message log.
 
-Enemy count scales with depth (`6 + depth`), their stats do not. There is no win
-condition yet.
+Enemy count scales with depth (`6 + depth`). Monster health and damage scale
+too — 15% per floor, capped at twice floor 1 from floor 8 — and wraiths get more
+common the deeper you go. Nothing in the dungeon ever acts faster than Noxx. The
+legend in the sidebar quotes the current floor's numbers, so it follows you down.
+
+There is no win condition yet.
 
 ## Install
 

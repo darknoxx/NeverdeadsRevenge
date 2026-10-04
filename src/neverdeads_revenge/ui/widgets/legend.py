@@ -11,6 +11,7 @@ the player sees on the map.
 from __future__ import annotations
 
 from rich.text import Text
+from textual.reactive import reactive
 from textual.widgets import Static
 
 from ...game.prologue import legend_rows
@@ -40,12 +41,21 @@ class Legend(Static):
     }
     """
 
+    #: Which floor the monster numbers describe. Reactive so that a descent
+    #: redraws the panel by assignment, with no call site that has to remember:
+    #: a legend quoting floor-1 damage next to a floor-8 ghoul is worse than no
+    #: legend at all.
+    depth: reactive[int] = reactive(1)
+
     def __init__(self, **kwargs) -> None:
         kwargs.setdefault("markup", False)
         super().__init__(**kwargs)
         self.can_focus = False
 
     def on_mount(self) -> None:
+        self.redraw()
+
+    def watch_depth(self, depth: int) -> None:
         self.redraw()
 
     def redraw(self) -> None:
@@ -58,7 +68,7 @@ class Legend(Static):
         out = Text(no_wrap=True)
         out.append("LEGEND\n", style="bold")
 
-        for glyph, meaning in legend_rows():
+        for glyph, meaning in legend_rows(self.depth):
             if not glyph:
                 # An empty meaning is a section break; an empty glyph with text
                 # is a continuation line, indented under the entry above it.
