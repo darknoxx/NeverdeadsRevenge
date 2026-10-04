@@ -6,14 +6,21 @@ Built with [Textual](https://textual.textualize.io/).
 
 ## The heroes
 
-| | | |
-| --- | --- | --- |
-| **N** | Noxx | Fast, fragile, lethal. Dodges what it cannot survive, and acts more often than anything in the dungeon. |
-| **Y** | Yeti | Slow and armoured. The only hero who does not get to pick his fights, and the only one who can stand in a corridor and let three things hit him. |
-| **W** | Walkyrion | The middle of the other two, with accuracy as his one edge: he misses least. |
+| | | | REVENGE grants |
+| --- | --- | --- | --- |
+| **N** | Noxx | Fast, fragile, lethal. Dodges what it cannot survive, and acts more often than anything in the dungeon. | +0.3 speed per kill |
+| **Y** | Yeti | Slow and armoured. The only hero who does not get to pick his fights, and the only one who can stand in a corridor and let three things hit him. | +1 armour per kill |
+| **W** | Walkyrion | The middle of the other two, with accuracy as his one edge: he misses least. | +2 damage per kill |
 
 Heroes take the capital of their name; monsters stay lowercase. A letter on the
 map tells you which side of the fight it is on before you have read the legend.
+
+**REVENGE** is the game's own name and is the same mechanic for everyone: every
+kill makes you more of what you already are. What it *grants* is the hero's.
+Each trait caps where it has roughly doubled that hero's speciality — five
+stacks of speed, three of armour, four of damage — because `+0.3 speed` and
+`+1 armour` are not the same amount of game, and a single shared cap either
+strangles one trait or lets another run away with the run.
 
 ## Status
 
@@ -39,8 +46,8 @@ when hurt, detour for nearby loot, otherwise beeline for the exit):
 | hero | escapes | mean depth |
 | --- | --- | --- |
 | Noxx | 3/30 | 7.0 |
-| Yeti | 7/30 | 8.2 |
-| Walkyrion | 5/30 | 8.0 |
+| Yeti | 7/30 | 8.7 |
+| Walkyrion | 8/30 | 7.9 |
 
 The bot plays "always trade" and cannot kite, so it underrates Noxx and flatters
 the armoured heroes. It is a rough instrument, not a verdict.
@@ -89,10 +96,6 @@ A talent tree, equipment, sound, saving mid-run, and the meta-progression the
 persistence layer is shaped for (`META_UPGRADES` is still an empty dict, and
 `state._apply_upgrades` is a no-op). Two roster slots are shown locked and are
 not playable yet.
-
-REVENGE — a speed bonus per kill, up to five stacks — is currently the same for
-every hero. It should be a per-hero trait before the roster means much: as it
-stands, the slow hero benefits from it most, which is backwards.
 
 The prologue is the only prose in the game, and it is shown once per session
 rather than once per run — told every run it stops being a premise and becomes a

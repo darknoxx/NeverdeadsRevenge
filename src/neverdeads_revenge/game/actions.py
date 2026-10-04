@@ -16,7 +16,7 @@ from neverdeads_revenge.core.direction import Direction, chebyshev, direction_to
 from neverdeads_revenge.world.tiles import Tile
 
 from .actors import Actor
-from .combat import REVENGE_SPEED_BONUS, apply_revenge, attack
+from .combat import apply_revenge, attack
 from .state import GameState, LogKind, RunState
 
 __all__ = [
@@ -26,7 +26,7 @@ __all__ = [
     "take_turn",
     "advance_world",
     "descend",
-    "REVENGE_SPEED_BONUS",
+    "REVENGE_MAX_STACKS",
     "MAX_ENEMY_ACTIONS_PER_PLAYER_TURN",
 ]
 
@@ -99,12 +99,16 @@ def _kill_message(state: GameState, enemy: Actor, outcome) -> None:
     )
     state.kills += 1
 
-    stacks = apply_revenge(state.player, state.revenge_stacks)
-    gained = stacks > state.revenge_stacks
-    state.revenge_stacks = stacks
-    if gained:
+    player = state.player
+    before = state.revenge_stacks
+    state.revenge_stacks = apply_revenge(player, before + 1)
+    if state.revenge_stacks > before:
+        # Say what it actually granted, not what it granted back when the game
+        # had one hero. "REVENGE 3: +3 armour" is the whole point of the trait
+        # belonging to the hero.
         state.say(
-            f"REVENGE {stacks}: +{REVENGE_SPEED_BONUS:.1f} speed.",
+            f"REVENGE {state.revenge_stacks}: "
+            f"{player.trait.describe(state.revenge_stacks)}.",
             LogKind.GOOD,
         )
 

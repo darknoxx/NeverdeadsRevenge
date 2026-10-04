@@ -22,6 +22,7 @@ from neverdeads_revenge.world.map import DungeonMap, GroundItem
 from neverdeads_revenge.world.tiles import Tile
 
 from .actors import Actor, Hero, make_enemy, make_hero, pick_enemy_template
+from .combat import apply_revenge
 
 __all__ = ["LogEntry", "LogKind", "RunState", "GameState", "VIEW_RADIUS", "ESCAPE_BONUS"]
 
@@ -165,9 +166,11 @@ class GameState:
         # summary reports the whole run, not the room the hero died in.
         self.turn = 0
 
-        # Revenge is a per-floor reward, so it lapses on the way down.
+        # Revenge is a per-floor reward, so it lapses on the way down. Setting it
+        # to zero clears whichever bonus this hero collects, without the caller
+        # needing to know which that is.
         self.revenge_stacks = 0
-        self.player.speed_bonus = 0.0
+        apply_revenge(self.player, 0)
 
         self.say(f"You descend to floor {depth}.", LogKind.SYSTEM)
         if floor.is_final:

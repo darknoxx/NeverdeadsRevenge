@@ -16,14 +16,14 @@ from dataclasses import dataclass
 
 from neverdeads_revenge.core.rng import Rng
 
-from .actors import Actor
+from .actors import Actor, Trait
+from .actors import REVENGE_MAX_STACKS as REVENGE_MAX_STACKS
 
 __all__ = [
     "AttackOutcome",
     "BASE_HIT_CHANCE",
     "MIN_HIT_CHANCE",
     "MAX_HIT_CHANCE",
-    "REVENGE_SPEED_BONUS",
     "REVENGE_MAX_STACKS",
     "hit_chance",
     "attack",
@@ -33,10 +33,6 @@ __all__ = [
 BASE_HIT_CHANCE = 0.85
 MIN_HIT_CHANCE = 0.30
 MAX_HIT_CHANCE = 0.97
-
-#: Speed granted per kill by the REVENGE trait, and how it stacks.
-REVENGE_SPEED_BONUS = 0.3
-REVENGE_MAX_STACKS = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,7 +103,7 @@ def attack(attacker: Actor, defender: Actor, rng: Rng) -> AttackOutcome:
     crit = rng.chance(attacker.stats.crit_chance)
     damage = int(round(base * attacker.stats.crit_multiplier)) if crit else base
 
-    dealt = defender.stats.hurt(damage)
+    dealt = defender.stats.hurt(damage, defender.armor_bonus)
     killed = not defender.stats.alive
     if killed:
         defender.alive = False
@@ -115,12 +111,23 @@ def attack(attacker: Actor, defender: Actor, rng: Rng) -> AttackOutcome:
     return AttackOutcome(hit=True, crit=crit, damage=dealt, killed=killed)
 
 
-def apply_revenge(actor: Actor, current_stacks: int) -> int:
-    """Grant the REVENGE speed bonus after a kill.
+def apply_revenge(actor: Actor, stacks: int) -> int:
+    """Set ``actor``'s REVENGE to ``stacks`` and fold the grant into its bonuses.
 
-    Returns the new stack count, capped so a long chain cannot make the holder
-    act infinitely often.
+    Returns the stack count actually held, clamped so a long chain cannot let the
+    holder run away with the run. The grant follows the actor's own
+    :class:`~neverdeads_revenge.game.actors.Trait`: speed for one hero, armour for
+    another, raw damage for a third.
+
+    Set rather than increment, deliberately. Gaining a stack and losing them all
+    on a new floor are then the same operation, so lapsing cannot leave a residue
+    behind on an actor -- and every bonus is written on every call rather than
+    only the relevant one, for the same reason.
     """
-    stacks = min(current_stacks + 1, REVENGE_MAX_STACKS)
-    actor.speed_bonus = stacks * REVENGE_SPEED_BONUS
+    stacks = max(0, min(stacks, actor.trait.cap))
+    amount = actor.trait.per_stack * stacks
+
+    actor.speed_bonus = amount if actor.trait is Trait.SPEED else 0.0
+    actor.armor_bonus = int(amount) if actor.trait is Trait.ARMOUR else 0
+    actor.damage_bonus = int(amount) if actor.trait is Trait.DAMAGE else 0
     return stacks

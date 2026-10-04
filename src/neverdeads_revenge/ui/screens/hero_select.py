@@ -118,6 +118,10 @@ class HeroSelectScreen(Screen[str]):
             ("damage", f"{s.damage[0]}-{s.damage[1]}", "per hit"),
             ("evasion", f"{s.evasion}", "lowers their hit chance"),
             ("armour", f"{s.armor}", "off every hit"),
+            # The trait belongs on this screen. It is the difference between
+            # three stat lines and three characters: Noxx gets faster, Yeti
+            # harder, Walkyrion sharper, and nothing else tells you that.
+            ("revenge", hero.trait.label, f"{hero.trait.describe(1)} per kill"),
         ]
         lines = [f"{label:<9}{value:<8}[dim]{note}[/dim]" for label, value, note in rows]
         return "\n".join(lines)

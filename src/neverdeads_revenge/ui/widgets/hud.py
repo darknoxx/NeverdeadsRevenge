@@ -89,7 +89,14 @@ class Hud(Static):
         out.append(f"  x{player.stats.crit_multiplier:.1f}\n", style="dim")
 
         if state.revenge_stacks:
-            out.append(f"REVENGE x{state.revenge_stacks}\n", style="bold green")
+            # Name the grant, not just the count. Three heroes collect three
+            # different things from the same mechanic, so "REVENGE x3" alone
+            # would mean a different number on each of them.
+            out.append(f"REVENGE x{state.revenge_stacks}", style="bold green")
+            out.append(
+                f"  {player.trait.describe(state.revenge_stacks)}\n",
+                style="green",
+            )
 
         out.append(f"Floor {state.depth}", style="bold cyan")
         out.append(f"/{ESCAPE_DEPTH}\n", style="dim cyan")

@@ -32,9 +32,10 @@ from neverdeads_revenge.game.actors import (
 from neverdeads_revenge.game.combat import (
     MAX_HIT_CHANCE,
     MIN_HIT_CHANCE,
+    REVENGE_MAX_STACKS,
+    apply_revenge,
     attack,
     hit_chance,
-    apply_revenge,
 )
 from neverdeads_revenge.game.difficulty import (
     MAX_ENEMY_SPEED,
@@ -535,13 +536,148 @@ def test_verbs_agree_with_their_subject():
     assert verbs(hit=False, dodged=True) == ("misses", "miss")
 
 
-def test_revenge_stacks_and_caps():
+def test_revenge_stacks_then_caps():
+    """Each trait stops paying at its own cap.
+
+    One shared number was the first attempt and it was wrong: ``+0.3 speed`` and
+    ``+1 armour`` are not the same amount of game, so a cap of five either
+    strangled the speed hero or let the armour hero run away with the run.
+    """
+    for hero in HEROES.values():
+        actor = make_hero(hero, (0, 0))
+        stacks = 0
+        for _ in range(50):
+            stacks = apply_revenge(actor, stacks + 1)
+        assert stacks == hero.trait.cap, hero.key
+        assert stacks <= REVENGE_MAX_STACKS[hero.trait]
+
+
+def test_each_hero_collects_their_own_revenge():
+    """Three heroes, three different rewards for the same mechanic.
+
+    The speed bonus used to be handed to everyone, which meant the *slow* hero
+    gained the most from it: +1.5 on a base of 0.75 triples Yeti's actions and
+    merely doubles Noxx's. The trait now follows the hero's own strength.
+    """
+    expected = {
+        "noxx": lambda a: a.speed == pytest.approx(1.5 + 5 * 0.3),
+        "yeti": lambda a: a.armor == 3 + 3,
+        "walkyrion": lambda a: a.damage_bonus == 8,
+    }
+    for key, hero in HEROES.items():
+        actor = make_hero(hero, (0, 0))
+        apply_revenge(actor, 99)
+        assert expected[key](actor), f"{key} did not collect its own grant"
+
+
+def test_revenge_grants_nothing_but_the_heroes_own_stat():
+    """A hero must not collect a stat they were never promised.
+
+    Yeti getting speed as well as armour, or Walkyrion getting both, would make
+    the trait a pile of bonuses rather than a character.
+    """
+    for hero in HEROES.values():
+        actor = make_hero(hero, (0, 0))
+        apply_revenge(actor, hero.trait.cap)
+        speed_gained = actor.speed > hero.stats.speed
+        armour_gained = actor.armor > hero.stats.armor
+        damage_gained = actor.damage_bonus > 0
+        gained = [
+            name
+            for name, flag in (
+                ("speed", speed_gained),
+                ("armour", armour_gained),
+                ("damage", damage_gained),
+            )
+            if flag
+        ]
+        assert gained == [hero.trait.label], (
+            f"{hero.key} collects {gained}, not just {hero.trait.label}"
+        )
+
+
+def test_lapsing_revenge_leaves_no_residue():
+    """Clearing has to undo the grant completely, whichever one it was.
+
+    This is why ``apply_revenge`` sets rather than increments: gaining and
+    lapsing are then the same call, so a new floor cannot leave a hero holding a
+    bonus from a floor they already left.
+    """
+    for hero in HEROES.values():
+        actor = make_hero(hero, (0, 0))
+        before = (actor.speed, actor.armor, actor.damage_bonus)
+        apply_revenge(actor, hero.trait.cap)
+        apply_revenge(actor, 0)
+        assert (actor.speed, actor.armor, actor.damage_bonus) == before
+
+
+def test_revenge_never_goes_negative():
     actor = make_hero(NOXX, (0, 0))
-    stacks = 0
-    for _ in range(50):
-        stacks = apply_revenge(actor, stacks)
-    assert stacks == 5
-    assert actor.speed == pytest.approx(1.5 + 5 * 0.3)
+    assert apply_revenge(actor, -3) == 0
+    assert actor.speed_bonus == 0.0
+
+
+def test_the_armour_trait_actually_stops_damage():
+    """The grant has to reach combat, not just the actor's fields.
+
+    ``Stats.hurt`` lives on the shared template and has no idea REVENGE exists,
+    so the bonus is passed in from the actor. A test that only checked
+    ``actor.armor`` would pass while every hit went through unchanged.
+    """
+    yeti = make_hero(YETI, (0, 0))
+    ghoul = make_enemy(ENEMIES["ghoul"], (1, 0))
+
+    unarmoured = make_hero(YETI, (0, 0))
+    apply_revenge(unarmoured, 0)
+    apply_revenge(yeti, yeti.trait.cap)
+
+    before_plain, before_armoured = unarmoured.hp, yeti.hp
+    rng_plain, rng_armoured = Rng(7), Rng(7)
+    for _ in range(60):
+        attack(ghoul, unarmoured, rng_plain)
+        attack(ghoul, yeti, rng_armoured)
+
+    assert unarmoured.hp < before_plain, "the ghoul never landed anything"
+    assert yeti.hp > unarmoured.hp, "REVENGE armour did not reduce the damage"
+
+
+def test_the_damage_trait_actually_adds_damage():
+    """Flat, on every hit, and visible as a bigger roll.
+
+    Paired seeds rather than one shared generator: two draws from the same
+    generator are two different rolls, so the comparison has to hold the roll
+    fixed and vary only the bonus.
+    """
+    walkyrion = make_hero(WALKYRION, (0, 0))
+    plain = make_hero(WALKYRION, (0, 0))
+    apply_revenge(walkyrion, walkyrion.trait.cap)
+
+    stacks = walkyrion.trait.cap
+    bonus = int(stacks * walkyrion.trait.per_stack)
+    assert bonus > 0
+
+    for seed in range(200):
+        assert walkyrion.damage_roll(Rng(seed)) == plain.damage_roll(Rng(seed)) + bonus
+
+
+def test_revenge_lapses_when_the_floor_does():
+    """Whatever the hero collects, a descent takes it back."""
+    from neverdeads_revenge.world.tiles import Tile
+
+    for hero in HEROES.values():
+        state = start_run(hero, seed=5)
+        for _ in range(4):
+            state.kills += 1
+            state.revenge_stacks = apply_revenge(
+                state.player, state.revenge_stacks + 1
+            )
+        assert state.revenge_stacks > 0
+        state.player.position = state.dungeon_map.find_tile(Tile.STAIRS_DOWN)[0]
+        perform_action(state, Action.DESCEND)
+        assert state.revenge_stacks == 0, hero.key
+        assert state.player.speed_bonus == 0.0
+        assert state.player.armor_bonus == 0
+        assert state.player.damage_bonus == 0
 
 
 # -- run setup -------------------------------------------------------------

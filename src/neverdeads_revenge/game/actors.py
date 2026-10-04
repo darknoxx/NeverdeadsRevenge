@@ -19,6 +19,9 @@ __all__ = [
     "Stats",
     "ActorKind",
     "Actor",
+    "Trait",
+    "REVENGE_MAX_STACKS",
+    "REVENGE_PER_STACK",
     "Hero",
     "NOXX",
     "YETI",
@@ -67,9 +70,14 @@ class Stats:
         self.hp = min(self.max_hp, self.hp + amount)
         return self.hp - before
 
-    def hurt(self, amount: int) -> int:
-        """Apply ``amount`` after armour. Returns damage actually taken."""
-        amount = max(0, amount - self.armor)
+    def hurt(self, amount: int, bonus_armor: int = 0) -> int:
+        """Apply ``amount`` after armour. Returns damage actually taken.
+
+        ``bonus_armor`` is the defender's temporary armour, which lives on the
+        :class:`Actor` rather than here: this object is copied from a template
+        and never sees a kill, so it has no business knowing about REVENGE.
+        """
+        amount = max(0, amount - self.armor - bonus_armor)
         self.hp = max(0, self.hp - amount)
         return amount
 
@@ -79,6 +87,66 @@ class ActorKind(Enum):
 
     HERO = "hero"
     ENEMY = "enemy"
+
+
+#: What REVENGE grants a hero, and how much of it.
+#:
+#: The mechanic is the game's own name and is the same for everyone; what it
+#: grants is not. Handing speed to a slow hero is handing his worst stat the
+#: biggest relative boost, which is exactly backwards.
+class Trait(Enum):
+    """What one stack of REVENGE grants, and what to call it in the UI."""
+
+    SPEED = "speed"
+    ARMOUR = "armour"
+    DAMAGE = "damage"
+
+    @property
+    def per_stack(self) -> float:
+        return REVENGE_PER_STACK[self]
+
+    @property
+    def label(self) -> str:
+        return self.value
+
+    @property
+    def cap(self) -> int:
+        return REVENGE_MAX_STACKS[self]
+
+    def describe(self, stacks: int) -> str:
+        """A short phrase for a message log or a status line."""
+        amount = self.per_stack * stacks
+        if self is Trait.SPEED:
+            return f"+{amount:.1f} speed"
+        return f"+{int(amount)} {self.value}"
+
+
+#: How much a single stack of REVENGE grants, per trait.
+#:
+#: Speed is the calibrated one -- 0.3 was tuned against the whole existing game
+#: and left alone. The other two are chosen to be worth roughly the same: five
+#: stacks of speed doubles Noxx's actions, so five stacks of armour should change
+#: a deep-floor hit by about half, and five stacks of damage should cut a
+#: skeleton's health in roughly half the blows.
+REVENGE_PER_STACK: dict[Trait, float] = {
+    Trait.SPEED: 0.3,
+    Trait.ARMOUR: 1.0,
+    Trait.DAMAGE: 2.0,
+}
+
+#: How many stacks each trait takes before it stops paying.
+#:
+#: Deliberately not one number for all three. ``+0.3 speed`` and ``+1 armour``
+#: are not the same amount of game -- armour is a flat subtraction, so a point of
+#: it is worth more the more of it you already have -- and a shared cap either
+#: strangles one trait or lets another run away with the run. Each cap is set at
+#: roughly the point the trait has doubled its own hero's speciality: Noxx's
+#: actions, Yeti's armour, Walkyrion's damage.
+REVENGE_MAX_STACKS: dict[Trait, int] = {
+    Trait.SPEED: 5,
+    Trait.ARMOUR: 3,
+    Trait.DAMAGE: 4,
+}
 
 
 @dataclass(slots=True)
@@ -99,8 +167,15 @@ class Actor:
     alive: bool = True
     #: Cells entered since the run started. Feeds the end-of-run score.
     steps: int = 0
-    #: Temporary additive speed bonuses, e.g. the REVENGE reward for a kill.
+    #: Temporary additive bonuses granted by REVENGE. Kept on the actor rather
+    #: than folded into ``stats`` so that lapsing is one assignment and cannot
+    #: leave a residue behind on a template.
     speed_bonus: float = 0.0
+    armor_bonus: int = 0
+    damage_bonus: int = 0
+    #: Which of the three REVENGE grants this actor collects. Copied from the
+    #: hero so the game layer never has to look the hero up mid-fight.
+    trait: Trait = Trait.SPEED
     #: How this actor wants to fight. Copied from the template so the AI does not
     #: have to carry the template around.
     behaviour: str = "aggressive"
@@ -128,9 +203,18 @@ class Actor:
         return chebyshev(self.position, other.position)
 
     def damage_roll(self, rng) -> int:
-        """A damage value in this actor's range."""
+        """A damage value in this actor's range, plus any REVENGE bonus.
+
+        Flat, not a multiplier: the bonus is added once to the roll, so it reads
+        on screen as the same number every hit and a player can count it.
+        """
         low, high = self.stats.damage
-        return rng.between(low, high)
+        return rng.between(low, high) + self.damage_bonus
+
+    @property
+    def armor(self) -> int:
+        """Armour including any REVENGE bonus, for display and for combat."""
+        return self.stats.armor + self.armor_bonus
 
     def __repr__(self) -> str:
         return f"Actor({self.name!r}, hp={self.hp}/{self.max_hp}, at={self.position})"
@@ -150,6 +234,8 @@ class Hero:
     glyph: str
     color: str
     stats: Stats
+    #: What REVENGE grants this hero for every kill. See :class:`Trait`.
+    trait: Trait = Trait.SPEED
     #: Permanent modifiers applied when the run starts, keyed by meta upgrade.
     unlocked: bool = True
 
@@ -189,6 +275,9 @@ NOXX = Hero(
         evasion=4,
         armor=1,
     ),
+    # REVENGE makes him faster still, which is the same joke his whole kit tells:
+    # the fight is over before it started.
+    trait=Trait.SPEED,
 )
 
 #: Yeti -- the opposite answer to the same question. Where Noxx avoids the blow,
@@ -230,6 +319,11 @@ YETI = Hero(
         evasion=0,
         armor=3,
     ),
+    # Every kill hardens him. This is the one the roster was missing: REVENGE
+    # used to hand a *slow* hero a speed bonus, which meant the hero built to
+    # absorb hits was the one who most wanted to stop taking them, and the trait
+    # worked hardest on the hero whose identity least wanted it.
+    trait=Trait.ARMOUR,
 )
 
 #: Walkyrion -- the middle road, taken on purpose. Fast enough to leave a fight
@@ -266,6 +360,11 @@ WALKYRION = Hero(
         evasion=2,
         armor=2,
     ),
+    # Every kill sharpens him. He is the hero with the least to gain from
+    # becoming more of one thing, so he becomes more dangerous instead -- which
+    # is what "balanced" should compound into rather than turning him into a
+    # slightly worse version of whoever he is standing next to.
+    trait=Trait.DAMAGE,
 )
 
 #: Registry. Later heroes drop in here and the select screen picks them up for
@@ -289,6 +388,7 @@ def make_hero(hero: Hero, position: Pos) -> Actor:
         glyph=hero.glyph,
         color=hero.color,
         is_player=True,
+        trait=hero.trait,
     )
 
 

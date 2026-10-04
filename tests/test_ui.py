@@ -547,6 +547,60 @@ async def test_a_second_run_can_be_started_after_quitting():
         await drive_to_game(app, pilot)
 
 
+async def test_the_hud_names_what_revenge_is_granting():
+    """``REVENGE x3`` means a different number on each hero.
+
+    Without the grant named, three heroes share a status line that tells the
+    player nothing about their own run.
+    """
+    from neverdeads_revenge.game.actors import HEROES
+    from neverdeads_revenge.game.combat import apply_revenge
+    from neverdeads_revenge.ui.widgets.hud import Hud
+
+    for key, hero in HEROES.items():
+        app = NeverdeadsRevenge()
+        async with app.run_test(size=SIZE) as pilot:
+            screen = await drive_to_game_as(app, pilot, key)
+            state = screen.state
+            state.revenge_stacks = apply_revenge(state.player, hero.trait.cap)
+            await pilot.press(".")
+            await pilot.pause()
+
+            shown = screen.query_one(Hud).render().plain
+            assert f"REVENGE x{hero.trait.cap}" in shown, key
+            assert hero.trait.describe(hero.trait.cap) in shown, key
+            # And not the other heroes' grants.
+            for other in HEROES.values():
+                if other.trait is hero.trait:
+                    continue
+                assert other.trait.describe(other.trait.cap) not in shown, (
+                    f"{key} is shown with {other.key}'s grant"
+                )
+
+
+async def test_the_hero_select_screen_shows_each_trait():
+    """The trait is the difference between three stat lines and three characters."""
+    from neverdeads_revenge.game.actors import HEROES
+    from neverdeads_revenge.ui.screens.hero_select import HeroSelectScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await pilot.press("x")
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, HeroSelectScreen)
+
+        for _ in range(len(HEROES)):
+            hero = screen.current
+            assert hero is not None
+            stats = str(screen.query_one("#hero-stats").render())
+            assert "revenge" in stats
+            assert hero.trait.label in stats, hero.key
+            await pilot.press("right")
+            await pilot.pause()
+
+
 # -- hero select -------------------------------------------------------------
 async def test_hero_select_cycles_into_locked_slots():
     """Every real hero first, then the locked slots, and locked ones do nothing.
