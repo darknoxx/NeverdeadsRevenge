@@ -7,7 +7,7 @@ import sys
 
 def main() -> int:
     """Run the game."""
-    from neverdeads_revenge.app import NeverdeadsRevenge
+    from neverdeads_revenge.ui.app import NeverdeadsRevenge
 
     NeverdeadsRevenge().run()
     return 0
