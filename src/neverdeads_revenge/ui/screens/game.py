@@ -24,6 +24,7 @@ from ...game.actions import Action, perform_action
 from ...game.actors import HEROES
 from ...game.state import GameState, start_run
 from ..widgets.hud import Hud
+from ..widgets.legend import Legend
 from ..widgets.map_view import MapView
 from ..widgets.message_log import MessageLog
 from .game_over import GameOverScreen
@@ -57,13 +58,18 @@ KEY_BINDINGS: dict[str, Action] = {
     "space": Action.WAIT,
     "g": Action.PICK_UP,
     ">": Action.DESCEND,
+    # Enter and return take the stairs too, for players who expect enter to
+    # mean "interact with what is under me". Both keys, like ``>``, only work
+    # while standing on the staircase.
+    "enter": Action.DESCEND,
+    "return": Action.DESCEND,
 }
 
 HELP_TEXT = """\
 [bold]movement   [/]w a s d  /  h j k l  /  arrows  /  y u b n   walk into a monster to attack
 [bold]wait       [/].  or  space
 [bold]pick up    [/]g
-[bold]descend    [/]>   (or walk onto the stairs)
+[bold]descend    [/]>   or  enter /  return  while standing on the stairs
 [bold]help       [/]?          [bold]menu[/]escape
 """
 
@@ -89,7 +95,9 @@ class GameScreen(Screen[None]):
             with Horizontal(id="game-body"):
                 yield MapView(id="map-view")
                 yield Hud(id="sidebar")
-            yield MessageLog(id="message-log")
+            with Horizontal(id="game-footer"):
+                yield MessageLog(id="message-log")
+                yield Legend(id="legend")
         yield Footer()
 
     def on_mount(self) -> None:

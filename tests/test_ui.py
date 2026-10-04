@@ -21,13 +21,19 @@ from neverdeads_revenge.ui.screens.game import GameScreen
 from neverdeads_revenge.ui.screens.game_over import GameOverScreen
 from neverdeads_revenge.ui.screens.hero_select import FUTURE_HEROES, HeroSelectScreen
 from neverdeads_revenge.ui.screens.pause import PauseScreen
+from neverdeads_revenge.ui.screens.prologue import PrologueScreen
 from neverdeads_revenge.ui.screens.title import TitleScreen
 
 SIZE = (100, 34)
 
 
 async def drive_to_game(app: NeverdeadsRevenge, pilot) -> GameScreen:
-    """Title -> hero select -> game, leaving the pilot on a live ``GameScreen``."""
+    """Title -> hero select -> game, ending on a live ``GameScreen``.
+
+    Walks through the prologue if it is showing. It only appears on the first
+    run of a session, so a test that drives the app twice needs this rather
+    than a hardcoded keypress.
+    """
     await pilot.pause()
     assert isinstance(app.screen, TitleScreen)
 
@@ -37,8 +43,104 @@ async def drive_to_game(app: NeverdeadsRevenge, pilot) -> GameScreen:
 
     await pilot.press("enter")
     await pilot.pause()
+    if isinstance(app.screen, PrologueScreen):
+        await pilot.press("enter")
+        await pilot.pause()
+
     assert isinstance(app.screen, GameScreen)
     return app.screen
+
+
+# -- prologue ---------------------------------------------------------------
+async def test_prologue_appears_on_the_first_run_only():
+    """The premise is stated once per session, not once per run.
+
+    Told every run it stops being a premise and becomes a toll, and players
+    learn to press through it without reading.
+    """
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await pilot.press("x")
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, PrologueScreen), "first run must tell the story"
+
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, GameScreen)
+
+        await pilot.press("escape")
+        await pilot.pause()
+        await pilot.press("q")
+        await pilot.pause()
+        assert isinstance(app.screen, TitleScreen)
+
+        await pilot.press("x")
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, GameScreen), "prologue shown twice"
+
+
+async def test_prologue_sits_between_the_hero_and_the_dungeon():
+    """The premise is told before floor 1, not after.
+
+    Read on the title screen it is skimming; read on floor 1 it is too late to
+    still care.
+    """
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await pilot.press("x")
+        await pilot.pause()
+        assert isinstance(app.screen, HeroSelectScreen)
+
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, PrologueScreen)
+
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, GameScreen)
+
+
+async def test_prologue_shows_every_line_of_the_story():
+    from neverdeads_revenge.game.prologue import PROLOGUE, PROLOGUE_TITLE
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await pilot.press("x")
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+
+        screen = app.screen
+        assert isinstance(screen, PrologueScreen)
+        shown = " ".join(
+            str(widget.render()) for widget in screen.query("Static")
+        )
+        for line in (PROLOGUE_TITLE, *PROLOGUE):
+            assert line in shown
+
+
+async def test_prologue_is_skipped_by_any_key():
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await pilot.press("x")
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+
+        await pilot.press("q")
+        await pilot.pause()
+        assert isinstance(app.screen, GameScreen)
+
+
+
 
 
 # -- the happy path ----------------------------------------------------------
@@ -271,6 +373,64 @@ async def test_map_view_renders_around_the_player():
         frame = screen.query_one(MapView).render().plain
         assert state.player.glyph in frame
         assert len(frame.splitlines()) > 5
+
+
+# -- legend ------------------------------------------------------------------
+async def test_legend_lists_every_monster_and_useful_terrain():
+    """The legend is generated from the game data, so it cannot drift.
+
+    Terrain and enemies are read from ``tiles.py`` and ``actors.py`` at render
+    time. Adding either without touching the UI has to show up here.
+    """
+    from neverdeads_revenge.game.actors import ENEMIES
+    from neverdeads_revenge.game.prologue import LEGEND_TERRAIN
+    from neverdeads_revenge.ui.widgets.legend import Legend
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        shown = screen.query_one(Legend).render().plain
+
+        assert "@" in shown
+        for template in ENEMIES.values():
+            assert template.glyph in shown, f"{template.key} missing from legend"
+            assert template.name in shown
+        for tile in LEGEND_TERRAIN:
+            assert tile.glyph in shown, f"{tile.name} missing from legend"
+            assert tile.description in shown
+
+
+async def test_legend_fits_its_panel_without_wrapping():
+    """Every legend line has to fit the panel width.
+
+    A line that wraps pushes the rest of the legend down and quietly truncates
+    the terrain half, which is the half a new player needs.
+    """
+    from neverdeads_revenge.game.prologue import legend_rows
+    from neverdeads_revenge.ui.widgets.legend import PANEL_WIDTH, USABLE_WIDTH
+
+    assert USABLE_WIDTH == PANEL_WIDTH - 4, "padding and borders accounted for"
+    for glyph, meaning in legend_rows():
+        # 2 columns for the glyph and its trailing space.
+        line = len(meaning) + (2 if glyph else 1)
+        assert line <= USABLE_WIDTH, f"legend line too long ({line}): {glyph} {meaning}"
+
+
+async def test_legend_shows_monster_numbers():
+    """HP, damage and pace are what a player needs mid-fight."""
+    from neverdeads_revenge.game.actors import ENEMIES
+    from neverdeads_revenge.ui.widgets.legend import Legend
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        shown = screen.query_one(Legend).render().plain
+
+        ghoul = ENEMIES["ghoul"]
+        assert f"{ghoul.stats.max_hp} hp" in shown
+        low, high = ghoul.stats.damage
+        assert f"{low}-{high} dmg" in shown
+        assert "slow" in shown, "ghoul is slower than the player"
 
 
 # -- theming -----------------------------------------------------------------

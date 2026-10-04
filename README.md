@@ -6,7 +6,11 @@ Built with [Textual](https://textual.textualize.io/).
 
 ## Status
 
-Milestone 1 — vertical slice. Playable from the title screen down to the death screen.
+Milestone 1 — vertical slice. Playable from the title screen down to the death
+screen, with a prologue, a legend and a message log.
+
+Enemy count scales with depth (`6 + depth`), their stats do not. There is no win
+condition yet.
 
 ## Install
 
@@ -40,10 +44,16 @@ or, without the launcher:
 | `w` `a` `s` `d` / `h` `j` `k` `l` / arrows | Move (walk into an enemy to attack) |
 | `.` or `space` | Wait a turn |
 | `g` | Pick up item |
-| `>` or walk onto stairs | Descend |
-| `i` | Inventory |
-| `?` | Help |
-| `Esc` | Menu / quit |
+| `>` | Descend, from anywhere on the floor |
+| `enter` / `return` | Descend, while standing on the stairs |
+| `?` | Controls |
+| `Esc` | Menu, `q` there to quit to title |
+
+## Not implemented yet
+
+Loot, inventory, a talent tree, sound, saving mid-run. The game also has no win
+condition yet: there is no victory state, and `RunState.ESCAPED` is never set,
+so the only way a run ends is death.
 
 ## Layout
 

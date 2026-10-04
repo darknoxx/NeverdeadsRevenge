@@ -109,11 +109,61 @@ async def test_descending_rebuilds_the_floor():
 
         assert state.depth == before_depth + 1
         assert state.player.position != before_player
+        assert state.floors_cleared == 1
         assert state.revenge_stacks == 0, "REVENGE lapses on a new floor"
         assert state.enemies, "a new floor has monsters"
         assert state.turn == 0, "the per-floor clock restarts"
         assert state.total_turns == 5, "but the run total keeps counting"
         assert_coherent(state)
+
+
+@pytest.mark.parametrize("key", [">", "enter", "return"])
+async def test_every_descend_key_works(key):
+    """All three ways down must reach the next floor.
+
+    ``>`` is for players who know the game; ``enter`` and ``return`` are what
+    most people press when standing on something they want to use.
+    """
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        assert state is not None
+
+        before = state.depth
+        state.player.position = state.dungeon_map.find_tile(Tile.STAIRS_DOWN)[0]
+        await pilot.press(key)
+        await pilot.pause()
+
+        assert state.depth == before + 1
+
+
+async def test_descend_keys_do_nothing_away_from_the_stairs():
+    """Standing next to the staircase, ``enter`` must not teleport you down.
+
+    Otherwise ``enter`` becomes a no-cost descent trigger wherever the stairs
+    happen to be on screen.
+    """
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        assert state is not None
+
+        stairs = state.dungeon_map.find_tile(Tile.STAIRS_DOWN)[0]
+        beside = (stairs[0] + 1, stairs[1])
+        state.player.position = beside
+        assert not state.on_stairs
+
+        before = state.depth
+        for key in ("enter", "return", ">"):
+            await pilot.press(key)
+            await pilot.pause()
+            assert state.depth == before
+            assert state.player.position == beside
+
+        assert state.log[-1].text == "There are no stairs here."
+        assert state.total_turns == 0, "a refused descent costs no turn"
 
 
 async def test_waiting_does_not_kill_an_untouched_player():

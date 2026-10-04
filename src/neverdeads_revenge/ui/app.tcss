@@ -103,11 +103,52 @@ Screen {
     padding: 0 1;
 }
 
+/* The log and the legend share one row. 18 rows is what the full legend needs:
+   a heading, 1 for the player, 6 for the three monsters, 1 spacer, 6 terrain,
+   1 spacer, 1 hint, and slack for the borders. */
+#game-footer {
+    height: 18;
+}
+
 #message-log {
-    height: 8;
+    width: 1fr;
+    height: 100%;
     border: round $panel;
     padding: 0 1;
     background: $surface;
+}
+
+/* -- prologue ------------------------------------------------------------ */
+
+#prologue-screen {
+    width: 72;
+    height: 80%;
+    padding: 1 2;
+    background: $surface 90%;
+}
+
+#prologue-title {
+    width: 1fr;
+    height: auto;
+    margin: 0 0 1 0;
+    content-align: center middle;
+    text-style: bold;
+    color: $error;
+}
+
+#prologue-screen .prologue-line {
+    width: 1fr;
+    height: auto;
+    margin: 0 0 1 0;
+    color: $foreground;
+}
+
+#prologue-hint {
+    width: 1fr;
+    height: auto;
+    margin: 1 0 0 0;
+    content-align: center middle;
+    color: #6b6b6b;
 }
 
 /* -- game over / pause ------------------------------------------------- */

@@ -20,6 +20,7 @@ from .screens.game import GameScreen
 from .screens.game_over import GameOverScreen
 from .screens.hero_select import HeroSelectScreen
 from .screens.pause import PauseScreen
+from .screens.prologue import PrologueScreen
 from .screens.title import TitleScreen
 
 __all__ = ["NeverdeadsRevenge"]
@@ -31,12 +32,17 @@ class NeverdeadsRevenge(App[None]):
     TITLE = "Neverdead's Revenge"
     CSS_PATH = "app.tcss"
 
+    #: Set once the prologue has been shown. Session state, not saved progress:
+    #: the premise is not worth re-reading, but it is also not worth persisting.
+    _prologue_seen = False
+
     SCREENS = {
         "title": TitleScreen,
         "hero_select": HeroSelectScreen,
         "game": GameScreen,
         "pause": PauseScreen,
         "game_over": GameOverScreen,
+        "prologue": PrologueScreen,
     }
 
     BINDINGS = [("ctrl+q", "quit", "Quit")]
@@ -54,7 +60,19 @@ class NeverdeadsRevenge(App[None]):
         self.push_screen("hero_select", self.start_run)
 
     def start_run(self, hero_key: str) -> None:
-        """Begin a run with the hero that was picked."""
+        """Begin a run with the hero that was picked.
+
+        The prologue is shown the first time only. Told once per run it stops
+        being a premise and becomes a toll, and players learn to skip past it.
+        """
+        if self._prologue_seen:
+            self._begin(hero_key)
+            return
+
+        self._prologue_seen = True
+        self.push_screen("prologue", lambda _result: self._begin(hero_key))
+
+    def _begin(self, hero_key: str) -> None:
         self.push_screen("game", hero_key)
 
     def return_to_title(self) -> None:

@@ -26,13 +26,15 @@ KIND_STYLES: dict[LogKind, str] = {
 
 
 class MessageLog(RichLog):
-    """Shows the most recent messages, newest at the bottom."""
+    """Shows the most recent messages, newest at the bottom.
+
+    The height comes from the stylesheet (``#message-log`` in ``app.tcss``) rather
+    than from here, so the surrounding layout can decide the split between this
+    panel and the legend beside it.
+    """
 
     DEFAULT_CSS = """
     MessageLog {
-        height: 7;
-        border: round $panel;
-        padding: 0 1;
         background: $surface;
     }
     """
