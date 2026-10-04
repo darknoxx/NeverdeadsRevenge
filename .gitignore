@@ -18,3 +18,6 @@ dist/
 .vscode/
 .idea/
 .DS_Store
+
+# Generated previews of the icon (tools/make_icon.py --png)
+assets/*.png

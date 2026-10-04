@@ -61,6 +61,26 @@ The numbers above are a rough read, not a verdict; 30 runs is a small sample.
 ## Install
 
 ```bash
+./install.sh
+```
+
+That creates a virtualenv, installs the game and its dependencies, and adds
+**Neverdead's Revenge** to your applications menu with an icon. Everything goes
+under `$HOME` — no `sudo`, nothing system-wide.
+
+| | |
+| --- | --- |
+| `./install.sh --no-desktop` | set up without the menu entry |
+| `./install.sh --uninstall` | remove the menu entry and the icon |
+
+Safe to re-run: it reuses the virtualenv if there is one.
+
+On a fresh Ubuntu the virtualenv step needs `python3-venv`. If it is missing the
+installer says so and tells you the one line to run.
+
+Doing it by hand is still fine:
+
+```bash
 python3 -m venv .venv
 ./.venv/bin/pip install -e ".[dev]"
 ```
@@ -71,17 +91,27 @@ python3 -m venv .venv
 ./ndr
 ```
 
-or, without the launcher:
-
-```bash
-./.venv/bin/python -m neverdeads_revenge
-```
+Or pick it from the applications menu. The game is a terminal program, so the
+menu entry opens a terminal — size it to roughly 100×34 if you can, because the
+sidebar gets cramped below about 30 rows.
 
 ## Test
 
 ```bash
 ./.venv/bin/pytest
 ```
+
+## The icon
+
+`assets/neverdeads-revenge.svg` is generated, not drawn by hand:
+
+```bash
+python3 tools/make_icon.py --motive a     # a: the hero, b: hero + rift, c: rift
+python3 tools/make_icon.py --png 256 48   # also rasterise, for looking at
+```
+
+The N is taken from the game's own block font, so the icon cannot drift from the
+title screen. A test regenerates it and fails if the committed file disagrees.
 
 ## Controls
 
