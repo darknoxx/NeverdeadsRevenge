@@ -78,6 +78,22 @@ Safe to re-run: it reuses the virtualenv if there is one.
 On a fresh Ubuntu the virtualenv step needs `python3-venv`. If it is missing the
 installer says so and tells you the one line to run.
 
+### macOS
+
+The game runs on macOS. The installer just does less there, because macOS has no
+applications menu that reads `.desktop` files — so it sets up the virtualenv and
+skips the menu entry rather than writing a file nothing will ever open.
+
+```bash
+./install.sh
+./ndr
+```
+
+`--desktop` writes the entry anyway, if you have a reason to want it. And if
+`python3` is missing or does not run, the installer tells you which of the two it
+is and how to fix it: on a Mac without the Xcode command line tools,
+`/usr/bin/python3` exists but only prints an error.
+
 Doing it by hand is still fine:
 
 ```bash

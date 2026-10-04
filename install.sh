@@ -5,8 +5,9 @@
 # Everything goes under $HOME -- no sudo, nothing system-wide, and the game stays
 # in this directory. Run it again any time; it reuses what is already there.
 #
-#   ./install.sh                 set up and add the menu entry
+#   ./install.sh                 set up, and add the menu entry on Linux
 #   ./install.sh --no-desktop    set up only
+#   ./install.sh --dry-run       say what it would do, change nothing
 #   ./install.sh --uninstall     remove the menu entry and the icon
 #
 set -euo pipefail
@@ -19,27 +20,51 @@ data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
 launcher_dir="$data_home/$slug"
 desktop_dir="$data_home/applications"
 icon_dir="$data_home/icons/hicolor/scalable/apps"
+venv_dir="$here/.venv"
 
-want_desktop=1
+want_desktop="auto"   # auto | yes | no
 want_uninstall=0
+dry_run=0
 
 say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
+note() { printf '    %s\n' "$*"; }
 warn() { printf '\033[1;33m warning:\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31m error:\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
-    sed -n '3,11p' "$0" | sed 's/^# \{0,1\}//'
+    # Everything between the shebang and the first line of code. Robust to the
+    # header growing, and awk is the same awk on Linux and macOS.
+    awk 'NR > 1 { if ($0 !~ /^#/) exit; sub(/^# ?/, ""); print }' "$0"
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --no-desktop) want_desktop=0 ;;
+        --desktop) want_desktop="yes" ;;
+        --no-desktop) want_desktop="no" ;;
+        --dry-run) dry_run=1 ;;
         --uninstall) want_uninstall=1 ;;
         -h|--help) usage; exit 0 ;;
         *) die "unknown option '$1' (try --help)" ;;
     esac
     shift
 done
+
+# -- what kind of machine is this -------------------------------------------
+
+os="$(uname -s 2>/dev/null || echo unknown)"
+is_macos=0
+[[ "$os" == "Darwin" ]] && is_macos=1
+
+if [[ "$want_desktop" == "auto" ]]; then
+    if [[ $is_macos -eq 1 ]]; then
+        # macOS has no applications menu that reads .desktop files. Writing one
+        # there would not fail -- it would just be a file nothing ever opens,
+        # which is worse than saying so.
+        want_desktop="no"
+    else
+        want_desktop="yes"
+    fi
+fi
 
 # -- uninstall --------------------------------------------------------------
 
@@ -56,27 +81,67 @@ fi
 
 # -- python -----------------------------------------------------------------
 
-command -v python3 >/dev/null || die "python3 not found. Install it with: sudo apt install python3"
+command -v python3 >/dev/null || {
+    if [[ $is_macos -eq 1 ]]; then
+        die "python3 not found. Install it from https://www.python.org/downloads/
+       or with Homebrew: brew install python@3.12"
+    fi
+    die "python3 not found. Install it with: sudo apt install python3"
+}
+
+# Running it is not the same as it existing. On a Mac without the Xcode command
+# line tools, /usr/bin/python3 is a shim that prints "no developer tools were
+# found" and exits -- so a bare `command -v` check passes and then the version
+# check fails with a message about a version nobody can see.
+if ! python3 -c 'import sys' >/dev/null 2>&1; then
+    if [[ $is_macos -eq 1 ]]; then
+        die "python3 exists but does not run. On macOS that usually means the
+       command line tools are missing. Either:
+         xcode-select --install
+       or install Python 3.12+ from https://www.python.org/downloads/ or Homebrew:
+         brew install python@3.12"
+    fi
+    die "python3 exists but does not run. Reinstall Python 3.12 or newer."
+fi
 
 if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)'; then
     die "Python 3.12 or newer is required, but $(python3 -V 2>&1) is what is installed."
 fi
 
+if [[ $dry_run -eq 1 ]]; then
+    say "Dry run -- nothing has been changed."
+    note "system      $os$([[ $is_macos -eq 1 ]] && echo ' (macOS)')"
+    note "python      $(python3 -V 2>&1)"
+    note "virtualenv  $venv_dir$([[ -x "$venv_dir/bin/python" ]] && echo ' (already there)' || echo ' (will be created)')"
+    note "menu entry  $([[ "$want_desktop" == "yes" ]] && echo 'yes' || echo 'no')"
+    if [[ "$want_desktop" == "yes" ]]; then
+        note "            $desktop_dir/$slug.desktop"
+        note "            $icon_dir/$slug.svg"
+    fi
+    exit 0
+fi
+
+# -- virtualenv -------------------------------------------------------------
+
 python=""
-if [[ -x "$here/.venv/bin/python" ]]; then
-    python="$here/.venv/bin/python"
+if [[ -x "$venv_dir/bin/python" ]]; then
+    python="$venv_dir/bin/python"
     say "Reusing the virtualenv in .venv"
 else
     say "Creating a virtualenv in .venv"
     # The one Ubuntu trap worth catching by hand: python3-venv is a separate
     # package, and without it this fails with a message about ensurepip that
     # does not name the package you actually need.
-    if ! err="$(python3 -m venv "$here/.venv" 2>&1)"; then
+    if ! err="$(python3 -m venv "$venv_dir" 2>&1)"; then
         printf '%s\n' "$err" >&2
+        if [[ $is_macos -eq 1 ]]; then
+            die "could not create a virtualenv. Reinstall Python 3.12 or newer
+       from https://www.python.org/downloads/ or Homebrew."
+        fi
         die "could not create a virtualenv. On Ubuntu this is usually fixed by:
        sudo apt install python3-venv"
     fi
-    python="$here/.venv/bin/python"
+    python="$venv_dir/bin/python"
 fi
 
 say "Installing $name and its dependencies"
@@ -93,7 +158,7 @@ say "Checking the install"
 
 # -- menu entry -------------------------------------------------------------
 
-if [[ $want_desktop -eq 1 ]]; then
+if [[ "$want_desktop" == "yes" ]]; then
     say "Adding $name to your applications menu"
     mkdir -p "$launcher_dir" "$desktop_dir" "$icon_dir"
 
@@ -122,19 +187,18 @@ WRAPPER
         warn "no desktop entry template at $template; skipping the menu entry"
     fi
 
-    if [[ -f "$here/assets/$slug.svg" ]]; then
-        cp "$here/assets/$slug.svg" "$icon_dir/$slug.svg"
-    else
-        warn "no icon found at assets/$slug.svg; the menu entry will use a default"
-    fi
-
     command -v update-desktop-database >/dev/null && update-desktop-database "$desktop_dir" 2>/dev/null || true
     command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -qtf "$data_home/icons/hicolor" 2>/dev/null || true
 fi
 
+# -- done -------------------------------------------------------------------
+
 say "Done."
 printf '\n  Play it now:      %s/ndr\n' "$here"
-if [[ $want_desktop -eq 1 ]]; then
+if [[ "$want_desktop" == "yes" ]]; then
     printf '  Or from the menu: look for "%s" (it may take a moment to appear)\n' "$name"
+elif [[ $is_macos -eq 1 ]]; then
+    printf '  Tip: in Finder, right-click this folder and "New Terminal at Folder",\n'
+    printf '       then run ./ndr -- or just drag it into the Dock.\n'
 fi
 printf '  To remove it:     %s/install.sh --uninstall\n\n' "$here"

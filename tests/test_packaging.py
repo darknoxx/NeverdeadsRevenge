@@ -7,6 +7,7 @@ by its syntax, its argument handling, and the files it is made of.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -79,6 +80,76 @@ def test_the_installer_restores_the_executable_bit():
     """A zip download does not reliably keep it, and ./ndr is step one."""
     body = INSTALL.read_text()
     assert "chmod +x" in body and "ndr" in body
+
+
+# -- running on other systems -----------------------------------------------
+def _as_macos(tmp_path: Path) -> dict[str, str]:
+    """A PATH whose ``uname`` claims to be Darwin."""
+    fake_bin = tmp_path / "fakebin"
+    fake_bin.mkdir(exist_ok=True)
+    uname = fake_bin / "uname"
+    uname.write_text("#!/bin/sh\necho Darwin\n")
+    uname.chmod(0o755)
+    return {**os.environ, "PATH": f"{fake_bin}:{os.environ['PATH']}"}
+
+
+def _plan(*args: str, env: dict[str, str] | None = None) -> str:
+    """Run the installer in dry-run mode and return what it said it would do."""
+    result = subprocess.run(
+        [str(INSTALL), "--dry-run", *args],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout
+
+
+def test_the_dry_run_changes_nothing():
+    """The whole point of it. Checked by looking for the files afterwards."""
+    before = sorted(p.name for p in Path.home().glob(".local/share/applications/*"))
+    _plan()
+    after = sorted(p.name for p in Path.home().glob(".local/share/applications/*"))
+    assert before == after
+
+
+def test_the_plan_offers_the_menu_entry_on_linux():
+    assert "menu entry  yes" in _plan()
+
+
+def test_the_plan_skips_the_menu_entry_on_macos(tmp_path):
+    """macOS has no applications menu for .desktop files.
+
+    Writing one there does not fail, it just produces a file nothing opens --
+    which is worse than not writing it, because it looks like it worked.
+    """
+    plan = _plan(env=_as_macos(tmp_path))
+    assert "Darwin (macOS)" in plan
+    assert "menu entry  no" in plan
+    assert ".desktop" not in plan
+
+
+def test_macos_can_still_be_told_to_write_the_entry(tmp_path):
+    """--desktop is an escape hatch, not a mistake waiting to happen."""
+    plan = _plan("--desktop", env=_as_macos(tmp_path))
+    assert "menu entry  yes" in plan
+
+
+def test_no_desktop_wins_on_linux_too():
+    assert "menu entry  no" in _plan("--no-desktop")
+
+
+def test_the_installer_knows_a_mac_python_stub_when_it_sees_one():
+    """`command -v python3` passes on a Mac with no command line tools.
+
+    /usr/bin/python3 is a shim there: it exists, and running it prints "no
+    developer tools were found". Checking that the interpreter *runs* is the
+    difference between a useful message and one about a version nobody can see.
+    """
+    body = INSTALL.read_text()
+    assert "xcode-select --install" in body
+    assert "import sys' >/dev/null" in body, "python3 is never actually run"
+    assert "brew install python@3.12" in body
 
 
 # -- the desktop entry ------------------------------------------------------
