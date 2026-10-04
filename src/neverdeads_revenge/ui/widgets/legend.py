@@ -109,16 +109,23 @@ class Legend(Static):
 
 
 def _glyph_style(glyph: str) -> str:
-    """Colour a legend entry the way the map colours the same glyph."""
+    """Colour a legend entry the way the map colours the same glyph.
+
+    Every registry is searched rather than a single hero being special-cased:
+    the old version hardcoded ``HEROES["noxx"]`` and painted every hero's row
+    white, which would have been wrong the day a second hero has a different
+    colour.
+    """
     from ...game.actors import ENEMIES, HEROES
     from ...world.items import ITEMS
     from ...world.tiles import Tile
 
-    if glyph == HEROES["noxx"].glyph:
-        return "bold white"
+    for hero in HEROES.values():
+        if hero.glyph == glyph:
+            return f"bold {hero.color}"
     for template in ENEMIES.values():
         if template.glyph == glyph:
-            return template.color
+            return f"bold {template.color}"
     for item in ITEMS.values():
         if item.glyph == glyph:
             return f"bold {item.color}"

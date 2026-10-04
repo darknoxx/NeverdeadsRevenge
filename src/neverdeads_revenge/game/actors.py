@@ -87,7 +87,11 @@ class Actor:
     kind: ActorKind
     stats: Stats
     position: Pos
-    glyph: str = "@"
+    #: A fallback for an actor built without an identity. Heroes and monsters get
+    #: theirs from their template, so this is never the player -- it used to
+    #: default to ``@``, which read as "the hero" long after the hero stopped
+    #: being an ``@``.
+    glyph: str = "?"
     color: str = "white"
     is_player: bool = False
     alive: bool = True
@@ -153,6 +157,11 @@ class Hero:
 
 
 #: Noxx -- high speed, high crit, low durability. Hits and runs.
+#:
+#: ``N`` rather than the usual ``@``: this hero has a name, and the map is where
+#: the player spends the whole run looking at him. Purple is his own -- the
+#: wraith is plain magenta and the elixir is bright magenta, so no two things on
+#: the map share both a glyph and a colour.
 NOXX = Hero(
     key="noxx",
     name="Noxx",
@@ -162,8 +171,11 @@ NOXX = Hero(
         "vanish, come back before they can swing. Fragile, but every opening "
         "is lethal."
     ),
-    glyph="@",
-    color="bright_white",
+    glyph="N",
+    # A hex rather than the name "purple": named colours get snapped to the
+    # terminal's nearest palette entry, and "purple" lands on the same magenta
+    # the wraith already uses. Hex renders exactly and stays his own.
+    color="#a855f7",
     stats=Stats(
         max_hp=26,
         hp=26,

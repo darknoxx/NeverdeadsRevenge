@@ -59,7 +59,10 @@ class Hud(Static):
 
         player = state.player
         out = Text(no_wrap=True)
-        out.append(f"{player.glyph} {player.name}", style="bold")
+        # The hero's own colour, so the name in the sidebar matches the glyph on
+        # the map. Two different marks for the same character is a small thing
+        # that makes the screen feel assembled rather than drawn.
+        out.append(f"{player.glyph} {player.name}", style=f"bold {player.color}")
         out.append(f"  {state.hero.title}\n", style="dim")
 
         # Health bar. 12 cells keeps the line inside the sidebar's content box,

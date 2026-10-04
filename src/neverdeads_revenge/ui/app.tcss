@@ -45,16 +45,25 @@ Screen {
     height: 1fr;
 }
 
-#hero-name {
-    width: 1fr;
+/* The glyph the player is about to become. Wide enough for one character plus
+   its padding so the name beside it does not shift when the hero changes. */
+#hero-glyph {
+    width: 4;
+    height: auto;
     content-align: center middle;
+}
+
+#hero-name {
+    width: auto;
+    content-align: left middle;
     color: $accent;
     text-style: bold;
 }
 
 #hero-title {
-    width: 1fr;
-    content-align: center middle;
+    width: auto;
+    padding: 0 0 0 1;
+    content-align: left middle;
     color: #8f8f8f;
 }
 

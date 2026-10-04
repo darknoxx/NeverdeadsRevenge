@@ -98,8 +98,11 @@ class MapView(Widget):
 
         actor = state.actor_at(position)
         if actor is not None and visible:
-            style = f"bold {actor.color}" if not actor.is_player else actor.color
-            return Text(actor.glyph, style=style)
+            # Bold for everyone, the hero included: the player used to be drawn
+            # un-bolded because an ``@`` does not need the help, but a named
+            # hero in his own colour is the thing the eye should land on first
+            # and must not be the dimmest mark on the map.
+            return Text(actor.glyph, style=f"bold {actor.color}")
 
         # Loot sits on the ground, so it is drawn over the terrain and under any
         # monster standing on it -- which is exactly the choice the player has to

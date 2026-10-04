@@ -57,6 +57,7 @@ class HeroSelectScreen(Screen[str]):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="hero-select"):
+            yield Static(id="hero-glyph")
             yield Static(id="hero-name")
             yield Static(id="hero-title")
         yield Static(id="hero-blurb")
@@ -70,6 +71,7 @@ class HeroSelectScreen(Screen[str]):
     def redraw(self) -> None:
         hero = self.current
         if hero is None:
+            self.query_one("#hero-glyph", Static).update("[dim]?[/dim]")
             self.query_one("#hero-name", Static).update("???")
             self.query_one("#hero-title", Static).update("")
             self.query_one("#hero-blurb", Static).update(
@@ -79,6 +81,12 @@ class HeroSelectScreen(Screen[str]):
             self.query_one("#hero-locked", Static).update("LOCKED")
             return
 
+        # The glyph the player is about to spend the whole run looking at, in the
+        # colour they will be looking for. Choosing a character you have not seen
+        # is not much of a choice.
+        self.query_one("#hero-glyph", Static).update(
+            f"[bold {hero.color}]{hero.glyph}[/]"
+        )
         self.query_one("#hero-name", Static).update(hero.name)
         self.query_one("#hero-title", Static).update(hero.title)
         self.query_one("#hero-blurb", Static).update(hero.blurb)

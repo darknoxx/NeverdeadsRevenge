@@ -160,6 +160,46 @@ def test_heroes_registry_is_populated():
     assert HEROES["noxx"] is NOXX
 
 
+def test_noxx_is_a_purple_n():
+    """The hero's mark on the map, and it is his own.
+
+    Held to a specific glyph and a specific colour because the map is where the
+    player looks for the whole run: a hero who is a different colour on the
+    select screen, the sidebar and the map is three characters, not one.
+    """
+    assert NOXX.glyph == "N"
+    assert NOXX.color == "#a855f7"
+
+
+def test_the_hero_colour_is_not_the_elixir_colour_in_disguise():
+    """``purple`` and ``magenta`` are one terminal approximation apart.
+
+    The named colour "purple" resolves to the same magenta the wraith uses on
+    terminals that cannot show the difference, which is why the hero carries a
+    hex value. This asserts the hex is actually a different colour from
+    everything else on the map rather than merely a different string.
+    """
+    from rich.color import Color
+
+    from neverdeads_revenge.world.items import ITEMS
+
+    mine = Color.parse(NOXX.color).get_truecolor()
+
+    rivals = {
+        template.key: template.color for template in ENEMIES.values()
+    } | {item.key: item.color for item in ITEMS.values()}
+    for key, colour in rivals.items():
+        theirs = Color.parse(colour).get_truecolor()
+        assert mine != theirs, f"the hero looks exactly like the {key}"
+        distance = sum(
+            (a - b) ** 2 for a, b in zip(mine, theirs)
+        )
+        # Perceptually distant, not just unequal: the wraith is already magenta
+        # and the elixir is bright magenta, so a purple a hair away from either
+        # would read as the same colour on a dark map.
+        assert distance > 4000, f"the hero is too close to the {key}"
+
+
 # -- difficulty by depth ----------------------------------------------------
 DEPTHS = range(1, 13)
 

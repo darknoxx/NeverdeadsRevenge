@@ -584,7 +584,7 @@ async def test_legend_lists_every_monster_and_every_draught():
     Monsters are read from ``actors.py`` and loot from ``items.py`` at render
     time. Adding either without touching the UI has to show up here.
     """
-    from neverdeads_revenge.game.actors import ENEMIES
+    from neverdeads_revenge.game.actors import ENEMIES, HEROES
     from neverdeads_revenge.ui.widgets.legend import Legend
     from neverdeads_revenge.world.items import ITEMS
 
@@ -593,7 +593,8 @@ async def test_legend_lists_every_monster_and_every_draught():
         screen = await drive_to_game(app, pilot)
         shown = screen.query_one(Legend).render().plain
 
-        assert "@" in shown
+        for hero in HEROES.values():
+            assert hero.glyph in shown, f"{hero.key} missing from the legend"
         for template in ENEMIES.values():
             assert template.glyph in shown, f"{template.key} missing from legend"
             assert template.name in shown

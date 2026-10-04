@@ -66,6 +66,32 @@ def test_loot_and_monsters_do_not_share_a_glyph_with_terrain():
     assert not (loot & actors), f"loot shares a glyph with an actor: {loot & actors}"
 
 
+def test_no_actor_shares_a_glyph_with_anything_else():
+    """One glyph, one thing. The map is read at a glance or not at all.
+
+    The hero is no longer an ``@``, so this is no longer free: a hero named by a
+    letter is only readable while no monster, draught or wall is using the same
+    letter.
+    """
+    from neverdeads_revenge.game.actors import ENEMIES, HEROES
+    from neverdeads_revenge.world.items import ITEMS
+
+    claimed: dict[str, str] = {}
+    for tile in Tile:
+        claimed.setdefault(tile.glyph, f"tile {tile.name}")
+    for hero in HEROES.values():
+        assert hero.glyph not in claimed, f"hero {hero.key} collides with {claimed[hero.glyph]}"
+        claimed[hero.glyph] = f"hero {hero.key}"
+    for template in ENEMIES.values():
+        assert template.glyph not in claimed, (
+            f"monster {template.key} collides with {claimed[template.glyph]}"
+        )
+        claimed[template.glyph] = f"monster {template.key}"
+    for item in ITEMS.values():
+        assert item.glyph not in claimed, f"item {item.key} collides with {claimed[item.glyph]}"
+        claimed[item.glyph] = f"item {item.key}"
+
+
 # -- map container ---------------------------------------------------------
 def test_tile_grid_roundtrips():
     dungeon = DungeonMap(width=10, height=6)
