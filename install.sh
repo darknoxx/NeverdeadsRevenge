@@ -7,6 +7,7 @@
 #
 #   ./install.sh                 set up, and add the menu entry on Linux
 #   ./install.sh --no-desktop    set up only
+#   ./install.sh --python PATH   use a specific interpreter, not python3
 #   ./install.sh --dry-run       say what it would do, change nothing
 #   ./install.sh --uninstall     remove the menu entry and the icon
 #
@@ -22,6 +23,7 @@ desktop_dir="$data_home/applications"
 icon_dir="$data_home/icons/hicolor/scalable/apps"
 venv_dir="$here/.venv"
 
+python_bin="python3"
 want_desktop="auto"   # auto | yes | no
 want_uninstall=0
 dry_run=0
@@ -43,6 +45,13 @@ while [[ $# -gt 0 ]]; do
         --no-desktop) want_desktop="no" ;;
         --dry-run) dry_run=1 ;;
         --uninstall) want_uninstall=1 ;;
+        --python)
+            # A Mac can easily have four Pythons installed at once and no
+            # reliable answer to which one python3 is, so let the user say.
+            [[ $# -ge 2 ]] || die "--python needs the path to an interpreter"
+            python_bin="$2"
+            shift
+            ;;
         -h|--help) usage; exit 0 ;;
         *) die "unknown option '$1' (try --help)" ;;
     esac
@@ -81,37 +90,55 @@ fi
 
 # -- python -----------------------------------------------------------------
 
-command -v python3 >/dev/null || {
+command -v "$python_bin" >/dev/null || {
     if [[ $is_macos -eq 1 ]]; then
-        die "python3 not found. Install it from https://www.python.org/downloads/
-       or with Homebrew: brew install python@3.12"
+        die "'$python_bin' not found. Install Python 3.12 or newer from
+       https://www.python.org/downloads/ or with Homebrew:
+         brew install python"
     fi
-    die "python3 not found. Install it with: sudo apt install python3"
+    die "'$python_bin' not found. Install it with: sudo apt install python3"
 }
 
 # Running it is not the same as it existing. On a Mac without the Xcode command
 # line tools, /usr/bin/python3 is a shim that prints "no developer tools were
 # found" and exits -- so a bare `command -v` check passes and then the version
 # check fails with a message about a version nobody can see.
-if ! python3 -c 'import sys' >/dev/null 2>&1; then
+if ! "$python_bin" -c 'import sys' >/dev/null 2>&1; then
     if [[ $is_macos -eq 1 ]]; then
-        die "python3 exists but does not run. On macOS that usually means the
-       command line tools are missing. Either:
+        die "'$python_bin' exists but does not run. On macOS that usually means
+       the command line tools are missing. Either:
          xcode-select --install
-       or install Python 3.12+ from https://www.python.org/downloads/ or Homebrew:
-         brew install python@3.12"
+       or install Python 3.12 or newer from https://www.python.org/downloads/
+       or with Homebrew:
+         brew install python"
     fi
-    die "python3 exists but does not run. Reinstall Python 3.12 or newer."
+    die "'$python_bin' exists but does not run. Reinstall Python 3.12 or newer."
 fi
 
-if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)'; then
-    die "Python 3.12 or newer is required, but $(python3 -V 2>&1) is what is installed."
+if ! "$python_bin" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)'; then
+    found="$("$python_bin" -V 2>&1)"
+    if [[ $is_macos -eq 1 ]]; then
+        # macOS ships a Python from 2021 and never replaces it, so this is the
+        # ordinary first step on a Mac rather than an unusual failure. A message
+        # that only states the version leaves the user to work out the rest,
+        # which is exactly what happened the first time this ran on one.
+        die "$found is too old -- Python 3.12 or newer is needed.
+       macOS ships an old Python and never updates it, so this is the normal
+       first step on a Mac. Either:
+         brew install python
+       or download the installer from https://www.python.org/downloads/
+
+       Then run this again. If python3 is still the old one -- Homebrew keeps
+       versioned formulae out of the way -- point at the new interpreter:
+         ./install.sh --python \$(brew --prefix)/bin/python3"
+    fi
+    die "Python 3.12 or newer is required, but $found is what is installed."
 fi
 
 if [[ $dry_run -eq 1 ]]; then
     say "Dry run -- nothing has been changed."
     note "system      $os$([[ $is_macos -eq 1 ]] && echo ' (macOS)')"
-    note "python      $(python3 -V 2>&1)"
+    note "python      $("$python_bin" -V 2>&1)  ($python_bin)"
     note "virtualenv  $venv_dir$([[ -x "$venv_dir/bin/python" ]] && echo ' (already there)' || echo ' (will be created)')"
     note "menu entry  $([[ "$want_desktop" == "yes" ]] && echo 'yes' || echo 'no')"
     if [[ "$want_desktop" == "yes" ]]; then
@@ -132,11 +159,11 @@ else
     # The one Ubuntu trap worth catching by hand: python3-venv is a separate
     # package, and without it this fails with a message about ensurepip that
     # does not name the package you actually need.
-    if ! err="$(python3 -m venv "$venv_dir" 2>&1)"; then
+    if ! err="$("$python_bin" -m venv "$venv_dir" 2>&1)"; then
         printf '%s\n' "$err" >&2
         if [[ $is_macos -eq 1 ]]; then
             die "could not create a virtualenv. Reinstall Python 3.12 or newer
-       from https://www.python.org/downloads/ or Homebrew."
+       from https://www.python.org/downloads/ or with Homebrew."
         fi
         die "could not create a virtualenv. On Ubuntu this is usually fixed by:
        sudo apt install python3-venv"

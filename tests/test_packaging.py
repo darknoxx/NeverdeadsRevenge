@@ -149,7 +149,79 @@ def test_the_installer_knows_a_mac_python_stub_when_it_sees_one():
     body = INSTALL.read_text()
     assert "xcode-select --install" in body
     assert "import sys' >/dev/null" in body, "python3 is never actually run"
-    assert "brew install python@3.12" in body
+    assert "brew install python" in body
+
+
+def test_the_too_old_message_on_a_mac_says_what_to_do(tmp_path):
+    """The failure every Mac user hits first, and it must not just state a number.
+
+    macOS ships Python 3.9 and never replaces it. The first version of this
+    message said only "3.9.6 is what is installed" and left the user to work out
+    the rest -- which cost five minutes on a real Mac.
+    """
+    fake_bin = tmp_path / "fakebin"
+    fake_bin.mkdir()
+    (fake_bin / "uname").write_text("#!/bin/sh\necho Darwin\n")
+    (fake_bin / "python3").write_text(
+        "#!/bin/sh\n"
+        'case "$1" in\n'
+        '  -V) echo "Python 3.9.6" ;;\n'
+        '  -c) case "$2" in *version_info*) exit 1 ;; *) exit 0 ;; esac ;;\n'
+        "  *) exit 0 ;;\n"
+        "esac\n"
+    )
+    for script in fake_bin.iterdir():
+        script.chmod(0o755)
+
+    env = {**os.environ, "PATH": f"{fake_bin}:{os.environ['PATH']}"}
+    result = subprocess.run(
+        [str(INSTALL), "--dry-run"], capture_output=True, text=True, env=env
+    )
+
+    assert result.returncode != 0
+    message = result.stderr
+    assert "3.9.6" in message, "the message does not say what it found"
+    assert "3.12" in message, "the message does not say what it needs"
+    assert "brew install python" in message, "no way out given"
+    assert "python.org" in message, "no alternative given"
+    assert "--python" in message, "no way to point at another interpreter"
+
+
+# -- choosing an interpreter ------------------------------------------------
+def test_the_interpreter_can_be_chosen():
+    """A Mac can have four Pythons and no reliable answer to which is python3."""
+    default = _plan()
+    chosen = _plan("--python", sys.executable)
+
+    assert "(python3)" in default, "the default is not python3"
+    assert sys.executable in chosen, "the chosen interpreter was not used"
+    assert sys.executable not in default, "the plan ignored --python"
+
+
+def test_choosing_an_interpreter_that_is_not_there_fails_loudly():
+    result = subprocess.run(
+        [str(INSTALL), "--dry-run", "--python", "/nope/python3"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "/nope/python3" in result.stderr
+
+
+def test_the_python_flag_insists_on_a_value():
+    """`--python` with nothing after it would otherwise silently use python3."""
+    result = subprocess.run(
+        [str(INSTALL), "--python"], capture_output=True, text=True
+    )
+    assert result.returncode != 0
+    assert "--python" in result.stderr
+
+
+def test_the_help_documents_the_python_flag():
+    result = subprocess.run(
+        [str(INSTALL), "--help"], capture_output=True, text=True
+    )
+    assert "--python" in result.stdout
 
 
 # -- the desktop entry ------------------------------------------------------

@@ -84,15 +84,26 @@ The game runs on macOS. The installer just does less there, because macOS has no
 applications menu that reads `.desktop` files — so it sets up the virtualenv and
 skips the menu entry rather than writing a file nothing will ever open.
 
+macOS ships an old Python and never updates it, so the first run will normally
+stop there. Install a current one and try again:
+
 ```bash
+brew install python        # or https://www.python.org/downloads/
 ./install.sh
 ./ndr
 ```
 
-`--desktop` writes the entry anyway, if you have a reason to want it. And if
-`python3` is missing or does not run, the installer tells you which of the two it
-is and how to fix it: on a Mac without the Xcode command line tools,
-`/usr/bin/python3` exists but only prints an error.
+If `python3` is still the old one afterwards — Homebrew keeps versioned formulae
+out of the way — point the installer at the right interpreter:
+
+```bash
+./install.sh --python "$(brew --prefix)/bin/python3"
+```
+
+`--desktop` writes the menu entry anyway, if you have a reason to want it. And if
+`python3` does not run at all, the installer says which of the two problems it is:
+on a Mac without the Xcode command line tools, `/usr/bin/python3` exists but only
+prints an error.
 
 Doing it by hand is still fine:
 
