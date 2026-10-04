@@ -93,7 +93,11 @@ class GameScreen(Screen[None]):
 
     def __init__(self, hero_key: str = "noxx", seed: int | None = None) -> None:
         super().__init__()
-        self.hero = HEROES.get(hero_key, next(iter(HEROES.values())))
+        # Loud on an unknown key rather than falling back to the first hero. The
+        # old fallback is precisely what hid a wiring bug that made every run
+        # play Noxx no matter who was chosen: a silent default turns a broken
+        # connection into a working-looking game.
+        self.hero = HEROES[hero_key]
         self.seed = seed
         self.state: GameState | None = None
 
@@ -118,6 +122,11 @@ class GameScreen(Screen[None]):
         map_view = self.query_one(MapView)
         map_view.state = self.state
         self.query_one(Hud).state = self.state
+        legend = self.query_one(Legend)
+        # Who is playing, before the first redraw: the "you" row is the hero's
+        # glyph, and the panel would otherwise show the roster's first entry.
+        legend.hero = self.hero
+        legend.depth = self.state.depth
         log = self.query_one(MessageLog)
         log.reset()
         log.show_new(self.state)
@@ -134,9 +143,12 @@ class GameScreen(Screen[None]):
         self.query_one(MapView).refresh()
         self.query_one(Hud).redraw()
         self.query_one(MessageLog).show_new(self.state)
-        # The legend quotes monster stats, which get worse every floor. Reactive,
-        # so this only redraws the panel on an actual descent.
-        self.query_one(Legend).depth = self.state.depth
+        # The legend quotes monster stats, which get worse every floor, and the
+        # hero's own glyph, which depends on who is playing. Reactive, so this
+        # only redraws the panel when one of them actually changes.
+        legend = self.query_one(Legend)
+        legend.depth = self.state.depth
+        legend.hero = self.state.hero
         self._update_footer()
     # -- input --------------------------------------------------------------
     def on_key(self, event) -> None:

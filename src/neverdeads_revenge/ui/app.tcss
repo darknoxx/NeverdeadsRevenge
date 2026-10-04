@@ -81,7 +81,15 @@ Screen {
     content-align: center middle;
 }
 
-#hero-locked {
+#hero-roster {
+    width: 1fr;
+    height: auto;
+    margin: 1 0 0 0;
+    content-align: center middle;
+    color: #6b6b6b;
+}
+
+#hero-roster-hint {
     width: 1fr;
     height: auto;
     content-align: center middle;

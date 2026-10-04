@@ -75,7 +75,13 @@ class NeverdeadsRevenge(App[None]):
         self.push_screen("prologue", lambda _result: self._begin(hero_key))
 
     def _begin(self, hero_key: str) -> None:
-        self.push_screen("game", hero_key)
+        # The screen is built here rather than pushed by name. A named push takes
+        # no arguments -- ``push_screen``'s second parameter is the dismiss
+        # callback, not a constructor argument -- so ``push_screen("game",
+        # hero_key)`` silently passed the hero key as a callback and the screen
+        # fell back to its default hero. That was invisible for as long as the
+        # roster held exactly one.
+        self.push_screen(GameScreen(hero_key))
 
     def return_to_title(self) -> None:
         """Drop every screen above the base screen and show the title.

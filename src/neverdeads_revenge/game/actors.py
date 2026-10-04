@@ -21,6 +21,8 @@ __all__ = [
     "Actor",
     "Hero",
     "NOXX",
+    "YETI",
+    "WALKYRION",
     "HEROES",
     "EnemyTemplate",
     "ENEMIES",
@@ -189,9 +191,90 @@ NOXX = Hero(
     ),
 )
 
+#: Yeti -- the opposite answer to the same question. Where Noxx avoids the blow,
+#: Yeti absorbs it: armour is a flat subtraction, so it eats the small hits that
+#: early floors are made of, and it is the only hero who can stand in a corridor
+#: and let three things hit him.
+#:
+#: His speed is below everything that matters and below the average of the
+#: dungeon, deliberately. He does not get to choose the fight, and a player who
+#: picks him is trading tempo for the right to never be the one who dies first.
+#: Damage is what makes that survivable: the sweep said raising his health
+#: changed nothing while raising his damage moved his escape rate threefold,
+#: because a slow hero does not lose by being fragile, he loses by needing four
+#: turns to kill something that hits him every one of them.
+YETI = Hero(
+    key="yeti",
+    name="Yeti",
+    title="the unmoved",
+    blurb=(
+        "Slow as a glacier and about as easy to move. Yeti does not dodge and "
+        "does not rush; everything that reaches him has to get through the "
+        "armour first, and most things do not."
+    ),
+    glyph="Y",
+    color="#7fd4ff",
+    stats=Stats(
+        max_hp=52,
+        hp=52,
+        speed=0.75,
+        # Damage is what makes a slow hero work, and the sweep said so: raising
+        # his health changed nothing (54 hp measured the same as 46) while
+        # raising his damage moved the escape rate threefold. A slow hero does
+        # not lose by being fragile, he loses by taking four turns to kill
+        # something that hits him every one of them.
+        damage=(9, 13),
+        crit_chance=0.05,
+        crit_multiplier=1.5,
+        accuracy=1,
+        evasion=0,
+        armor=3,
+    ),
+)
+
+#: Walkyrion -- the middle road, taken on purpose. Fast enough to leave a fight
+#: he does not want, armoured enough to survive the one he misjudged, and with no
+#: single glaring hole for a deep floor to find.
+#:
+#: Every hero needs one number they are bad at or they are not a choice. His is
+#: that none of his numbers is the best, so nothing he does wins the run by
+#: itself.
+WALKYRION = Hero(
+    key="walkyrion",
+    name="Walkyrion",
+    title="the even blade",
+    blurb=(
+        "No weakness worth naming and no trick worth relying on. Walkyrion "
+        "strikes on time, takes the hit he has to, and is still standing when "
+        "the screaming stops."
+    ),
+    glyph="W",
+    color="#ffb000",
+    stats=Stats(
+        # Every number here sits between Noxx's and Yeti's, which is the whole
+        # point, and the accuracy of 2 is the one thing that is nobody else's.
+        # "Balanced" measured as the worst hero in the game until that edge
+        # existed: a middle of two specialists is below both of them unless it
+        # gets a small speciality of its own, and never missing is a quiet one.
+        max_hp=36,
+        hp=36,
+        speed=1.15,
+        damage=(6, 9),
+        crit_chance=0.20,
+        crit_multiplier=1.8,
+        accuracy=2,
+        evasion=2,
+        armor=2,
+    ),
+)
+
 #: Registry. Later heroes drop in here and the select screen picks them up for
 #: free -- that is the whole reason heroes are data and not a hardcoded branch.
-HEROES: dict[str, Hero] = {NOXX.key: NOXX}
+#:
+#: Heroes take the capital of their name and monsters stay lowercase, so a letter
+#: on the map tells you which side of the fight it is on before you have read the
+#: legend. The wraith had the ``W`` until Walkyrion needed it.
+HEROES: dict[str, Hero] = {hero.key: hero for hero in (NOXX, YETI, WALKYRION)}
 
 
 def make_hero(hero: Hero, position: Pos) -> Actor:
@@ -254,7 +337,7 @@ ENEMIES: dict[str, EnemyTemplate] = {
     "wraith": EnemyTemplate(
         key="wraith",
         name="wraith",
-        glyph="W",
+        glyph="w",
         color="magenta",
         behaviour="hunter",
         stats=Stats(max_hp=7, hp=7, speed=1.3, damage=(2, 5), evasion=3),

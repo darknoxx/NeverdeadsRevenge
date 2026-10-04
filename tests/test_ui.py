@@ -52,6 +52,38 @@ async def drive_to_game(app: NeverdeadsRevenge, pilot) -> GameScreen:
     return app.screen
 
 
+async def drive_to_game_as(app: NeverdeadsRevenge, pilot, hero_key: str) -> GameScreen:
+    """Same, but choosing a specific hero off the roster.
+
+    Separate from :func:`drive_to_game` because most tests do not care who they
+    are playing, and only the roster tests do.
+    """
+    from neverdeads_revenge.game.actors import HEROES
+
+    await pilot.pause()
+    assert isinstance(app.screen, TitleScreen)
+
+    await pilot.press("x")
+    await pilot.pause()
+    screen = app.screen
+    assert isinstance(screen, HeroSelectScreen)
+
+    while screen.current is not None and screen.current.key != hero_key:
+        await pilot.press("right")
+        await pilot.pause()
+    assert screen.current is not None, f"the roster has no {hero_key}"
+
+    await pilot.press("enter")
+    await pilot.pause()
+    if isinstance(app.screen, PrologueScreen):
+        await pilot.press("enter")
+        await pilot.pause()
+
+    assert isinstance(app.screen, GameScreen)
+    assert app.screen.state.hero is HEROES[hero_key]
+    return app.screen
+
+
 async def test_legend_lists_the_rift_and_the_loot():
     """The way out and the draughts have to be in the panel too.
 
@@ -517,6 +549,11 @@ async def test_a_second_run_can_be_started_after_quitting():
 
 # -- hero select -------------------------------------------------------------
 async def test_hero_select_cycles_into_locked_slots():
+    """Every real hero first, then the locked slots, and locked ones do nothing.
+
+    Cycled rather than hardcoded to "one press right" so the test keeps meaning
+    something when the roster grows, which it already has once.
+    """
     app = NeverdeadsRevenge()
     async with app.run_test(size=SIZE) as pilot:
         await pilot.pause()
@@ -529,13 +566,30 @@ async def test_hero_select_cycles_into_locked_slots():
         assert len(screen.slots) == total
         assert screen.current is not None
 
-        await pilot.press("right")
-        await pilot.pause()
+        # Walk forward to the first locked slot.
+        for _ in range(len(actors_module.HEROES)):
+            assert screen.current is not None
+            await pilot.press("right")
+            await pilot.pause()
+        assert screen.current is None, "the roster did not reach a locked slot"
 
         # A locked slot must not start a run.
         await pilot.press("enter")
         await pilot.pause()
         assert isinstance(app.screen, HeroSelectScreen)
+
+
+async def test_every_hero_can_actually_start_a_run():
+    """The select screen is data-driven, so each entry has to be playable.
+
+    A hero in the registry that the screen cannot start is worse than a missing
+    one: it is visible, selectable and does nothing.
+    """
+    for key in actors_module.HEROES:
+        app = NeverdeadsRevenge()
+        async with app.run_test(size=SIZE) as pilot:
+            screen = await drive_to_game_as(app, pilot, key)
+            assert screen.state.hero.key == key
 
 
 async def test_hero_select_wraps_around():
@@ -667,14 +721,40 @@ async def test_legend_lists_every_monster_and_every_draught():
         screen = await drive_to_game(app, pilot)
         shown = screen.query_one(Legend).render().plain
 
-        for hero in HEROES.values():
-            assert hero.glyph in shown, f"{hero.key} missing from the legend"
+        # The "you" row is the hero who is playing, and only that one: the panel
+        # has one row for the player, not one per entry in the roster.
+        playing = screen.state.hero
+        assert playing.glyph in shown
+        for other in HEROES.values():
+            if other.key != playing.key:
+                assert other.glyph not in shown, (
+                    f"{other.key} is in the legend but is not the one playing"
+                )
         for template in ENEMIES.values():
             assert template.glyph in shown, f"{template.key} missing from legend"
             assert template.name in shown
         for item in ITEMS.values():
             assert item.glyph in shown, f"{item.key} missing from legend"
             assert item.name in shown
+
+
+async def test_the_legend_names_the_hero_you_actually_picked():
+    """The "you" row has to follow the roster, not the first entry in it.
+
+    Written because it did exactly the wrong thing: with three heroes the panel
+    still said ``N you`` while you were playing Yeti.
+    """
+    from neverdeads_revenge.game.actors import HEROES
+    from neverdeads_revenge.ui.widgets.legend import Legend
+
+    for key in HEROES:
+        app = NeverdeadsRevenge()
+        async with app.run_test(size=SIZE) as pilot:
+            await drive_to_game_as(app, pilot, key)
+
+            legend = app.screen.query_one(Legend)
+            assert legend.hero is not None and legend.hero.key == key
+            assert f"{HEROES[key].glyph} you" in legend.render().plain
 
 
 async def test_the_terrain_reference_lives_in_the_help_screen():
@@ -887,6 +967,41 @@ async def test_every_hud_line_fits_the_sidebar_without_wrapping():
         width = hud.content_size.width
         for line in str(hud.render()).splitlines():
             assert len(line) <= width, f"HUD line wraps ({len(line)}>{width}): {line!r}"
+
+
+async def test_the_sidebar_fits_for_every_hero():
+    """Hero names differ in length and the sidebar is a fixed 34 columns.
+
+    Both panels are clipped rather than scrolled, so a name that wraps costs the
+    legend a row -- and the row it costs is at the bottom, where the goal is.
+    """
+    from neverdeads_revenge.game.actors import HEROES
+    from neverdeads_revenge.ui.widgets.hud import Hud
+    from neverdeads_revenge.ui.widgets.legend import Legend
+
+    for key in HEROES:
+        app = NeverdeadsRevenge()
+        async with app.run_test(size=SIZE) as pilot:
+            screen = await drive_to_game_as(app, pilot, key)
+            # The worst case for the sidebar: a speed bonus and a full legend.
+            screen.state.player.speed_bonus = 1.5
+            screen.state.revenge_stacks = 5
+            await pilot.press(".")
+            await pilot.pause()
+
+            hud = screen.query_one(Hud)
+            width = hud.content_size.width
+            for line in str(hud.render()).splitlines():
+                assert len(line) <= width, (
+                    f"{key}: HUD line wraps ({len(line)}>{width}): {line!r}"
+                )
+
+            legend = screen.query_one(Legend)
+            lines = str(legend.render()).splitlines()
+            assert legend.content_size.height >= len(lines), (
+                f"{key}: the legend needs {len(lines)} rows and has "
+                f"{legend.content_size.height}"
+            )
 
 
 # -- theming -----------------------------------------------------------------

@@ -14,6 +14,7 @@ from rich.text import Text
 from textual.reactive import reactive
 from textual.widgets import Static
 
+from ...game.actors import Hero
 from ...game.prologue import GOAL_HINT, legend_rows
 from ...world.tiles import Tile
 
@@ -63,6 +64,11 @@ class Legend(Static):
     #: legend at all.
     depth: reactive[int] = reactive(1)
 
+    #: Which hero the "you" row is describing. Reactive for the same reason as
+    #: ``depth``: the roster is data, so the panel has to be told who is playing
+    #: rather than assuming, or every hero is labelled with the first one's glyph.
+    hero: reactive[Hero | None] = reactive(None)
+
     def __init__(self, **kwargs) -> None:
         kwargs.setdefault("markup", False)
         super().__init__(**kwargs)
@@ -72,6 +78,9 @@ class Legend(Static):
         self.redraw()
 
     def watch_depth(self, depth: int) -> None:
+        self.redraw()
+
+    def watch_hero(self, hero: Hero | None) -> None:
         self.redraw()
 
     def redraw(self) -> None:
@@ -90,7 +99,7 @@ class Legend(Static):
         out.append(f"{Tile.RIFT.glyph} ", style="bold bright_cyan")
         out.append(f"{GOAL_HINT}\n", style="bold")
 
-        for glyph, meaning in legend_rows(self.depth):
+        for glyph, meaning in legend_rows(self.depth, self.hero):
             if not glyph:
                 # An empty meaning is a section break; an empty glyph with text
                 # is a continuation line, indented under the entry above it.

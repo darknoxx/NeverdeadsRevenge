@@ -62,7 +62,7 @@ class HeroSelectScreen(Screen[str]):
             yield Static(id="hero-title")
         yield Static(id="hero-blurb")
         yield Static(id="hero-stats")
-        yield Static(id="hero-locked")
+        yield Static(id="hero-roster")
 
     def on_mount(self) -> None:
         self.redraw()
@@ -70,6 +70,7 @@ class HeroSelectScreen(Screen[str]):
     # -- rendering ----------------------------------------------------------
     def redraw(self) -> None:
         hero = self.current
+        self.query_one("#hero-roster", Static).update(self._roster())
         if hero is None:
             self.query_one("#hero-glyph", Static).update("[dim]?[/dim]")
             self.query_one("#hero-name", Static).update("???")
@@ -78,7 +79,6 @@ class HeroSelectScreen(Screen[str]):
                 "\n[dim]Not yet resurrected.[/dim]\n"
             )
             self.query_one("#hero-stats", Static).update("")
-            self.query_one("#hero-locked", Static).update("LOCKED")
             return
 
         # The glyph the player is about to spend the whole run looking at, in the
@@ -92,24 +92,49 @@ class HeroSelectScreen(Screen[str]):
         self.query_one("#hero-blurb", Static).update(hero.blurb)
         self.query_one("#hero-stats", Static).update(self._stat_block(hero))
 
-        locked = len(self.slots) > len(HEROES)
-        self.query_one("#hero-locked", Static).update(
-            "\n".join(">" if i == self._index else " " for i in range(len(self.slots)))
-            + ("   (enter to play)" if not locked else "")
-        )
+    def _roster(self) -> str:
+        """One glyph per slot, the current one boxed, locked ones dim.
+
+        The old screen only ever showed the hero you were already on, which was
+        fine with a roster of one and useless with a roster of three: cycling
+        through cards you cannot see the end of is not choosing, it is browsing.
+        """
+        parts: list[str] = []
+        for index, hero in enumerate(self.slots):
+            here = index == self._index
+            if hero is None:
+                cell = "[dim]?[/dim]"
+            else:
+                cell = f"[bold {hero.color}]{hero.glyph}[/]"
+            parts.append(f"[reverse] {cell} [/reverse]" if here else f" {cell} ")
+        return "  ".join(parts)
 
     def _stat_block(self, hero: Hero) -> str:
         s = hero.stats
         rows = [
-            ("health", f"{s.max_hp}", "low is a promise"),
+            ("health", f"{s.max_hp}", self._health_note(s.max_hp)),
             ("speed", f"{s.speed:.2f}", "actions per turn"),
             ("crit", f"{s.crit_chance:.0%}", f"x{s.crit_multiplier:.1f} damage"),
             ("damage", f"{s.damage[0]}-{s.damage[1]}", "per hit"),
-            ("evasion", f"{s.evasion}", "hard to pin down"),
-            ("armour", f"{s.armor}", "soaks that much"),
+            ("evasion", f"{s.evasion}", "lowers their hit chance"),
+            ("armour", f"{s.armor}", "off every hit"),
         ]
         lines = [f"{label:<9}{value:<8}[dim]{note}[/dim]" for label, value, note in rows]
         return "\n".join(lines)
+
+    @staticmethod
+    def _health_note(max_hp: int) -> str:
+        """Say what the health number means for this hero, not just that it exists.
+
+        "low is a promise" was written for Noxx and read as nonsense beside
+        Yeti's 46. The note is the only place the screen interprets a number
+        instead of printing it, so it has to be about the hero being shown.
+        """
+        if max_hp >= 44:
+            return "a long argument"
+        if max_hp >= 32:
+            return "room to be wrong"
+        return "low is a promise"
 
     # -- actions ------------------------------------------------------------
     def _move(self, delta: int) -> None:

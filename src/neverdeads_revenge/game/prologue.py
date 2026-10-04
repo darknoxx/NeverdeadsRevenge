@@ -17,7 +17,7 @@ for each of them; one that says "you" belongs to whoever the player picked.
 
 from __future__ import annotations
 
-from ..game.actors import ENEMIES, HEROES, scale_template
+from ..game.actors import ENEMIES, HEROES, Hero, scale_template
 from ..world.generator import ESCAPE_DEPTH
 from ..world.items import ITEMS
 from ..world.tiles import Tile
@@ -112,7 +112,7 @@ def item_legend() -> list[tuple[str, str]]:
     ]
 
 
-def enemy_legend(depth: int = 1) -> list[tuple[str, str]]:
+def enemy_legend(depth: int = 1, hero: Hero | None = None) -> list[tuple[str, str]]:
     """``(glyph, meaning)`` for the player's own marker and every enemy.
 
     Built from the live templates, so adding a monster to ``ENEMIES`` adds it
@@ -124,9 +124,16 @@ def enemy_legend(depth: int = 1) -> list[tuple[str, str]]:
     player at exactly the moment they need the truth. The kinds listed stay the
     same at every depth -- a monster that only appears from floor 6 would need a
     different panel, not a longer one.
+
+    ``hero`` matters for the same reason. The panel says "you" beside a glyph,
+    and which glyph that is depends on who the player picked; hardcoding the
+    first hero would label the wrong letter once the roster grew, which is
+    exactly what happened when it did.
     """
+    if hero is None:
+        hero = next(iter(HEROES.values()))
     rows: list[tuple[str, str]] = [
-        (HEROES["noxx"].glyph, "you"),
+        (hero.glyph, "you"),
     ]
     for template in ENEMIES.values():
         scaled = scale_template(template, depth)
@@ -146,7 +153,7 @@ def enemy_legend(depth: int = 1) -> list[tuple[str, str]]:
     return rows
 
 
-def legend_rows(depth: int = 1) -> list[tuple[str, str]]:
+def legend_rows(depth: int = 1, hero: Hero | None = None) -> list[tuple[str, str]]:
     """The always-on legend: you, the monsters, then the loot.
 
     Terrain is deliberately *not* here. ``LEGEND_TERRAIN`` is static -- a wall is
@@ -162,7 +169,7 @@ def legend_rows(depth: int = 1) -> list[tuple[str, str]]:
     A row with an empty glyph is a section break, or a continuation line when it
     carries text of its own; the widget decides how to render it.
     """
-    return [*enemy_legend(depth), ("", ""), *item_legend()]
+    return [*enemy_legend(depth, hero), ("", ""), *item_legend()]
 
 
 def terrain_help() -> str:

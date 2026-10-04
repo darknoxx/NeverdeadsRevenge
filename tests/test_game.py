@@ -19,6 +19,8 @@ from neverdeads_revenge.game.actors import (
     ENEMIES,
     HEROES,
     NOXX,
+    WALKYRION,
+    YETI,
     Actor,
     ActorKind,
     Stats,
@@ -171,33 +173,111 @@ def test_noxx_is_a_purple_n():
     assert NOXX.color == "#a855f7"
 
 
-def test_the_hero_colour_is_not_the_elixir_colour_in_disguise():
+def test_the_hero_colour_is_not_another_hero_or_monster_in_disguise():
     """``purple`` and ``magenta`` are one terminal approximation apart.
 
     The named colour "purple" resolves to the same magenta the wraith uses on
-    terminals that cannot show the difference, which is why the hero carries a
-    hex value. This asserts the hex is actually a different colour from
-    everything else on the map rather than merely a different string.
+    terminals that cannot show the difference, which is why the heroes carry hex
+    values. This asserts each hero is actually a different colour from everything
+    else on the map rather than merely a different string.
     """
     from rich.color import Color
 
     from neverdeads_revenge.world.items import ITEMS
 
-    mine = Color.parse(NOXX.color).get_truecolor()
+    everything = {
+        f"monster {t.key}": t.color for t in ENEMIES.values()
+    } | {f"item {i.key}": i.color for i in ITEMS.values()}
+    for hero in HEROES.values():
+        everything[f"hero {hero.key}"] = hero.color
 
-    rivals = {
-        template.key: template.color for template in ENEMIES.values()
-    } | {item.key: item.color for item in ITEMS.values()}
-    for key, colour in rivals.items():
-        theirs = Color.parse(colour).get_truecolor()
-        assert mine != theirs, f"the hero looks exactly like the {key}"
-        distance = sum(
-            (a - b) ** 2 for a, b in zip(mine, theirs)
+    names = list(everything)
+    for i, left in enumerate(names):
+        for right in names[i + 1 :]:
+            a = Color.parse(everything[left]).get_truecolor()
+            b = Color.parse(everything[right]).get_truecolor()
+            distance = sum((x - y) ** 2 for x, y in zip(a, b))
+            assert distance > 4000, (
+                f"{left} and {right} are the same colour to the eye "
+                f"({everything[left]} vs {everything[right]})"
+            )
+
+
+# -- the roster -------------------------------------------------------------
+def test_the_roster_has_more_than_one_hero_in_it():
+    """The select screen is data-driven, and a roster of one is not a choice."""
+    assert len(HEROES) == 3
+    assert set(HEROES) == {"noxx", "yeti", "walkyrion"}
+
+
+def test_each_hero_is_the_best_at_something():
+    """Three heroes who are all good at the same thing are one hero.
+
+    Roles are asserted by who wins each stat rather than by a list of expected
+    numbers, so retuning a hero's health does not fail a test that was really
+    about him being the tough one.
+    """
+    heroes = list(HEROES.values())
+    best_speed = max(heroes, key=lambda h: h.stats.speed)
+    best_hp = max(heroes, key=lambda h: h.stats.max_hp)
+    best_armor = max(heroes, key=lambda h: h.stats.armor)
+    best_evasion = max(heroes, key=lambda h: h.stats.evasion)
+    best_accuracy = max(heroes, key=lambda h: h.stats.accuracy)
+
+    assert best_speed is NOXX and best_evasion is NOXX, "Noxx is not the fast one"
+    assert best_hp is YETI and best_armor is YETI, "Yeti is not the tough one"
+    assert best_accuracy is WALKYRION, "Walkyrion has no edge of his own"
+
+
+def test_walkyrion_is_the_middle_of_the_other_two():
+    """Balanced has to mean between, or it just means worse.
+
+    ``Walkyrion`` measured as the weakest hero in the game until his accuracy
+    went above both of the others': the middle of two specialists is below both
+    of them, because each specialist is paying for their spike with a hole and
+    the generalist is paying for nothing.
+    """
+    for name in ("max_hp", "speed", "armor", "evasion"):
+        low, high = sorted(
+            (getattr(NOXX.stats, name), getattr(YETI.stats, name))
         )
-        # Perceptually distant, not just unequal: the wraith is already magenta
-        # and the elixir is bright magenta, so a purple a hair away from either
-        # would read as the same colour on a dark map.
-        assert distance > 4000, f"the hero is too close to the {key}"
+        middle = getattr(WALKYRION.stats, name)
+        assert low <= middle <= high, f"Walkyrion's {name} is not the middle"
+
+    # And a hole of his own for the specialists to exploit, or he is simply
+    # better than both.
+    assert WALKYRION.stats.max_hp < YETI.stats.max_hp
+    assert WALKYRION.stats.speed < NOXX.stats.speed
+
+
+def test_yeti_is_the_slowest_hero_and_slower_than_most_of_the_dungeon():
+    """The trade he made, stated as a test so it cannot be quietly undone.
+
+    A tank with average speed is not a choice, it is Noxx with more armour. Yeti
+    is the only hero who does not get to pick his fights.
+    """
+    assert min(HEROES.values(), key=lambda h: h.stats.speed) is YETI
+
+    speeds = [template.stats.speed for template in ENEMIES.values()]
+    assert YETI.stats.speed < sum(speeds) / len(speeds)
+    # Not quite the slowest thing alive -- a ghoul shuffles along at 0.7, and
+    # being barely ahead of it is fine. The two that matter both move first.
+    assert YETI.stats.speed < ENEMIES["bone"].stats.speed
+    assert YETI.stats.speed < ENEMIES["wraith"].stats.speed
+
+
+def test_every_hero_has_its_own_glyph_colour_and_blurb():
+    """The select screen renders these, so none of them may be blank."""
+    glyphs = [hero.glyph for hero in HEROES.values()]
+    assert len(set(glyphs)) == len(HEROES)
+    for hero in HEROES.values():
+        assert len(hero.glyph) == 1
+        assert hero.color
+        assert hero.title
+        assert hero.blurb
+        assert hero.name.lower().startswith(hero.glyph.lower()), (
+            f"{hero.key} is a {hero.glyph} but is not called {hero.glyph}..."
+        )
 
 
 # -- difficulty by depth ----------------------------------------------------

@@ -1,8 +1,19 @@
 # Neverdead's Revenge
 
-A terminal roguelite. You are **Noxx** — fast, fragile, and lethal in the right hands.
+A terminal roguelite. Three heroes, ten floors, and one way out.
 
 Built with [Textual](https://textual.textualize.io/).
+
+## The heroes
+
+| | | |
+| --- | --- | --- |
+| **N** | Noxx | Fast, fragile, lethal. Dodges what it cannot survive, and acts more often than anything in the dungeon. |
+| **Y** | Yeti | Slow and armoured. The only hero who does not get to pick his fights, and the only one who can stand in a corridor and let three things hit him. |
+| **W** | Walkyrion | The middle of the other two, with accuracy as his one edge: he misses least. |
+
+Heroes take the capital of their name; monsters stay lowercase. A letter on the
+map tells you which side of the fight it is on before you have read the legend.
 
 ## Status
 
@@ -15,18 +26,24 @@ run is over. Both endings show the same summary screen.
 
 Enemy count scales with depth (`6 + depth`). Monster health and damage scale too
 — 15% per floor, capped at twice floor 1 from floor 8 — and wraiths get more
-common the deeper you go. Nothing in the dungeon ever acts faster than Noxx, so
-his crit chance and his REVENGE speed stacking keep paying off all the way down.
-The legend in the sidebar quotes the current floor's numbers, so it follows you
-down.
+common the deeper you go. The legend in the sidebar quotes the current floor's
+numbers, so it follows you down.
 
-Noxx cannot heal on his own; potions and elixirs on the floor are the only way
+No hero can heal on their own; potions and elixirs on the floor are the only way
 back up. A run's health is therefore a budget you spend across ten floors, and
 skipping loot to save time is a real trade.
 
-Measured with a greedy bot over 30 seeds (attack what is adjacent, drink when
-hurt, detour for nearby loot, otherwise beeline for the exit): mean depth 7.0,
-and it escapes 3 times in 30.
+Measured with a greedy bot over 30 seeds each (attack what is adjacent, drink
+when hurt, detour for nearby loot, otherwise beeline for the exit):
+
+| hero | escapes | mean depth |
+| --- | --- | --- |
+| Noxx | 3/30 | 7.0 |
+| Yeti | 7/30 | 8.2 |
+| Walkyrion | 5/30 | 8.0 |
+
+The bot plays "always trade" and cannot kite, so it underrates Noxx and flatters
+the armoured heroes. It is a rough instrument, not a verdict.
 
 ## Install
 
@@ -70,7 +87,12 @@ or, without the launcher:
 
 A talent tree, equipment, sound, saving mid-run, and the meta-progression the
 persistence layer is shaped for (`META_UPGRADES` is still an empty dict, and
-`state._apply_upgrades` is a no-op). There is no second hero yet.
+`state._apply_upgrades` is a no-op). Two roster slots are shown locked and are
+not playable yet.
+
+REVENGE — a speed bonus per kill, up to five stacks — is currently the same for
+every hero. It should be a per-hero trait before the roster means much: as it
+stands, the slow hero benefits from it most, which is backwards.
 
 The prologue is the only prose in the game, and it is shown once per session
 rather than once per run — told every run it stops being a premise and becomes a
