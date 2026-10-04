@@ -191,9 +191,7 @@ logic testable without a terminal and makes a headless simulator possible later.
 
 ## License
 
-**GNU General Public License, version 3 or later.** The full text is in
-[LICENSE](LICENSE).
+**MIT.** The full text is in [LICENSE](LICENSE).
 
-In short: you are free to run, study, share and modify this. If you distribute
-it or anything built on it, it has to stay under the same licence and come with
-the source. There is no warranty.
+In short: do what you like with this — use it, change it, share it, sell it —
+as long as the copyright notice stays with it. There is no warranty.

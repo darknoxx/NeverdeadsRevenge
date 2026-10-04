@@ -403,22 +403,22 @@ def test_the_icon_ships_no_stray_characters():
 def test_the_licence_says_the_same_thing_everywhere():
     """README, LICENSE and the package metadata have to agree.
 
-    They did not before: pyproject declared MIT and there was no LICENSE file at
-    all, so the repository contradicted itself about the one thing a reader is
-    entitled to take at face value.
+    They did not before: pyproject declared a licence and there was no LICENSE
+    file at all, so the repository contradicted itself about the one thing a
+    reader is entitled to take at face value.
     """
     import tomllib
 
     project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
     declared = project["license"]["text"]
-    assert "GPL" in declared, f"pyproject still says {declared!r}"
+    assert "MIT" in declared, f"pyproject says {declared!r}"
 
     licence = (ROOT / "LICENSE").read_text(encoding="utf-8")
-    assert "GNU GENERAL PUBLIC LICENSE" in licence
-    assert "Version 3" in licence
+    assert "MIT License" in licence
+    assert "Permission is hereby granted" in licence
 
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "General Public License" in readme, "the README does not name the licence"
+    assert "MIT" in readme, "the README does not name the licence"
     assert "LICENSE" in readme, "the README does not point at the file"
 
 
@@ -433,9 +433,36 @@ def test_the_licence_file_is_shipped_with_the_package():
         assert (ROOT / name).exists(), f"license-files names {name}, which is not there"
 
 
-def test_the_licence_file_is_the_real_thing():
-    """Not a stub, not a summary -- the text the FSF publishes."""
+def test_the_licence_is_the_real_thing_and_not_a_summary():
+    """The grant and the disclaimer both have to be there, in full.
+
+    A "MIT" that omits the permission grant or the warranty disclaimer is not
+    MIT, whatever the file is called.
+    """
     licence = (ROOT / "LICENSE").read_text(encoding="utf-8")
-    assert len(licence) > 30_000, "the LICENSE file looks like a summary, not the text"
-    assert "Copyright (C) 2007 Free Software Foundation" in licence
-    assert "TERMS AND CONDITIONS" in licence
+    assert "without restriction" in licence, "the permission grant is missing"
+    assert "WITHOUT WARRANTY OF ANY KIND" in licence, "the disclaimer is missing"
+    assert "MERCHANTABILITY" in licence
+    assert len(licence) > 900, "the LICENSE file looks like a summary"
+
+
+def test_the_licence_names_a_copyright_holder():
+    """MIT grants nothing to nobody: the copyright line is the whole hook.
+
+    Without a name and a year there is no one to attribute, which is the one
+    thing this licence asks for in return.
+    """
+    licence = (ROOT / "LICENSE").read_text(encoding="utf-8")
+    assert re.search(r"Copyright \(c\) \d{4} \S", licence), (
+        "no 'Copyright (c) YEAR NAME' line in the LICENSE file"
+    )
+
+
+def test_the_copyright_holder_matches_the_package_author():
+    """Two different names would be two different people granting and receiving."""
+    import tomllib
+
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+    author = project["authors"][0]["name"]
+    licence = (ROOT / "LICENSE").read_text(encoding="utf-8")
+    assert author in licence, f"{author!r} is the author but not the copyright holder"
