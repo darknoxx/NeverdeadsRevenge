@@ -174,6 +174,55 @@ async def test_the_rift_does_not_win_the_run_early():
         assert isinstance(app.screen, GameScreen)
 
 
+async def test_the_victory_screen_answers_the_prologue():
+    """The premise was that death was denied; the win is the other way out.
+
+    A story that opens on a question and never returns to it is just set
+    dressing. This is the one place the game closes the loop.
+    """
+    from neverdeads_revenge.world.generator import ESCAPE_DEPTH
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.build_floor(ESCAPE_DEPTH)
+        screen.state.player.position = screen.state.exit_pos
+        await pilot.press(">")
+        await pilot.pause()
+
+        body = str(app.screen.query_one("#game-over-body").render())
+        assert "You were not granted death" in body
+
+        # And the death screen must not say it: it would be a cruel lie there.
+        assert "Out of the dark" in body
+        await pilot.press(" ")
+        await pilot.pause()
+
+        # A death gets the plain summary.
+        screen = await drive_to_game(app, pilot)
+        screen.state.player.stats.hp = 1
+        from neverdeads_revenge.game.actors import ENEMIES, make_enemy
+        from neverdeads_revenge.game.actions import Action, perform_action
+
+        enemy = make_enemy(
+            ENEMIES["ghoul"],
+            (screen.state.player.position[0] + 1, screen.state.player.position[1]),
+        )
+        screen.state.enemies = [enemy]
+        screen.state.turn_queue = type(screen.state.turn_queue)([screen.state.player, enemy])
+        screen.state.refresh_vision()
+        for _ in range(80):
+            if screen.state.over:
+                break
+            perform_action(screen.state, Action.WAIT)
+        screen._game_over(won=False)
+        await pilot.pause()
+
+        body = str(app.screen.query_one("#game-over-body").render())
+        assert "You were not granted death" not in body
+        assert "Floor reached" in body
+
+
 # -- prologue ---------------------------------------------------------------
 async def test_prologue_appears_on_the_first_run_only():
     """The premise is stated once per session, not once per run.
@@ -229,8 +278,38 @@ async def test_prologue_sits_between_the_hero_and_the_dungeon():
         assert isinstance(app.screen, GameScreen)
 
 
-async def test_prologue_shows_every_line_of_the_story():
-    from neverdeads_revenge.game.prologue import PROLOGUE, PROLOGUE_TITLE
+async def test_the_whole_prologue_fits_without_scrolling():
+    """The last line of the story is the point of the story, so it must show.
+
+    The pane does not scroll: any key dismisses the screen, so a player who
+    needed to scroll could not. That makes the story's length a layout
+    constraint, not just an editorial one, and this is the assertion that keeps
+    a future line from silently pushing the ending off the bottom.
+    """
+    from neverdeads_revenge.ui.screens.prologue import PrologueScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await pilot.press("x")
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert isinstance(app.screen, PrologueScreen)
+        panel = app.screen.query_one("#prologue-screen")
+        assert panel.virtual_size.height <= panel.size.height, (
+            f"the prologue needs {panel.virtual_size.height} rows and has "
+            f"{panel.size.height}: the last line is cut off"
+        )
+
+
+async def test_the_prologue_shows_every_line_of_the_story():
+    from neverdeads_revenge.game.prologue import (
+        PROLOGUE,
+        PROLOGUE_HINT,
+        PROLOGUE_TITLE,
+    )
 
     app = NeverdeadsRevenge()
     async with app.run_test(size=SIZE) as pilot:
@@ -245,7 +324,7 @@ async def test_prologue_shows_every_line_of_the_story():
         shown = " ".join(
             str(widget.render()) for widget in screen.query("Static")
         )
-        for line in (PROLOGUE_TITLE, *PROLOGUE):
+        for line in (PROLOGUE_TITLE, *PROLOGUE, PROLOGUE_HINT):
             assert line in shown
 
 

@@ -180,6 +180,10 @@ class GameScreen(Screen[None]):
         summary.append(f"Turns taken     {state.total_turns}\n")
         summary.append(f"Cells walked    {state.player.steps}\n")
         summary.append(f"Score           {state.score}\n")
+        if won:
+            # The prologue opened by telling the player death was not granted to
+            # them. This is the answer: they went and found the other way out.
+            summary.append("\nYou were not granted death.\n", style="italic")
 
         self.app.push_screen(
             GameOverScreen(

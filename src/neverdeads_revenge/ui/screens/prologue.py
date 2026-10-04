@@ -1,7 +1,7 @@
 """The prologue screen.
 
 Shown once, between the hero choice and floor 1. It exists because the game has
-a premise that the mechanics cannot state: Noxx is dead, he came back anyway, and
+a premise that the mechanics cannot state: the hero is dead, came back anyway, and
 the dungeon is the way out. Everything after this has to work without repeating
 it.
 
@@ -18,13 +18,13 @@ from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Static
 
-from ...game.prologue import PROLOGUE, PROLOGUE_TITLE
+from ...game.prologue import PROLOGUE, PROLOGUE_HINT, PROLOGUE_TITLE
 
 __all__ = ["PrologueScreen"]
 
 
 class PrologueScreen(Screen[None]):
-    """The premise, once per run."""
+    """The premise, once per session."""
 
     BINDINGS = [Binding("escape", "begin", "Begin")]
 
@@ -41,13 +41,12 @@ class PrologueScreen(Screen[None]):
                 # A class rather than a per-line id: ids must be unique, and a
                 # class survives the prologue growing a line.
                 yield Static(line, classes="prologue-line")
-            yield Static("weiter mit enter  ·  press enter", id="prologue-hint")
+            # Set apart from the story: the story is what happened, this is what
+            # it means, and running them together buries the one line the player
+            # is meant to leave with.
+            yield Static(PROLOGUE_HINT, id="prologue-hint")
+            yield Static("press any key", id="prologue-dismiss")
 
     def on_key(self, event) -> None:
-        """Any key continues, but not one that is bound to something else.
-
-        The prose is German while the game's own text is English, so the hint
-        says both.
-        """
         event.stop()
         self.dismiss()

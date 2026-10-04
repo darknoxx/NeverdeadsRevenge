@@ -73,8 +73,9 @@ A talent tree, equipment, sound, saving mid-run, and the meta-progression the
 persistence layer is shaped for (`META_UPGRADES` is still an empty dict, and
 `state._apply_upgrades` is a no-op). There is no second hero yet.
 
-The prologue text is German while the rest of the game's text is English. That is
-a genuine inconsistency and needs a decision.
+The prologue is the only prose in the game, and it is shown once per session
+rather than once per run — told every run it stops being a premise and becomes a
+toll.
 
 ## Layout
 

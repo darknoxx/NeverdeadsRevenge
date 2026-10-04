@@ -1,14 +1,18 @@
 """The prologue and the map legend.
 
 Both live here, in the headless layer, for a reason that is not tidiness: the
-legend's terrain half is generated from :class:`~neverdeads_revenge.world.tiles.Tile`
-itself, so a new terrain type cannot be added without the legend noticing. The
-same goes for the enemy half, which is read from ``ENEMIES``. Deriving the text
-rather than writing it twice is what keeps the sidebar from quietly going stale.
+legend is generated from :class:`~neverdeads_revenge.world.tiles.Tile` and
+``ENEMIES`` and ``ITEMS`` themselves, so a new terrain type, monster or draught
+cannot be added without it noticing. Deriving the text rather than writing it
+twice is what keeps the sidebar from quietly going stale.
 
-The prologue is plain data. It is shown once per run, before floor 1, and it is
-the only place the game's premise is stated in prose -- everything afterwards has
-to work without being told again.
+The prologue is plain data. It is shown once per session, before floor 1, and it
+is the only place the game's premise is stated in prose -- everything afterwards
+has to work without being told again.
+
+It is written in the second person and never names the hero. More heroes are
+coming, and a backstory that says "Noxx" is a backstory that has to be rewritten
+for each of them; one that says "you" belongs to whoever the player picked.
 """
 
 from __future__ import annotations
@@ -21,6 +25,7 @@ from ..world.tiles import Tile
 __all__ = [
     "PROLOGUE",
     "PROLOGUE_TITLE",
+    "PROLOGUE_HINT",
     "GOAL_HINT",
     "terrain_legend",
     "terrain_help",
@@ -36,22 +41,45 @@ __all__ = [
 #: widget so the width test can measure it like any other legend line.
 GOAL_HINT = f"the way out is on floor {ESCAPE_DEPTH}"
 
-#: Shown on the title screen, before a run exists. Kept short on purpose.
-PROLOGUE_TITLE = "Der Tod ist nicht das Ende. Das war dir nicht vergönnt."
+#: Shown above the story. The premise in one sentence, for a player skimming.
+PROLOGUE_TITLE = "Death is not the end. You were not granted even that."
 
-#: Lines told as the run opens, one per floor entry, then gone.
+#: The story, told once per session.
 #:
-#: Ordered: the premise, then the moment of waking, then what the hero wants.
-#: No line explains a mechanic; mechanics are explained when they are met.
+#: The beats are the user's: the battle on Mount Karpas, the falling axe, the
+#: blackness that was not peaceful, the body returned, the question of a way out.
+#: Everything else is rhythm -- the strongest line here is the shortest ("And the
+#: axe."), and it only works because the line before it is long. Nothing explains
+#: a mechanic; mechanics are explained when they are met.
+#:
+#: The line lengths are load-bearing. The pane does not scroll (any key dismisses
+#: the screen, so a player who needed to scroll could not), which means the story
+#: has to fit a 34-row terminal. Most lines are kept under 70 characters so they
+#: occupy one row each; the three that run long do so on purpose, for the beat
+#: they land on. ``tests/test_ui.py`` asserts the whole thing still fits.
 PROLOGUE: tuple[str, ...] = (
-    "Das Letzte, was unser Held noch wusste, war die Schlacht auf dem Berg Karpas.",
-    "Eine schwingende Axt über seinem Kopf.",
-    "Schwärze. Tiefste Schwärze.",
-    "Doch sie war nicht ruhig. Sie war nicht sanft, sondern wild und verstörend.",
-    "Nach einer gefühlten Ewigkeit gefangen in diesem unruhigen Nichts öffneten sich seine Augen.",
-    "Die Schwärze hatte ihm die Körperlichkeit zurückgegeben.",
-    "Eine Möglichkeit, diese Leere zu verlassen?",
+    "The last thing you remember is Karpas. The pass in the mountains, the mud, "
+    "the cold coming up through your boots.",
+    "And the axe. It hung above you a long time. Long enough to count the notches.",
+    "Then black. Not the black behind the eyes -- the black that owns them.",
+    "It was not still, and it was not kind. It pressed against you, and it was "
+    "pleased.",
+    "You cannot say how long. Forever is for people who still have time.",
+    "Then pain in the dark. That is how you knew the body was yours again.",
+    "You opened your eyes. Nothing opened with them.",
+    "The emptiness had given back your hands, your breath, your weight. Under your "
+    "palms, stone. Ahead of you, a cold that has a direction.",
+    "So down, then. Whatever door leads out of this, it is not behind you.",
 )
+
+#: The last line on the prologue screen, set apart from the story.
+#:
+#: The story ends on a decision ("so down, then"); this is the hook that turns the
+#: decision into a reason. It answers the question the user's original asked --
+#: whether there is a way out of the emptiness -- without doing the arithmetic of
+#: which floor, which the sidebar already states exactly.
+PROLOGUE_HINT = "There is a way out. It is under everything."
+
 
 #: Terrain worth explaining. VOID and FLOOR are omitted on purpose: void is
 #: "not yet seen", which the player learns from the dimming, and floor is the

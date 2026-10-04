@@ -159,9 +159,13 @@ HelpScreen {
 /* -- prologue ------------------------------------------------------------ */
 
 #prologue-screen {
-    width: 72;
-    height: 80%;
-    padding: 1 2;
+    /* Auto rather than a percentage: the pane is exactly as tall as the story,
+       so a short prologue does not float in a mostly-empty box. The max keeps a
+       very long story from running off the screen entirely. */
+    width: 76;
+    height: auto;
+    max-height: 95%;
+    padding: 1 3;
     background: $surface 90%;
 }
 
@@ -178,10 +182,23 @@ HelpScreen {
     width: 1fr;
     height: auto;
     margin: 0 0 1 0;
-    color: $foreground;
+    /* Just off white. The prose is meant to read as remembered rather than
+       reported, and full-brightness text in a dark panel reads as a form. */
+    color: #c8c8c8;
 }
 
+/* The line the player is meant to leave with, so it is set apart from the story
+   above it rather than being one more paragraph. */
 #prologue-hint {
+    width: 1fr;
+    height: auto;
+    margin: 1 0 0 0;
+    content-align: center middle;
+    text-style: bold italic;
+    color: $accent;
+}
+
+#prologue-dismiss {
     width: 1fr;
     height: auto;
     margin: 1 0 0 0;
