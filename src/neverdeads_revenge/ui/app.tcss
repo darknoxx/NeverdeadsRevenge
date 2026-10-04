@@ -1,0 +1,153 @@
+/* Neverdead's Revenge -- visual theme.
+   Dark, cold and readable at a glance: the dungeon should feel like a place you
+   are looking into, not a page of text.
+
+   Only real Textual design tokens are used here (accent, background, border,
+   error, foreground, panel, primary, secondary, success, surface, text,
+   warning). Dimmed text uses literal greys, because there is no muted/dim token. */
+
+Screen {
+    background: $background;
+    color: $foreground;
+}
+
+/* -- title ------------------------------------------------------------- */
+
+#title-screen {
+    align: center middle;
+    height: 1fr;
+}
+
+#title-art {
+    width: 1fr;
+    content-align: center middle;
+    color: $accent;
+    text-style: bold;
+}
+
+#title-subtitle {
+    width: 1fr;
+    content-align: center middle;
+    color: #8f8f8f;
+}
+
+#title-version, #title-hint {
+    width: 1fr;
+    content-align: center middle;
+    color: #6b6b6b;
+}
+
+/* -- hero select ------------------------------------------------------- */
+
+#hero-select {
+    align: center middle;
+    width: 1fr;
+    height: 1fr;
+}
+
+#hero-name {
+    width: 1fr;
+    content-align: center middle;
+    color: $accent;
+    text-style: bold;
+}
+
+#hero-title {
+    width: 1fr;
+    content-align: center middle;
+    color: #8f8f8f;
+}
+
+#hero-blurb {
+    width: 56;
+    height: auto;
+    margin: 1 0 0 0;
+    content-align: center middle;
+}
+
+#hero-stats {
+    width: 1fr;
+    height: auto;
+    margin: 1 0 0 0;
+    content-align: center middle;
+}
+
+#hero-locked {
+    width: 1fr;
+    height: auto;
+    content-align: center middle;
+    color: #6b6b6b;
+}
+
+/* -- game screen ------------------------------------------------------- */
+
+#game-screen {
+    layout: vertical;
+}
+
+#game-body {
+    height: 1fr;
+}
+
+#map-view {
+    width: 1fr;
+    height: 1fr;
+    border: round $panel;
+    padding: 0 1;
+}
+
+#sidebar {
+    width: 28;
+    height: 1fr;
+    border: round $panel;
+    padding: 0 1;
+}
+
+#message-log {
+    height: 8;
+    border: round $panel;
+    padding: 0 1;
+    background: $surface;
+}
+
+/* -- game over / pause ------------------------------------------------- */
+
+/* Both modals share a shape; only the accent differs. */
+#game-over, #pause {
+    align: center middle;
+    width: auto;
+    max-width: 80%;
+    height: auto;
+    padding: 1 3;
+    background: $background 85%;
+    border: round $panel;
+}
+
+#game-over-title {
+    width: 1fr;
+    content-align: center middle;
+    text-style: bold;
+    color: $error;
+}
+
+#pause-title {
+    width: 1fr;
+    content-align: center middle;
+    text-style: bold;
+    color: $warning;
+}
+
+#game-over-body, #pause-body {
+    width: 42;
+    height: auto;
+    margin: 1 0 0 0;
+    content-align: center middle;
+}
+
+#game-over-hint {
+    width: 1fr;
+    height: auto;
+    margin: 1 0 0 0;
+    content-align: center middle;
+    color: #6b6b6b;
+}

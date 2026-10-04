@@ -72,6 +72,7 @@ class GameState:
     turn_queue: TurnQueue = field(default_factory=TurnQueue)
     log: list[LogEntry] = field(default_factory=list)
     turn: int = 0
+    total_turns: int = 0
     run_state: RunState = RunState.PLAYING
     kills: int = 0
     revenge_stacks: int = 0
@@ -153,6 +154,8 @@ class GameState:
         ]
         self.turn_queue = TurnQueue([self.player, *self.enemies])
         self.refresh_vision()
+        # The per-floor clock restarts; total_turns keeps counting so the run
+        # summary reports the whole run, not the room the hero died in.
         self.turn = 0
 
         # Revenge is a per-floor reward, so it lapses on the way down.

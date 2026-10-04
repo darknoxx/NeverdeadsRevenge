@@ -156,6 +156,7 @@ def perform_action(state: GameState, action: Action) -> ActionResult:
     # turn counter, or the displayed turn number drifts away from the world.
     if acted:
         state.turn += 1
+        state.total_turns += 1
         advance_world(state)
     state.refresh_vision()
     return ActionResult(consumed_turn=acted, acted=acted, died=state.over)
