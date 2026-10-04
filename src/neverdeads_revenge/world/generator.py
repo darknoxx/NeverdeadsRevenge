@@ -1,0 +1,248 @@
+"""Procedural dungeon generation.
+
+Deliberately conservative: rectangular rooms joined by L-shaped corridors, then
+validated. Nothing clever, but the output is always fully connected and always
+has a reachable exit, which is the property that actually matters for a
+roguelite. Exotic generators can come later without touching anything else.
+
+Layout is produced first, then validated, and only then populated. That ordering
+means a room can never hold the player, an enemy, and the stairs all at once in a
+way that could not possibly connect.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from neverdeads_revenge.core.direction import Pos
+from neverdeads_revenge.core.rng import Rng
+
+from .map import DungeonMap
+from .tiles import Tile
+
+__all__ = ["GeneratedFloor", "generate_floor"]
+
+
+@dataclass(frozen=True, slots=True)
+class Rect:
+    """An inclusive rectangle."""
+
+    x: int
+    y: int
+    width: int
+    height: int
+
+    @property
+    def center(self) -> Pos:
+        return (self.x + self.width // 2, self.y + self.height // 2)
+
+    def contains(self, pos: Pos) -> bool:
+        px, py = pos
+        return self.x <= px < self.x + self.width and self.y <= py < self.y + self.height
+
+    def intersects(self, other: Rect) -> bool:
+        return not (
+            self.x + self.width <= other.x
+            or other.x + other.width <= self.x
+            or self.y + self.height <= other.y
+            or other.y + other.height <= self.y
+        )
+
+    def shrunk(self, margin: int) -> Rect:
+        return Rect(
+            self.x + margin,
+            self.y + margin,
+            max(1, self.width - 2 * margin),
+            max(1, self.height - 2 * margin),
+        )
+
+    @property
+    def inner(self) -> Rect:
+        """The room without its wall ring."""
+        return self.shrunk(1)
+
+    @property
+    def inner_positions(self) -> list[Pos]:
+        inner = self.inner
+        return [
+            (x, y)
+            for y in range(inner.y, inner.y + inner.height)
+            for x in range(inner.x, inner.x + inner.width)
+        ]
+
+
+@dataclass(slots=True)
+class GeneratedFloor:
+    """A finished floor, ready to be handed to a game."""
+
+    map: DungeonMap
+    player_start: Pos
+    stairs_down: Pos
+    spawn_points: list[Pos]
+    depth: int
+
+
+# -- layout ----------------------------------------------------------------
+
+
+MIN_ROOM_WIDTH = 5
+MIN_ROOM_HEIGHT = 4
+MAX_ROOM_WIDTH = 11
+MAX_ROOM_HEIGHT = 8
+
+
+def _make_room(rng: Rng, dungeon: Rect) -> Rect | None:
+    """Pick a random room inside ``dungeon``, or ``None`` if it cannot fit."""
+    if dungeon.width < MIN_ROOM_WIDTH or dungeon.height < MIN_ROOM_HEIGHT:
+        return None
+    # Clamp to the dungeon so the placement range can never invert.
+    width = min(rng.between(MIN_ROOM_WIDTH, MAX_ROOM_WIDTH), dungeon.width)
+    height = min(rng.between(MIN_ROOM_HEIGHT, MAX_ROOM_HEIGHT), dungeon.height)
+    x = rng.between(dungeon.x, dungeon.x + dungeon.width - width)
+    y = rng.between(dungeon.y, dungeon.y + dungeon.height - height)
+    return Rect(x, y, width, height)
+
+
+def _carve_room(dungeon_map: DungeonMap, room: Rect) -> None:
+    for y in range(room.y, room.y + room.height):
+        for x in range(room.x, room.x + room.width):
+            dungeon_map.set_tile((x, y), Tile.WALL)
+    for pos in room.inner_positions:
+        dungeon_map.set_tile(pos, Tile.FLOOR)
+
+
+def _carve_h_tunnel(dungeon_map: DungeonMap, x1: int, x2: int, y: int) -> None:
+    for x in range(min(x1, x2), max(x1, x2) + 1):
+        dungeon_map.set_tile((x, y), Tile.FLOOR)
+
+
+def _carve_v_tunnel(dungeon_map: DungeonMap, y1: int, y2: int, x: int) -> None:
+    for y in range(min(y1, y2), max(y1, y2) + 1):
+        dungeon_map.set_tile((x, y), Tile.FLOOR)
+
+
+def _corridor_between(dungeon_map: DungeonMap, start: Pos, end: Pos) -> None:
+    """Join two points with an L-shaped corridor, going horizontal first."""
+    _carve_h_tunnel(dungeon_map, start[0], end[0], start[1])
+    _carve_v_tunnel(dungeon_map, start[1], end[1], end[0])
+
+
+def _build_rooms(
+    rng: Rng, dungeon_map: DungeonMap, dungeon: Rect, attempts: int
+) -> list[Rect]:
+    """Place non-overlapping rooms, then connect them.
+
+    Corridors are carved only after every room is in place. Carving them eagerly
+    as each room is accepted looks equivalent but is not: a later room's wall ring
+    can land on top of an earlier corridor and sever it, leaving rooms stranded.
+    Doing corridors last means they always win.
+    """
+    rooms: list[Rect] = []
+    for _ in range(attempts):
+        room = _make_room(rng, dungeon)
+        if room is None or any(room.intersects(other) for other in rooms):
+            continue
+        _carve_room(dungeon_map, room)
+        rooms.append(room)
+
+    for previous, current in zip(rooms, rooms[1:]):
+        _corridor_between(dungeon_map, previous.center, current.center)
+    return rooms
+
+
+# -- validation ------------------------------------------------------------
+
+
+def _reachable(start: Pos, dungeon_map: DungeonMap) -> set[Pos]:
+    """Flood fill over walkable tiles from ``start``."""
+    seen = {start}
+    frontier = [start]
+    while frontier:
+        current = frontier.pop()
+        for neighbour in dungeon_map.neighbours(current):
+            if neighbour not in seen and dungeon_map.is_walkable(neighbour):
+                seen.add(neighbour)
+                frontier.append(neighbour)
+    return seen
+
+
+def _pick(rng: Rng, candidates: list[Pos]) -> Pos:
+    return candidates[rng.below(len(candidates))]
+
+
+def _scatter_decor(rng: Rng, dungeon_map: DungeonMap, rooms: list[Rect], count: int) -> None:
+    """Sprinkle rubble and grass for texture. Purely cosmetic, never on stairs."""
+    reserved = {pos for room in rooms for pos in room.inner_positions}
+    candidates = [pos for pos in dungeon_map.walkable_positions() if pos not in reserved]
+    if not candidates:
+        return
+    for pos in rng.shuffled(candidates)[:count]:
+        tile = rng.choice_weighted([(Tile.RUBBLE, 3.0), (Tile.GRASS, 5.0)])
+        if dungeon_map.tile_at(pos) is Tile.FLOOR:
+            dungeon_map.set_tile(pos, tile)
+
+
+def generate_floor(
+    rng: Rng,
+    depth: int = 1,
+    width: int = 61,
+    height: int = 39,
+    room_attempts: int = 140,
+    enemy_budget: int | None = None,
+) -> GeneratedFloor:
+    """Build one complete, validated dungeon floor.
+
+    Args:
+        rng: Seeded generator; the caller owns it so runs stay reproducible.
+        depth: 1-based floor number, used for difficulty scaling.
+        width, height: Map dimensions.
+        room_attempts: How many random rooms to try before giving up.
+        enemy_budget: Overrides the enemy count. Defaults to scaling with depth.
+
+    Raises:
+        RuntimeError: If no connected layout could be produced. With the default
+            dimensions this does not happen, but a caller may pass a tiny map.
+    """
+    dungeon_map = DungeonMap(width=width, height=height, depth=depth)
+    dungeon = Rect(1, 1, width - 2, height - 2)
+
+    rooms = _build_rooms(rng, dungeon_map, dungeon, room_attempts)
+    if not rooms:
+        raise RuntimeError(
+            f"failed to generate a floor at {width}x{height}; try a larger map"
+        )
+
+    # The first room is the safest bet for the player, the last for the exit.
+    start_room = rooms[0]
+    exit_room = rooms[-1]
+
+    reachable = _reachable(start_room.center, dungeon_map)
+    if exit_room.center not in reachable:
+        raise RuntimeError("exit room is not reachable from the entrance")
+
+    player_start = start_room.center
+    stairs_down = exit_room.center
+    dungeon_map.set_tile(stairs_down, Tile.STAIRS_DOWN)
+
+    # Spawn candidates: interior floor of every room, minus the player's room so
+    # nothing materialises on top of you.
+    candidates = [
+        pos
+        for room in rooms[1:]
+        for pos in room.inner_positions
+        if pos != stairs_down
+    ]
+    # Never hand out fewer spawn points than we need; a cramped floor is fine.
+    if enemy_budget is None:
+        enemy_budget = min(6 + depth, len(candidates))
+    spawn_points = rng.shuffled(candidates)[:enemy_budget]
+
+    _scatter_decor(rng, dungeon_map, rooms, count=len(dungeon_map.walkable_positions()) // 18)
+
+    return GeneratedFloor(
+        map=dungeon_map,
+        player_start=player_start,
+        stairs_down=stairs_down,
+        spawn_points=spawn_points,
+        depth=depth,
+    )
