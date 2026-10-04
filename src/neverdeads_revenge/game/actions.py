@@ -43,6 +43,12 @@ class Action(Enum):
     MOVE_SE = "se"
     MOVE_SW = "sw"
     WAIT = "wait"
+    #: Do whatever is under the player: take it, or take the stairs. This is the
+    #: verb a key is bound to. The two specific actions below stay because they
+    #: are meaningful on their own -- ``>`` is the classic "go down" and does not
+    #: need to guess, and a test that wants to pick something up should not have
+    #: to arrange a floor first.
+    INTERACT = "interact"
     PICK_UP = "pickup"
     DESCEND = "descend"
     QUAFF = "quaff"
@@ -155,6 +161,8 @@ def perform_action(state: GameState, action: Action) -> ActionResult:
         return _outcome(state, consumed_turn=False, acted=False)
 
     match action:
+        case Action.INTERACT:
+            return _interact(state)
         case Action.PICK_UP:
             return _pick_up(state)
         case Action.QUAFF:
@@ -214,6 +222,28 @@ def _resolve_player_attack(state: GameState, target: Actor) -> None:
     _enemy_takes_damage(state, target, outcome)
     if outcome.killed:
         _remove_corpse(state, target)
+
+
+def _interact(state: GameState) -> ActionResult:
+    """Do the one useful thing where the player is standing.
+
+    Items are taken before the exit is used, and the order is the whole design:
+    the generator never puts loot on the stairs, but if it ever did, walking onto
+    the staircase and leaving the floor without the potion would be the game
+    silently throwing something away on the player's behalf. Taking it first
+    means ``enter`` is always safe to press.
+
+    Costs no turn. Picking something up and going downstairs are not things the
+    monsters should get to answer.
+    """
+    if state.dungeon_map.item_at(state.player.position) is not None:
+        return _pick_up(state)
+
+    if state.on_exit:
+        return _try_descend(state)
+
+    state.say("There is nothing here.", LogKind.PLAIN)
+    return ActionResult(consumed_turn=False, acted=False)
 
 
 def _pick_up(state: GameState) -> ActionResult:

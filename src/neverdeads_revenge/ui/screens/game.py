@@ -57,25 +57,25 @@ KEY_BINDINGS: dict[str, Action] = {
     "pagedown": Action.MOVE_SE,
     ".": Action.WAIT,
     "space": Action.WAIT,
-    "g": Action.PICK_UP,
     "i": Action.INVENTORY,
     "q": Action.QUAFF,
     ">": Action.DESCEND,
-    # Enter and return take the stairs too, for players who expect enter to
-    # mean "interact with what is under me". Both keys, like ``>``, only work
-    # while standing on the staircase.
-    "enter": Action.DESCEND,
-    "return": Action.DESCEND,
+    # Enter is the interaction key: it takes what is under the player, or takes
+    # the stairs if there is nothing to take. One key for "do the thing here",
+    # because the alternative is a separate key per verb and a player looking
+    # down at the keyboard to find it.
+    "enter": Action.INTERACT,
+    "return": Action.INTERACT,
 }
 
 HELP_TEXT = f"""\
 [bold]movement   [/]w a s d  /  h j k l  /  arrows  /  y u b n   walk into a monster to attack
 [bold]wait       [/].  or  space
-[bold]pick up    [/]g
+[bold]interact   [/]enter      pick up what you are standing on, or take the stairs
+[bold]descend    [/]>          the same, when you already know you want to go down
 [bold]drink      [/]q          [bold]carried [/]i
-[bold]stairs     [/]>   or  enter /  return  while standing on them
 [bold]the way out[/]  {GOAL_HINT}; step into it to win
-[bold]help       [/]?          [bold]menu[/]escape
+[bold]help       [/]?          [bold]menu[/]  escape
 
 [bold]terrain[/]
 {terrain_help()}

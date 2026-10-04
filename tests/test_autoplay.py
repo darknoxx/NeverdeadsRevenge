@@ -37,7 +37,7 @@ async def autoplay(pilot, state, turns: int, seed: int, descend_every: int = 40)
         if roll < 0.06:
             key = "."
         elif roll < 0.10:
-            key = "g"
+            key = "enter"  # the interaction key: pick up here, descend if on stairs
         elif roll < 0.13:
             key = "q"
         elif roll < 0.15:
@@ -188,10 +188,11 @@ async def test_descending_rebuilds_the_floor():
 
 @pytest.mark.parametrize("key", [">", "enter", "return"])
 async def test_every_descend_key_works(key):
-    """All three ways down must reach the next floor.
+    """Both routes down must reach the next floor.
 
-    ``>`` is for players who know the game; ``enter`` and ``return`` are what
-    most people press when standing on something they want to use.
+    ``>`` is for players who know the game; ``enter`` is what most people press
+    when standing on something they want to use, and it takes the stairs only
+    after checking there is nothing to pick up first.
     """
     app = NeverdeadsRevenge()
     async with app.run_test(size=SIZE) as pilot:
@@ -231,6 +232,8 @@ async def test_descend_keys_do_nothing_away_from_the_stairs():
             assert state.depth == before
             assert state.player.position == beside
 
+        # ``>`` names the stairs, so it says so. ``enter`` is the general verb,
+        # so it only reports that there was nothing to interact with.
         assert state.log[-1].text == "There are no stairs here."
         assert state.total_turns == 0, "a refused descent costs no turn"
 

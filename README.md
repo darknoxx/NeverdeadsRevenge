@@ -59,11 +59,10 @@ or, without the launcher:
 | --- | --- |
 | `w` `a` `s` `d` / `h` `j` `k` `l` / arrows | Move (walk into an enemy to attack) |
 | `.` or `space` | Wait a turn |
-| `g` | Pick up what is under you |
+| `enter` | Interact: pick up what you are standing on, or take the stairs |
+| `>` | Descend, when you already know that is what you want |
 | `q` | Drink a potion |
 | `i` | Show what you are carrying |
-| `>` | Take the stairs / step into the rift, from anywhere on the floor |
-| `enter` / `return` | Same, while standing on them |
 | `?` | Controls and the terrain reference |
 | `Esc` | Menu, `q` there to quit to title |
 

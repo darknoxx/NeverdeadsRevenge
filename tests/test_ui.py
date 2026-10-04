@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from neverdeads_revenge.game import actors as actors_module
+from neverdeads_revenge.game.actions import Action
 from neverdeads_revenge.game.state import GameState, RunState
 from neverdeads_revenge.ui.app import NeverdeadsRevenge
 from neverdeads_revenge.ui.screens.game import GameScreen
@@ -106,8 +107,13 @@ async def test_hud_counts_the_draughts_you_are_carrying():
         assert "Draughts 1" in screen.query_one(Hud).render().plain
 
 
-async def test_pressing_q_drinks_and_g_picks_up():
-    """The two new keys have to reach the game layer, not just the state."""
+async def test_enter_picks_up_and_q_drinks():
+    """``enter`` has to do the thing, and ``q`` has to drink it.
+
+    Both keys are checked through the real key path rather than by calling the
+    action, because the interesting failure is a key that never reaches the game
+    layer at all.
+    """
     from neverdeads_revenge.world.items import ITEMS, make_item
 
     app = NeverdeadsRevenge()
@@ -119,7 +125,7 @@ async def test_pressing_q_drinks_and_g_picks_up():
 
         # An elixir on the floor, under the player.
         state.dungeon_map.add_item(state.player.position, make_item(ITEMS["elixir"]))
-        await pilot.press("g")
+        await pilot.press("enter")
         await pilot.pause()
         assert [item.name for item in state.inventory] == ["elixir"]
 
@@ -127,6 +133,74 @@ async def test_pressing_q_drinks_and_g_picks_up():
         await pilot.pause()
         assert state.player.hp == state.player.max_hp
         assert state.inventory == []
+
+
+async def test_enter_does_the_useful_thing_wherever_you_stand():
+    """One key, three outcomes, and picking up wins over leaving.
+
+    The order matters more than it looks: if the exit were checked first, an item
+    that ever landed on the staircase would be silently abandoned the moment the
+    player pressed enter to take it.
+    """
+    from neverdeads_revenge.game.state import RunState
+    from neverdeads_revenge.world.generator import ESCAPE_DEPTH
+    from neverdeads_revenge.world.items import ITEMS, make_item
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        assert state is not None
+
+        # Nothing here: says so, costs nothing.
+        await pilot.press("enter")
+        await pilot.pause()
+        assert state.log[-1].text == "There is nothing here."
+        assert state.depth == 1
+        assert state.total_turns == 0
+
+        # On the stairs: goes down.
+        state.player.position = state.stairs
+        await pilot.press("enter")
+        await pilot.pause()
+        assert state.depth == 2
+
+        # On an item on the stairs: takes the item, does not leave the floor.
+        state.player.position = state.stairs
+        state.dungeon_map.add_item(state.stairs, make_item(ITEMS["potion"]))
+        depth = state.depth
+        await pilot.press("enter")
+        await pilot.pause()
+        assert [item.name for item in state.inventory] == ["potion"]
+        assert state.depth == depth, "enter left the floor with loot still on it"
+
+        # Second press, item gone: now it goes down.
+        await pilot.press("enter")
+        await pilot.pause()
+        assert state.depth == depth + 1
+        assert [item.name for item in state.inventory] == ["potion"]
+
+        # On the rift: wins.
+        state.build_floor(ESCAPE_DEPTH)
+        state.player.position = state.exit_pos
+        await pilot.press("enter")
+        await pilot.pause()
+        assert state.run_state is RunState.ESCAPED
+
+
+async def test_g_is_no_longer_a_key():
+    """The old pick-up key is gone, not merely undocumented.
+
+    A key that still works but is not in the help is worse than no key: it is a
+    second way to do something, known only to players who read the source.
+    """
+    from neverdeads_revenge.ui.screens.game import KEY_BINDINGS
+
+    assert "g" not in KEY_BINDINGS
+    assert KEY_BINDINGS["enter"] is Action.INTERACT
+    assert KEY_BINDINGS["return"] is Action.INTERACT
+    assert KEY_BINDINGS["q"] is Action.QUAFF
+    assert KEY_BINDINGS["i"] is Action.INVENTORY
 
 
 # -- winning ----------------------------------------------------------------
