@@ -188,3 +188,12 @@ src/neverdeads_revenge/
 The one rule: `core/`, `world/` and `game/` never import `textual`.
 Game logic is headless and deterministic; the UI only renders it. That keeps the
 logic testable without a terminal and makes a headless simulator possible later.
+
+## License
+
+**GNU General Public License, version 3 or later.** The full text is in
+[LICENSE](LICENSE).
+
+In short: you are free to run, study, share and modify this. If you distribute
+it or anything built on it, it has to stay under the same licence and come with
+the source. There is no warranty.

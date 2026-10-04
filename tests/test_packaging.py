@@ -397,3 +397,45 @@ def test_the_icon_ships_no_stray_characters():
     """The title art's lesson, applied here: blocks or nothing."""
     body = ICON.read_text()
     assert "█" not in body, "the SVG should use rects, not block characters"
+
+
+# -- the licence ------------------------------------------------------------
+def test_the_licence_says_the_same_thing_everywhere():
+    """README, LICENSE and the package metadata have to agree.
+
+    They did not before: pyproject declared MIT and there was no LICENSE file at
+    all, so the repository contradicted itself about the one thing a reader is
+    entitled to take at face value.
+    """
+    import tomllib
+
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+    declared = project["license"]["text"]
+    assert "GPL" in declared, f"pyproject still says {declared!r}"
+
+    licence = (ROOT / "LICENSE").read_text(encoding="utf-8")
+    assert "GNU GENERAL PUBLIC LICENSE" in licence
+    assert "Version 3" in licence
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "General Public License" in readme, "the README does not name the licence"
+    assert "LICENSE" in readme, "the README does not point at the file"
+
+
+def test_the_licence_file_is_shipped_with_the_package():
+    """A licence nobody receives is not a licence."""
+    import tomllib
+
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+    files = project.get("license-files", [])
+    assert files, "license-files is not set, so LICENSE will not be shipped"
+    for name in files:
+        assert (ROOT / name).exists(), f"license-files names {name}, which is not there"
+
+
+def test_the_licence_file_is_the_real_thing():
+    """Not a stub, not a summary -- the text the FSF publishes."""
+    licence = (ROOT / "LICENSE").read_text(encoding="utf-8")
+    assert len(licence) > 30_000, "the LICENSE file looks like a summary, not the text"
+    assert "Copyright (C) 2007 Free Software Foundation" in licence
+    assert "TERMS AND CONDITIONS" in licence
