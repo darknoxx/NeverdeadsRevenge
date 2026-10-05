@@ -167,6 +167,9 @@ class Actor:
     color: str = "white"
     is_player: bool = False
     alive: bool = True
+    #: Coins this actor leaves behind when it dies. Copied from the template so
+    #: the kill does not have to go looking for which monster it was.
+    gold: tuple[int, int] = (0, 0)
     #: Cells entered since the run started. A run total, like ``total_turns``,
     #: and a statistic rather than a score input: the score rewards time, and
     #: walking further is the opposite of that.
@@ -466,6 +469,10 @@ class EnemyTemplate:
     stats: Stats
     #: How this monster behaves. See game.ai.
     behaviour: str = "aggressive"
+    #: Coins this monster leaves behind, before depth scaling. A range rather
+    #: than a number so a kill is worth something different each time, which is
+    #: what makes a floor feel like it paid out unevenly.
+    gold: tuple[int, int] = (2, 4)
     #: Relative chance of being picked when populating a floor.
     weight: float = 1.0
     #: How much ``weight`` grows per floor descended. ``1.0`` keeps the monster
@@ -483,6 +490,7 @@ ENEMIES: dict[str, EnemyTemplate] = {
         color="green",
         behaviour="aggressive",
         stats=Stats(max_hp=9, hp=9, speed=0.7, damage=(2, 4), evasion=0, armor=0),
+        gold=(3, 6),
         weight=4.0,
     ),
     "bone": EnemyTemplate(
@@ -492,6 +500,7 @@ ENEMIES: dict[str, EnemyTemplate] = {
         color="grey70",
         behaviour="cautious",
         stats=Stats(max_hp=14, hp=14, speed=1.0, damage=(3, 6), accuracy=1, armor=1),
+        gold=(6, 11),
         weight=3.0,
     ),
     "wraith": EnemyTemplate(
@@ -501,6 +510,7 @@ ENEMIES: dict[str, EnemyTemplate] = {
         color="magenta",
         behaviour="hunter",
         stats=Stats(max_hp=7, hp=7, speed=1.3, damage=(2, 5), evasion=3),
+        gold=(5, 9),
         weight=1.5,
         # The only monster that gets more common as you descend. It is fast and
         # evasive, which is exactly the thing that makes a floor feel unfair if
@@ -522,6 +532,7 @@ def make_enemy(template: EnemyTemplate, position: Pos) -> Actor:
         glyph=template.glyph,
         color=template.color,
         behaviour=template.behaviour,
+        gold=template.gold,
     )
 
 
@@ -554,7 +565,12 @@ def scale_template(template: EnemyTemplate, depth: int) -> EnemyTemplate:
         # speed 2.6, faster than Noxx, and the hero would stop being the fast one.
         speed=min(template.stats.speed * factor, MAX_ENEMY_SPEED),
     )
-    return replace(template, stats=stats)
+    # The purse scales with the same factor as the damage: a deep floor pays
+    # better, which is the whole reason to keep going down rather than farm the
+    # first three.
+    low, high = template.gold
+    gold = (max(1, round(low * factor)), max(1, round(high * factor)))
+    return replace(template, stats=stats, gold=gold)
 
 
 def pick_enemy_template(rng: Rng, depth: int = 1) -> EnemyTemplate:

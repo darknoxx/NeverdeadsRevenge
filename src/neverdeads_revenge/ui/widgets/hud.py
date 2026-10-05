@@ -120,11 +120,16 @@ class Hud(Static):
         if state.at_the_rift:
             out.append("The rift hums.\n", style="bold bright_cyan")
 
+        # Gold and the draughts share a line. The sidebar is clipped, not
+        # scrolled, and the legend needs the rows more than these two need a
+        # line each.
+        out.append("Gold ", style="dim")
+        out.append(f"{state.gold}", style="bold yellow" if state.gold else "dim")
         potions = sum(1 for item in state.inventory if item.heal > 0)
-        out.append("Draughts ", style="dim")
+        out.append("   Draughts ", style="dim")
         out.append(f"{potions}", style="bold bright_red" if potions else "dim")
         if potions:
-            out.append("  q", style="dim")
+            out.append(" q", style="dim")
         out.append("\n")
 
         out.append(f"Kills {state.kills}  Turns {state.total_turns}\n", style="dim")

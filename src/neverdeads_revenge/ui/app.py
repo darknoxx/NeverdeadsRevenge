@@ -115,6 +115,7 @@ class NeverdeadsRevenge(App[None]):
             depth=state.depth,
             score=state.score,
             kills=state.kills,
+            gold=state.gold,
             won=state.run_state is RunState.ESCAPED,
         )
         try:

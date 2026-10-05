@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from ..game.actors import ENEMIES, HEROES, Hero, scale_template
 from ..world.generator import ESCAPE_DEPTH
-from ..world.items import CHEST_GLYPH, ITEMS
+from ..world.items import CHEST_GLYPH, COIN_GLYPH, ITEMS
 from ..world.tiles import Tile
 
 __all__ = [
@@ -131,6 +131,7 @@ def item_legend() -> list[tuple[str, str]]:
         else:
             rows.append((template.glyph, f"{template.name}, heals {template.heal}"))
     rows.append((CHEST_GLYPH, "a chest, and a price"))
+    rows.append((COIN_GLYPH, "coins, for the shop"))
     return rows
 
 

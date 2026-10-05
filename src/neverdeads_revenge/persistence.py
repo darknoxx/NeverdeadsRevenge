@@ -60,6 +60,9 @@ class MetaProgress:
     unlocked_heroes: list[str] = field(default_factory=lambda: ["noxx"])
     #: Upgrade key -> number of stacks bought.
     upgrades: dict[str, int] = field(default_factory=dict)
+    #: Coins banked across every run. Spent in the shop, so it is the one number
+    #: that survives death and is worth something afterwards.
+    gold: int = 0
     #: Lifetime run statistics.
     runs_started: int = 0
     runs_won: int = 0
@@ -86,10 +89,23 @@ class MetaProgress:
     def is_unlocked(self, hero_key: str) -> bool:
         return hero_key in self.unlocked_heroes
 
-    def record_run(self, *, depth: int, score: int, kills: int, won: bool = False) -> None:
-        """Fold a finished run into the lifetime totals."""
+    def record_run(
+        self,
+        *,
+        depth: int,
+        score: int,
+        kills: int,
+        gold: int = 0,
+        won: bool = False,
+    ) -> None:
+        """Fold a finished run into the lifetime totals.
+
+        ``gold`` is added rather than kept at its best: coin is a currency, and a
+        bad run that still picked up a purse is a run that moved you forward.
+        """
         self.runs_started += 1
         self.total_kills += kills
+        self.gold += gold
         self.best_depth = max(self.best_depth, depth)
         self.best_score = max(self.best_score, score)
         if won:
@@ -138,16 +154,21 @@ def load_meta(path: Path | None = None) -> MetaProgress:
     if not isinstance(raw, dict) or raw.get("version") != SAVE_VERSION:
         return MetaProgress()
 
+    # Read field by field with defaults rather than by key. A save written by an
+    # older build is missing whatever was added since, and the version check
+    # above would otherwise have thrown the whole file away -- losing a player's
+    # high score to add a coin counter.
     try:
         return MetaProgress(
             version=raw["version"],
-            unlocked_heroes=list(raw["unlocked_heroes"]),
-            upgrades=dict(raw["upgrades"]),
-            runs_started=int(raw["runs_started"]),
-            runs_won=int(raw["runs_won"]),
-            best_depth=int(raw["best_depth"]),
-            best_score=int(raw["best_score"]),
-            total_kills=int(raw["total_kills"]),
+            unlocked_heroes=list(raw.get("unlocked_heroes", ["noxx"])),
+            upgrades=dict(raw.get("upgrades", {})),
+            gold=int(raw.get("gold", 0)),
+            runs_started=int(raw.get("runs_started", 0)),
+            runs_won=int(raw.get("runs_won", 0)),
+            best_depth=int(raw.get("best_depth", 0)),
+            best_score=int(raw.get("best_score", 0)),
+            total_kills=int(raw.get("total_kills", 0)),
         )
     except (KeyError, TypeError, ValueError):
         return MetaProgress()

@@ -987,16 +987,24 @@ def test_no_actions_are_accepted_after_death():
     assert state.turn == before
 
 
-def test_score_rewards_kills_and_depth():
+def test_score_rewards_depth_and_not_kills():
+    """Killing pays in coin now, so the score is about how far and how fast.
+
+    Running them together made every fight worth points whether or not it was
+    worth fighting; the purse is the thing that should reward a fight.
+    """
     state = start_run(NOXX, seed=6)
     assert state.score == 0
-    state.kills = 3
+
     state.floors_cleared = 2
     # Spend the whole turn budget, so this is testing the base and nothing else.
     state.total_turns = TURN_BUDGET_PER_FLOOR * state.floors_cleared
-    assert state.base_score == 3 * 100 + 2 * 250
+    without_kills = state.base_score
+
+    state.kills = 30
+    assert state.base_score == without_kills, "kills moved the score"
+    assert state.base_score == 2 * 250
     assert state.speed_bonus == 0
-    assert state.score == 800
 
 
 def test_score_rewards_speed():
@@ -1781,3 +1789,98 @@ def _place_adjacent_enemy(state: GameState) -> Actor:
     victim.position = Direction.EAST.step(state.player.position)
     state.refresh_vision()
     return victim
+
+
+# -- coins ------------------------------------------------------------------
+def _kill_one(state: GameState, key: str = "ghoul") -> Actor:
+    """Put a one-hit monster beside the player and let the player kill it."""
+    enemy = make_enemy(ENEMIES[key], (state.player.position[0] + 1, state.player.position[1]))
+    enemy.stats.hp = 1
+    state.enemies = [enemy]
+    state.turn_queue = type(state.turn_queue)([state.player, enemy])
+    state.refresh_vision()
+    for _ in range(40):
+        if not enemy.alive:
+            break
+        perform_action(state, Action.MOVE_EAST)
+    assert not enemy.alive, "the player never landed the hit"
+    return enemy
+
+
+def test_a_kill_leaves_coins_where_the_monster_fell():
+    state = start_run(NOXX, seed=3)
+    enemy = _kill_one(state)
+    pos = enemy.position
+
+    dropped = state.dungeon_map.item_at(pos)
+    assert dropped is not None
+    assert dropped.kind == "coin"
+    low, high = enemy.gold
+    assert low <= dropped.gold <= high
+
+
+def test_killing_does_not_pay_score():
+    """The two clocks are separate: one is a record, the other is a purse."""
+    state = start_run(NOXX, seed=3)
+    before = state.base_score
+    _kill_one(state)
+    assert state.base_score == before
+    assert state.kills == 1
+
+
+def test_picking_coins_up_adds_them_to_the_purse():
+    state = start_run(NOXX, seed=3)
+    enemy = _kill_one(state)
+    coins = state.dungeon_map.item_at(enemy.position)
+
+    state.player.position = enemy.position
+    perform_action(state, Action.PICK_UP)
+
+    assert state.gold == coins.gold
+    assert state.dungeon_map.item_at(enemy.position) is None
+    assert "coins" in state.log[-1].text
+
+
+def test_two_kills_in_the_same_spot_make_one_bigger_pile():
+    """Otherwise the second pile silently overwrites the first."""
+    from neverdeads_revenge.world.items import make_coin
+
+    state = start_run(NOXX, seed=3)
+    pos = (state.player.position[0] + 1, state.player.position[1])
+    state.dungeon_map.add_item(pos, make_coin(4))
+
+    enemy = make_enemy(ENEMIES["ghoul"], pos)
+    enemy.stats.hp = 1
+    state.enemies = [enemy]
+    state.turn_queue = type(state.turn_queue)([state.player, enemy])
+    state.refresh_vision()
+    for _ in range(40):
+        if not enemy.alive:
+            break
+        perform_action(state, Action.MOVE_EAST)
+
+    pile = state.dungeon_map.item_at(pos)
+    assert pile.kind == "coin"
+    assert pile.gold > 4, "the first pile was overwritten"
+
+
+def test_deeper_monsters_carry_more():
+    from neverdeads_revenge.game.actors import scale_template
+
+    for template in ENEMIES.values():
+        shallow = scale_template(template, 1).gold
+        deep = scale_template(template, 9).gold
+        assert deep[0] >= shallow[0] and deep[1] >= shallow[1], template.key
+        assert deep[1] > shallow[1], template.key
+
+
+def test_coins_are_not_carried_in_the_pack():
+    """They go straight into the purse; the pack is for draughts."""
+    state = start_run(NOXX, seed=3)
+    enemy = _kill_one(state)
+    state.player.position = enemy.position
+
+    perform_action(state, Action.PICK_UP)
+
+    assert state.inventory == []
+    assert state.gold > 0

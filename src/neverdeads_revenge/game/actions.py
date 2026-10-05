@@ -18,6 +18,7 @@ from neverdeads_revenge.core.direction import (
     chebyshev,
     direction_towards,
 )
+from neverdeads_revenge.world.items import make_coin
 from neverdeads_revenge.world.map import GroundItem
 from neverdeads_revenge.world.tiles import Tile
 
@@ -114,6 +115,7 @@ def _kill_message(state: GameState, enemy: Actor, outcome) -> None:
         LogKind.CRIT if outcome.crit else LogKind.COMBAT,
     )
     state.kills += 1
+    _drop_coins(state, enemy)
 
     player = state.player
     before = state.revenge_stacks
@@ -127,6 +129,31 @@ def _kill_message(state: GameState, enemy: Actor, outcome) -> None:
             f"{player.trait.describe(state.revenge_stacks)}.",
             LogKind.GOOD,
         )
+
+
+def _drop_coins(state: GameState, enemy: Actor) -> None:
+    """Leave what the monster was carrying where it fell.
+
+    A pile rather than a number added straight to the purse: gold you have to
+    walk over is gold you can decide to leave, and deciding is the point. It
+    also puts the two clocks in the game against each other -- the score wants
+    you gone quickly, the coins want you to take one more step.
+    """
+    low, high = enemy.gold
+    if high <= 0:
+        return
+
+    value = state.rng.between(low, high)
+    existing = state.dungeon_map.item_at(enemy.position)
+    if existing is not None and existing.kind == "coin":
+        # Two kills in the same corner should be one bigger pile, not one pile
+        # and a silently overwritten one.
+        existing.gold += value
+        return
+    if existing is not None:
+        return  # something else is lying there; the coins are lost to it
+
+    state.dungeon_map.add_item(enemy.position, make_coin(value))
 
 
 def _player_takes_damage(state: GameState, enemy: Actor, outcome) -> None:
@@ -348,6 +375,12 @@ def _pick_up(state: GameState) -> ActionResult:
         return ActionResult(consumed_turn=False, acted=False)
 
     state.dungeon_map.remove_item(state.player.position)
+
+    if item.kind == "coin":
+        state.gold += item.gold
+        state.say(f"You pocket {item.gold} coins.", LogKind.GOOD)
+        return ActionResult(consumed_turn=False, acted=False)
+
     if item.slot:
         _equip(state, item)
     else:

@@ -214,6 +214,7 @@ class GameScreen(Screen[None]):
         else:
             summary.append(f"Floor reached  {state.depth}\n", style="bold cyan")
         summary.append(f"Monsters slain  {state.kills}\n")
+        summary.append(f"Coins gathered  {state.gold}\n")
         summary.append(f"Turns taken     {state.total_turns}\n")
         summary.append(f"Cells walked    {state.player.steps}\n")
         # Shown on its own line, with a sign, so it reads as something earned

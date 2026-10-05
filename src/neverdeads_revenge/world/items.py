@@ -25,6 +25,7 @@ __all__ = [
     "ITEMS",
     "make_item",
     "make_chest",
+    "make_coin",
     "roll_item",
     "roll_chest_contents",
     "loot_count",
@@ -36,6 +37,8 @@ __all__ = [
     "ARMOUR_COLOR",
     "CHEST_GLYPH",
     "CHEST_COLOR",
+    "COIN_GLYPH",
+    "COIN_COLOR",
 ]
 
 
@@ -229,6 +232,22 @@ ITEMS: dict[str, ItemTemplate] = {
 #: trap, and the dialog is where the trap gets said out loud.
 CHEST_GLYPH = "&"
 CHEST_COLOR = "bright_yellow"
+
+#: Coins left by a dead monster.
+COIN_GLYPH = "$"
+COIN_COLOR = "#ffd700"
+
+
+def make_coin(value: int) -> GroundItem:
+    """A pile of coins on the floor."""
+    return GroundItem(
+        item_id="coin",
+        name="coins",
+        glyph=COIN_GLYPH,
+        color=COIN_COLOR,
+        kind="coin",
+        gold=value,
+    )
 
 
 def make_chest(curse_key: str, contents: ItemTemplate) -> GroundItem:

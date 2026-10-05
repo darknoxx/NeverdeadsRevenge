@@ -38,6 +38,8 @@ class GroundItem:
     curse: str | None = None
     #: What is inside a chest. ``None`` for everything else.
     contents: GroundItem | None = None
+    #: Coins in a pile. Zero for everything that is not a coin.
+    gold: int = 0
 
 
 @dataclass(slots=True)

@@ -113,6 +113,10 @@ class GameState:
     #: What chests have taken. Run-long: there is no cure, so a curse is a
     #: decision made once and lived with.
     curses: list[Curse] = field(default_factory=list)
+    #: Coins picked up this run. Banked when the run ends and spent in the shop,
+    #: which is why it is kept apart from the score: one is a record of the run,
+    #: the other is what the run was worth to you afterwards.
+    gold: int = 0
 
     # -- curses -------------------------------------------------------------
     def add_curse(self, curse: Curse) -> None:
@@ -312,8 +316,14 @@ class GameState:
     # -- scoring ------------------------------------------------------------
     @property
     def base_score(self) -> int:
-        """Kills and depth, before speed and before getting out."""
-        return self.kills * 100 + self.floors_cleared * 250
+        """Depth, before speed and before getting out.
+
+        Killing things pays in coin rather than in points. The score is about
+        how far and how fast; the purse is about what you can afford next time,
+        and running them together made every fight worth points whether or not
+        it was worth fighting.
+        """
+        return self.floors_cleared * 250
 
     @property
     def speed_bonus(self) -> int:
