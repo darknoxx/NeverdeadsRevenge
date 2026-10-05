@@ -22,6 +22,7 @@ from textual.widgets import Footer, Static
 
 from ...game.actions import Action, perform_action
 from ...game.actors import HEROES
+from ...game.shop import Loadout
 from ...game.prologue import GOAL_HINT, terrain_help
 from ...game.state import GameState, start_run
 from ..widgets.hud import Hud
@@ -95,7 +96,12 @@ class GameScreen(Screen[None]):
         Binding("escape", "menu", "Menu"),
     ]
 
-    def __init__(self, hero_key: str = "noxx", seed: int | None = None) -> None:
+    def __init__(
+        self,
+        hero_key: str = "noxx",
+        seed: int | None = None,
+        loadout: Loadout | None = None,
+    ) -> None:
         super().__init__()
         # Loud on an unknown key rather than falling back to the first hero. The
         # old fallback is precisely what hid a wiring bug that made every run
@@ -103,6 +109,8 @@ class GameScreen(Screen[None]):
         # connection into a working-looking game.
         self.hero = HEROES[hero_key]
         self.seed = seed
+        #: What the shop sold for this run. Empty for a run that bought nothing.
+        self.loadout = loadout or Loadout()
         self.state: GameState | None = None
 
     # -- composition --------------------------------------------------------
@@ -122,7 +130,7 @@ class GameScreen(Screen[None]):
     # -- run lifecycle ------------------------------------------------------
     def _start_run(self) -> None:
         seed = self.seed if self.seed is not None else _fresh_seed()
-        self.state = start_run(self.hero, seed=seed)
+        self.state = start_run(self.hero, seed=seed, loadout=self.loadout)
         map_view = self.query_one(MapView)
         map_view.state = self.state
         self.query_one(Hud).state = self.state

@@ -18,12 +18,14 @@ from neverdeads_revenge.core.rng import Rng
 from neverdeads_revenge.core.turn_queue import TurnQueue
 from neverdeads_revenge.world.fov import compute_fov_full
 from neverdeads_revenge.world.generator import GeneratedFloor, generate_floor
+from neverdeads_revenge.world.items import ITEMS, make_item
 from neverdeads_revenge.world.map import DungeonMap, GroundItem
 from neverdeads_revenge.world.tiles import Tile
 
 from .actors import Actor, Hero, make_enemy, make_hero, pick_enemy_template
 from .combat import apply_revenge
 from .curses import CURSES, Curse
+from .shop import META_UPGRADES, Loadout
 
 __all__ = [
     "LogEntry",
@@ -118,6 +120,20 @@ class GameState:
     #: the other is what the run was worth to you afterwards.
     gold: int = 0
 
+    # -- what the shop sent with you ----------------------------------------
+    #
+    # Bought before the run and carried into it. Kept as plain numbers rather
+    # than as a reference to the purchase, so nothing in the hot path has to ask
+    # the save file what a wild offer does.
+    #: Extra sight on top of the base radius, from the lantern upgrade.
+    sight_bonus: int = 0
+    #: What a dropped coin is multiplied by: the pact and greed both touch it.
+    coin_multiplier: float = 1.0
+    #: What every monster's health is multiplied by. Greed's catch.
+    enemy_hp_multiplier: float = 1.0
+    #: Killing blows left before one of them lands. Second wind.
+    extra_lives: int = 0
+
     # -- curses -------------------------------------------------------------
     def add_curse(self, curse: Curse) -> None:
         """Take on ``curse``, for good.
@@ -149,7 +165,7 @@ class GameState:
         The tightest curse wins rather than the last one applied: two things
         closing the dark in should not open it back up.
         """
-        radius = VIEW_RADIUS
+        radius = VIEW_RADIUS + self.sight_bonus
         for curse in self.curses:
             if curse.sight is not None:
                 radius = min(radius, curse.sight)
@@ -249,6 +265,7 @@ class GameState:
             make_enemy(pick_enemy_template(self.rng, depth), pos)
             for pos in floor.spawn_points
         ]
+        self.toughen_enemies()
         self.turn_queue = TurnQueue([self.player, *self.enemies])
         self.refresh_vision()
         # The per-floor clock restarts; total_turns keeps counting so the run
@@ -302,7 +319,46 @@ class GameState:
     def on_stairs(self) -> bool:
         return self.stairs is not None and self.player.position == self.stairs
 
+    def toughen_enemies(self) -> None:
+        """Apply the enemy-health multiplier to whatever is on this floor.
+
+        Called from ``build_floor``, and again from :func:`start_run` after the
+        wild offers land -- greed is bought for a run that has already had its
+        first floor built, and a bargain that skips floor one is a bargain that
+        is quietly mis-sold.
+        """
+        if self.enemy_hp_multiplier == 1.0:
+            return
+        for enemy in self.enemies:
+            enemy.stats.max_hp = max(
+                1, round(enemy.stats.max_hp * self.enemy_hp_multiplier)
+            )
+            enemy.stats.hp = enemy.stats.max_hp
+
     # -- endings ------------------------------------------------------------
+    def die(self, cause: str) -> bool:
+        """Kill the hero, unless something bought keeps them alive.
+
+        Returns whether the hero actually died. One place rather than at every
+        way a run can end, because bleeding out is a death like any other and a
+        bargain that only worked against monsters would be a bargain with a
+        footnote.
+        """
+        if self.extra_lives > 0:
+            self.extra_lives -= 1
+            self.player.stats.hp = 1
+            self.player.alive = True
+            self.say(
+                "Something hauls you back from the edge. Not this time.",
+                LogKind.GOOD,
+            )
+            return False
+
+        self.player.alive = False
+        self.run_state = RunState.DEAD
+        self.say(cause, LogKind.BAD)
+        return True
+
     def escape(self) -> None:
         """Step through the rift and out of the dungeon.
 
@@ -354,24 +410,106 @@ class GameState:
         return self.base_score + self.speed_bonus + escape
 
 
-def start_run(hero: Hero, seed: int, upgrades: dict[str, int] | None = None) -> GameState:
+def start_run(
+    hero: Hero,
+    seed: int,
+    loadout: Loadout | None = None,
+    upgrades: dict[str, int] | None = None,
+) -> GameState:
     """Begin a fresh run with ``hero``.
 
     Args:
         hero: The chosen character.
         seed: The run seed. The same seed always yields the same dungeon.
-        upgrades: Permanent meta upgrades, as ``{key: stacks}``.
+        loadout: What the shop sold for this run.
+        upgrades: Permanent meta upgrades, as ``{key: stacks}``. Kept as a
+            shorthand for callers that have no loadout; ``loadout.upgrades``
+            wins when both are given.
     """
+    loadout = loadout or Loadout()
     state = GameState(hero=hero, rng=Rng(seed), seed=seed)
-    _apply_upgrades(state, upgrades or {})
+
+    # The floor first, because the hero does not exist until it is built and
+    # everything below changes the hero.
     state.build_floor(1)
+
+    permanent = loadout.upgrades or (upgrades or {})
+    _apply_upgrades(state, permanent)
+    _apply_pending(state, loadout.pending)
+    _apply_wilds(state, loadout.wilds)
+    # The floor is already built, so anything the wilds changed about the
+    # monsters has to be applied to them now.
+    state.toughen_enemies()
     return state
 
 
 def _apply_upgrades(state: GameState, upgrades: dict[str, int]) -> None:
-    """Fold permanent meta upgrades into the hero's starting stats.
+    """Fold permanent upgrades into the hero's starting stats.
 
-    Stubbed for milestone 1: the data path exists so later upgrades only need an
-    entry here, not a change to the run setup.
+    Every upgrade is a delta, including the negative one the blood bargain
+    sells, which is why this is a sum and not a set of special cases.
     """
-    del upgrades  # nothing to apply yet
+    player = state.player
+    for key, stacks in upgrades.items():
+        upgrade = META_UPGRADES.get(key)
+        if upgrade is None or stacks <= 0:
+            continue
+        if upgrade.max_hp:
+            player.stats.max_hp = max(1, player.stats.max_hp + upgrade.max_hp * stacks)
+        if upgrade.speed:
+            player.stats.speed += upgrade.speed * stacks
+        if upgrade.sight:
+            state.sight_bonus += upgrade.sight * stacks
+
+    # A run starts whole. Bought health you do not have is not bought health,
+    # and the blood bargain's whole point is that the missing part is gone.
+    player.stats.hp = player.stats.max_hp
+
+
+def _receive(state: GameState, template) -> None:
+    """Put an item where it belongs: draughts in the pack, the rest worn."""
+    item = make_item(template)
+    if template.kind == "draught":
+        state.inventory.append(item)
+    else:
+        state.player.equipment[template.slot] = item
+
+
+def _apply_pending(state: GameState, keys) -> None:
+    """Open the shop's parcel: everything bought for this run."""
+    for key in keys:
+        template = ITEMS.get(key)
+        if template is None:
+            continue
+        _receive(state, template)
+        state.say(f"You start with the {template.name}.", LogKind.SYSTEM)
+
+
+def _apply_wilds(state: GameState, keys) -> None:
+    """Apply the bargains. Each one is its own small rule, on purpose.
+
+    A table of effects would be shorter and would also be a table of lambdas,
+    which is not shorter to read. There are six of these and each does something
+    the others do not.
+    """
+    for key in keys:
+        if key == "blind_box":
+            template = state.rng.choice_weighted(
+                [(t, t.weight) for t in ITEMS.values()]
+            )
+            _receive(state, template)
+            state.say(f"The blind box holds a {template.name}.", LogKind.GOOD)
+        elif key == "pact":
+            state.coin_multiplier *= 1.5
+            state.add_curse(state.rng.pick(list(CURSES.values())))
+            state.say("The pact settles over you, and will not lift.", LogKind.BAD)
+        elif key == "greed":
+            state.coin_multiplier *= 2.0
+            state.enemy_hp_multiplier *= 1.2
+            state.say("You want all of it, and the dark can tell.", LogKind.BAD)
+        elif key == "grave_goods":
+            _receive(state, ITEMS["grave"])
+            state.say("Grave iron, cold and heavier than it looks.", LogKind.SYSTEM)
+        elif key == "second_wind":
+            state.extra_lives += 1
+            state.say("Something down here is keeping count of your deaths.", LogKind.SYSTEM)

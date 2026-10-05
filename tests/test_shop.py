@@ -1,0 +1,363 @@
+"""Tests for the shop.
+
+Two halves, and they are tested together because they are one feature: the
+catalogue (what is on sale, for how much, and what the shop refuses) and the
+loadout (what a bought thing actually does once the run starts). A price list
+that sells a weapon which does nothing is worse than no shop at all.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from neverdeads_revenge.core.rng import Rng
+from neverdeads_revenge.game.actors import NOXX, YETI
+from neverdeads_revenge.game.curses import CURSES
+from neverdeads_revenge.game.shop import (
+    GEAR,
+    META_UPGRADES,
+    SECTIONS,
+    SUPPLIES,
+    WILD_OFFERS,
+    WILD_SLOTS,
+    Loadout,
+    ShopError,
+    build_stock,
+    buy,
+    describe_item,
+    loadout_from,
+    roll_wild_stock,
+)
+from neverdeads_revenge.game.state import start_run
+from neverdeads_revenge.persistence import MetaProgress
+from neverdeads_revenge.world.items import ITEMS
+
+
+def shop(gold: int = 0, **wilds) -> MetaProgress:
+    """A progress with coin in it and a shelf to look at."""
+    progress = MetaProgress(gold=gold)
+    progress.reroll_wilds(Rng(11))
+    return progress
+
+
+def offer_for(progress: MetaProgress, key: str):
+    for offer in build_stock(progress):
+        if offer.key == key:
+            return offer
+    raise AssertionError(f"nothing on the shelf called {key!r}")
+
+
+# -- the catalogue ----------------------------------------------------------
+def test_every_shelf_is_on_the_shelf_in_order():
+    """The screen draws sections in the order it is given them."""
+    stock = build_stock(shop(0))
+    seen: list[str] = []
+    for offer in stock:
+        if offer.section not in seen:
+            seen.append(offer.section)
+    assert seen == list(SECTIONS)
+
+
+def test_the_fixed_stock_is_always_there():
+    """Supplies, gear and upgrades do not rotate. Only the wilds do."""
+    stock = {offer.key for offer in build_stock(shop(0))}
+    for item in (*SUPPLIES, *GEAR):
+        assert item.key in stock
+    for key, upgrade in META_UPGRADES.items():
+        if not upgrade.wild:
+            assert key in stock, key
+
+
+def test_a_wild_upgrade_is_not_in_the_fixed_stock():
+    """Blood bargain is permanent, but it is not on the sensible shelf."""
+    stock = {offer.key for offer in build_stock(shop(0))}
+    assert "blood_deal" not in stock
+    assert "blood_deal" in {offer.key for offer in build_stock(_with_wilds("blood_deal"))}
+
+
+def test_prices_are_positive():
+    for offer in build_stock(shop(0)):
+        assert offer.price > 0, offer.key
+
+
+def test_what_is_affordable_is_marked_before_the_screen_draws():
+    progress = shop(30)
+    assert offer_for(progress, "potion").affordable
+    assert offer_for(progress, "elixir").affordable
+    assert not offer_for(progress, "blade").affordable, "60 coins on 30"
+    assert offer_for(progress, "blade").buyable is False
+
+
+def test_an_item_describes_itself():
+    assert describe_item(ITEMS["potion"]) == "heals 8"
+    assert "damage" in describe_item(ITEMS["knife"])
+    assert "armour" in describe_item(ITEMS["leather"])
+
+
+def test_every_wild_offer_is_a_deal_with_two_halves():
+    """A bargain whose cost is not stated is not a bargain, it is a trap."""
+    for key, offer in WILD_OFFERS.items():
+        assert offer.pitch, key
+        assert offer.catch, key
+        assert offer.price > 0, key
+
+
+def test_a_permanent_wild_points_at_a_real_upgrade():
+    for key, offer in WILD_OFFERS.items():
+        if offer.permanent is not None:
+            assert offer.permanent in META_UPGRADES, key
+
+
+def _with_wilds(*keys: str) -> MetaProgress:
+    progress = MetaProgress(gold=0)
+    progress.wild_stock = list(keys)
+    return progress
+
+
+def test_the_shelf_turns_over_two_at_a_time():
+    for seed in range(20):
+        stock = roll_wild_stock(Rng(seed))
+        assert len(stock) == WILD_SLOTS
+        assert len(set(stock)) == WILD_SLOTS, "the same offer twice is one offer"
+        assert all(key in WILD_OFFERS for key in stock)
+
+
+# -- buying -----------------------------------------------------------------
+def test_buying_a_draught_sets_it_aside_for_the_next_run():
+    progress = shop(100)
+    message = buy(progress, offer_for(progress, "potion"))
+
+    assert progress.gold == 85
+    assert progress.pending == ["potion"]
+    assert "potion" in message
+
+
+def test_buying_gear_sets_it_aside_too():
+    progress = shop(100)
+    buy(progress, offer_for(progress, "blade"))
+    assert progress.pending == ["blade"]
+
+
+def test_buying_an_upgrade_is_permanent_and_stacks():
+    progress = shop(500)
+    for _ in range(2):
+        buy(progress, offer_for(progress, "vigour"))
+
+    assert progress.upgrades["vigour"] == 2
+    assert progress.gold == 500 - 160
+    assert progress.pending == [], "an upgrade is not consumed by a run"
+
+
+def test_an_upgrade_cannot_be_bought_past_its_cap():
+    progress = shop(1000)
+    cap = META_UPGRADES["lantern"].max_stacks
+    for _ in range(cap):
+        buy(progress, offer_for(progress, "lantern"))
+
+    spent = progress.gold
+    with pytest.raises(ShopError):
+        buy(progress, offer_for(progress, "lantern"))
+    assert progress.gold == spent, "a refusal must not cost anything"
+
+
+def test_buying_a_wild_waits_for_the_next_run():
+    progress = _with_wilds("second_wind")
+    progress.gold = 100
+    buy(progress, offer_for(progress, "second_wind"))
+
+    assert progress.wilds == ["second_wind"]
+    assert progress.gold == 30
+
+
+def test_a_permanent_wild_goes_straight_into_the_upgrades():
+    """There is nothing to wait for: it changes every run from now on."""
+    progress = _with_wilds("blood_deal")
+    progress.gold = 100
+    buy(progress, offer_for(progress, "blood_deal"))
+
+    assert progress.upgrades["blood_deal"] == 1
+    assert progress.wilds == [], "a permanent offer is not spent by a run"
+
+
+def test_a_permanent_wild_cannot_be_bought_past_its_cap():
+    progress = _with_wilds("blood_deal")
+    progress.gold = 1000
+    for _ in range(META_UPGRADES["blood_deal"].max_stacks):
+        buy(progress, offer_for(progress, "blood_deal"))
+
+    with pytest.raises(ShopError):
+        buy(progress, offer_for(progress, "blood_deal"))
+
+
+def test_the_shop_refuses_what_the_purse_cannot_cover():
+    progress = shop(10)
+    with pytest.raises(ShopError) as refusal:
+        buy(progress, offer_for(progress, "blade"))
+
+    assert "10" in str(refusal.value), "the refusal should say what you have"
+    assert progress.gold == 10
+    assert progress.pending == []
+
+
+# -- the loadout ------------------------------------------------------------
+def test_the_loadout_is_taken_off_the_books():
+    """A draught bought for this run is drunk in this run."""
+    progress = shop(0)
+    progress.pending = ["potion", "blade"]
+    progress.wilds = ["greed"]
+
+    loadout = loadout_from(progress)
+
+    assert loadout.pending == ("potion", "blade")
+    assert loadout.wilds == ("greed",)
+    assert progress.pending == []
+    assert progress.wilds == []
+    assert loadout.upgrades == progress.upgrades, "upgrades are never consumed"
+
+
+# -- what a bought thing does ----------------------------------------------
+def test_bought_draughts_are_in_the_pack_at_the_first_step():
+    state = start_run(NOXX, seed=3, loadout=Loadout(pending=("potion", "elixir")))
+    assert [item.item_id for item in state.inventory] == ["potion", "elixir"]
+
+
+def test_bought_gear_is_worn_at_the_first_step():
+    state = start_run(NOXX, seed=3, loadout=Loadout(pending=("blade", "leather")))
+    assert state.player.equipment["weapon"].item_id == "blade"
+    assert state.player.equipment["armour"].item_id == "leather"
+
+
+def test_gear_changes_the_numbers_it_says_it_does():
+    plain = start_run(NOXX, seed=3)
+    armed = start_run(NOXX, seed=3, loadout=Loadout(pending=("blade", "leather")))
+
+    assert armed.player.damage_range[0] == plain.player.damage_range[0] + 2
+    assert armed.player.armor == plain.player.armor + 1
+
+
+def test_vigour_is_health_you_actually_start_with():
+    plain = start_run(NOXX, seed=3)
+    tough = start_run(NOXX, seed=3, loadout=Loadout(upgrades={"vigour": 3}))
+
+    assert tough.player.max_hp == plain.player.max_hp + 6
+    assert tough.player.hp == tough.player.max_hp, "bought health you do not have"
+
+
+def test_haste_and_lantern_do_what_they_say():
+    plain = start_run(NOXX, seed=3)
+    upgraded = start_run(
+        NOXX, seed=3, loadout=Loadout(upgrades={"haste": 2, "lantern": 1})
+    )
+
+    assert upgraded.player.speed == pytest.approx(plain.player.speed + 0.10)
+    assert upgraded.sight_radius == plain.sight_radius + 1
+
+
+def test_the_blood_bargain_costs_health_for_good():
+    """The one offer that is a permanent subtraction, and it must be permanent."""
+    plain = start_run(NOXX, seed=3)
+    struck = start_run(NOXX, seed=3, loadout=Loadout(upgrades={"blood_deal": 1}))
+
+    assert struck.player.max_hp == plain.player.max_hp - 4
+    assert struck.player.speed == pytest.approx(plain.player.speed + 0.15)
+    assert struck.player.hp == struck.player.max_hp
+
+
+def test_the_blood_bargain_can_never_leave_a_hero_at_nothing():
+    """Four at a time against a fragile hero would otherwise reach zero."""
+    frail = start_run(YETI, seed=3, loadout=Loadout(upgrades={"blood_deal": 2}))
+    assert frail.player.max_hp >= 1
+    assert frail.player.hp >= 1
+
+
+def test_upgrades_are_applied_to_every_hero_the_same_way():
+    for hero in (NOXX, YETI):
+        state = start_run(hero, seed=3, loadout=Loadout(upgrades={"vigour": 1}))
+        assert state.player.max_hp == hero.stats.max_hp + 2, hero.key
+
+
+def test_the_blind_box_always_hands_something_over():
+    for seed in range(12):
+        state = start_run(NOXX, seed=seed, loadout=Loadout(wilds=("blind_box",)))
+        worn = list(state.player.equipment.values())
+        assert state.inventory or worn, f"seed {seed} gave nothing"
+
+
+def test_the_pact_curses_you_and_pays_better():
+    state = start_run(NOXX, seed=3, loadout=Loadout(wilds=("pact",)))
+
+    assert len(state.curses) == 1
+    assert state.curses[0].key in CURSES
+    assert state.coin_multiplier == pytest.approx(1.5)
+
+
+def test_greed_doubles_the_coin_and_toughens_the_monsters():
+    plain = start_run(NOXX, seed=3)
+    greedy = start_run(NOXX, seed=3, loadout=Loadout(wilds=("greed",)))
+
+    assert greedy.coin_multiplier == pytest.approx(2.0)
+    assert greedy.enemy_hp_multiplier == pytest.approx(1.2)
+    assert greedy.enemies, "the floor should still have monsters on it"
+    assert all(
+        enemy.max_hp > plain_enemy.max_hp
+        for enemy, plain_enemy in zip(greedy.enemies, plain.enemies)
+    )
+
+
+def test_grave_goods_puts_the_heavy_blade_in_your_hands():
+    state = start_run(NOXX, seed=3, loadout=Loadout(wilds=("grave_goods",)))
+    assert state.player.equipment["weapon"].item_id == "grave"
+    assert state.player.speed < NOXX.stats.speed, "and it is heavy"
+
+
+def test_second_wind_holds_the_first_killing_blow():
+    state = start_run(NOXX, seed=3, loadout=Loadout(wilds=("second_wind",)))
+    assert state.extra_lives == 1
+
+    state.player.stats.hp = 0
+    assert state.die("slain") is False
+    assert state.player.alive
+    assert state.player.hp == 1
+    assert state.run_state.value == "playing"
+
+    # And the second one lands. A bargain that works twice is a bargain that
+    # was mis-sold.
+    state.player.stats.hp = 0
+    assert state.die("slain") is True
+    assert state.run_state.value == "dead"
+
+
+def test_two_second_winds_are_two_lives():
+    state = start_run(NOXX, seed=3, loadout=Loadout(wilds=("second_wind",) * 2))
+    assert state.extra_lives == 2
+
+
+def test_the_coin_multiplier_reaches_the_pile_on_the_floor():
+    from neverdeads_revenge.game.actors import ENEMIES, make_enemy
+
+    plain = start_run(NOXX, seed=3)
+    greedy = start_run(NOXX, seed=3, loadout=Loadout(wilds=("greed",)))
+
+    for state in (plain, greedy):
+        enemy = make_enemy(ENEMIES["ghoul"], state.player.position)
+        enemy.gold = (10, 10)
+        state.enemies = [enemy]
+        from neverdeads_revenge.game.actions import _drop_coins
+
+        _drop_coins(state, enemy)
+
+    assert plain.dungeon_map.item_at(plain.player.position).gold == 10
+    assert greedy.dungeon_map.item_at(greedy.player.position).gold == 20
+
+
+def test_a_run_without_a_loadout_is_the_run_it_always_was():
+    """The shop must not change a run that bought nothing."""
+    plain = start_run(NOXX, seed=3)
+    explicit = start_run(NOXX, seed=3, loadout=Loadout())
+
+    assert plain.player.max_hp == explicit.player.max_hp
+    assert plain.player.speed == explicit.player.speed
+    assert plain.coin_multiplier == 1.0
+    assert plain.enemy_hp_multiplier == 1.0
+    assert plain.extra_lives == 0
+    assert plain.sight_radius == explicit.sight_radius

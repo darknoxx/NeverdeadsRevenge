@@ -143,7 +143,7 @@ def _drop_coins(state: GameState, enemy: Actor) -> None:
     if high <= 0:
         return
 
-    value = state.rng.between(low, high)
+    value = max(1, round(state.rng.between(low, high) * state.coin_multiplier))
     existing = state.dungeon_map.item_at(enemy.position)
     if existing is not None and existing.kind == "coin":
         # Two kills in the same corner should be one bigger pile, not one pile
@@ -165,9 +165,7 @@ def _player_takes_damage(state: GameState, enemy: Actor, outcome) -> None:
     else:
         state.say(f"The {enemy.name} attacks and misses you.", LogKind.PLAIN)
     if outcome.killed:
-        state.player.alive = False
-        state.run_state = RunState.DEAD
-        state.say(f"You are slain by the {enemy.name}.", LogKind.BAD)
+        state.die(f"You are slain by the {enemy.name}.")
 
 
 def _enemy_takes_damage(state: GameState, enemy: Actor, outcome) -> None:
@@ -281,9 +279,7 @@ def _bleed(state: GameState) -> None:
 
     state.player.stats.hp = max(0, state.player.stats.hp - 1)
     if state.player.hp <= 0:
-        state.player.alive = False
-        state.run_state = RunState.DEAD
-        state.say("You bleed out between one step and the next.", LogKind.BAD)
+        state.die("You bleed out between one step and the next.")
         return
     state.say("You are bleeding.", LogKind.DAMAGE)
 

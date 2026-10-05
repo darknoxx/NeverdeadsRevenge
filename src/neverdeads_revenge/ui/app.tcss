@@ -305,6 +305,54 @@ NameEntryScreen, ScoreboardScreen {
     color: #6b6b6b;
 }
 
+/* -- shop ----------------------------------------------------------------- */
+
+ShopScreen {
+    align: center middle;
+    background: $background 70%;
+}
+
+#shop {
+    width: 74;
+    height: auto;
+    max-height: 90%;
+    padding: 1 2;
+    border: round $accent;
+    background: $surface;
+}
+
+#shop-title {
+    width: 1fr;
+    height: auto;
+    text-style: bold;
+    color: $accent;
+}
+
+#shop-gold {
+    width: 1fr;
+    height: auto;
+    margin: 0 0 1 0;
+}
+
+#shop-list {
+    width: 1fr;
+    height: auto;
+}
+
+#shop-message {
+    width: 1fr;
+    height: auto;
+    margin: 1 0 0 0;
+    color: $text-muted;
+}
+
+#shop-hint {
+    width: 1fr;
+    height: auto;
+    content-align: center middle;
+    color: #6b6b6b;
+}
+
 /* -- chest --------------------------------------------------------------- */
 
 ChestScreen {

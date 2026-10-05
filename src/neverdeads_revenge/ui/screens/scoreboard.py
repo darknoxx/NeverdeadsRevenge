@@ -44,6 +44,11 @@ class ScoreboardScreen(ModalScreen[None]):
             yield Static("press any key", id="scoreboard-hint")
 
     def on_key(self, event) -> None:
+        # A key still repeating from the title must not close the board on the
+        # way in. See App.note_key.
+        if self.app.note_key(event.key):
+            event.stop()
+            return
         event.stop()
         self.dismiss()
 

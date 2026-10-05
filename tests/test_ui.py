@@ -1904,3 +1904,165 @@ async def test_a_repeated_enter_does_not_type_into_the_name():
         await pilot.pause()
 
         assert app.screen._name == before, "a repeat typed a letter"
+
+
+# -- the shop ----------------------------------------------------------------
+async def _open_shop(app, pilot, gold: int):
+    """Put coin in the purse and walk to the shop."""
+    from neverdeads_revenge.ui.screens.shop import ShopScreen
+
+    app.progress.gold = gold
+    await pilot.pause()
+    await pilot.press("s")
+    await pilot.pause()
+    assert isinstance(app.screen, ShopScreen), "s did not open the shop"
+    return app.screen
+
+
+async def test_s_opens_the_shop_from_the_title():
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, TitleScreen)
+
+        await _open_shop(app, pilot, 100)
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, TitleScreen)
+
+
+async def test_the_shop_takes_the_coin_and_keeps_the_parcel():
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        shop = await _open_shop(app, pilot, 100)
+
+        # The first row is the cheapest draught.
+        assert shop.offers[shop.index].key == "potion"
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert app.progress.gold == 85
+        assert app.progress.pending == ["potion"]
+        assert "potion" in shop.message
+
+
+async def test_the_shop_says_no_and_charges_nothing():
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        shop = await _open_shop(app, pilot, 0)
+
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert app.progress.gold == 0
+        assert app.progress.pending == []
+        assert "coins" in shop.message, "the refusal should mention the price"
+
+
+async def test_a_maxed_upgrade_says_it_is_already_yours():
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        app.progress.upgrades["lantern"] = 1
+        shop = await _open_shop(app, pilot, 500)
+
+        index = next(i for i, o in enumerate(shop.offers) if o.key == "lantern")
+        for _ in range(index):
+            await pilot.press("down")
+        await pilot.pause()
+
+        assert shop.offers[shop.index].key == "lantern"
+        assert shop.offers[shop.index].maxed
+        spent = app.progress.gold
+
+        await pilot.press("enter")
+        await pilot.pause()
+        assert app.progress.gold == spent, "a maxed upgrade took coin anyway"
+
+
+async def test_a_bought_draught_is_in_the_pack_when_the_run_starts():
+    """The whole point of the shop, end to end."""
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await _open_shop(app, pilot, 100)
+        await pilot.press("enter")  # potion
+        await pilot.pause()
+        await pilot.press("escape")
+        await pilot.pause()
+
+        screen = await drive_to_game(app, pilot)
+
+        assert [item.item_id for item in screen.state.inventory] == ["potion"]
+        assert app.progress.pending == [], "the parcel was not taken off the books"
+
+
+async def test_bought_gear_is_worn_from_the_first_step():
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        shop = await _open_shop(app, pilot, 100)
+        index = next(i for i, o in enumerate(shop.offers) if o.key == "leather")
+        for _ in range(index):
+            await pilot.press("down")
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press("escape")
+        await pilot.pause()
+
+        screen = await drive_to_game(app, pilot)
+
+        assert screen.state.player.equipment["armour"].item_id == "leather"
+
+
+async def test_an_upgrade_bought_in_the_shop_reaches_the_next_run():
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        shop = await _open_shop(app, pilot, 500)
+        index = next(i for i, o in enumerate(shop.offers) if o.key == "vigour")
+        for _ in range(index):
+            await pilot.press("down")
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press("escape")
+        await pilot.pause()
+
+        screen = await drive_to_game(app, pilot)
+
+        assert screen.state.player.max_hp == screen.hero.stats.max_hp + 2
+
+
+async def test_the_shelf_turns_over_after_a_run():
+    """Otherwise there is no reason to walk past the shop a second time."""
+    from neverdeads_revenge.core.rng import Rng
+    from neverdeads_revenge.game.shop import roll_wild_stock
+
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        assert app.progress.wild_stock == roll_wild_stock(Rng(3))
+
+        screen = await drive_to_game(app, pilot)
+        screen._game_over()
+        await pilot.pause()
+        await finish_run(pilot)
+
+        assert app.progress.runs_started == 1
+        assert app.progress.wild_stock == roll_wild_stock(Rng(4))
+
+
+async def test_a_wild_offer_bought_in_the_shop_is_felt_in_the_run():
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        app.progress.wild_stock = ["second_wind", "greed"]
+        shop = await _open_shop(app, pilot, 200)
+
+        index = next(i for i, o in enumerate(shop.offers) if o.key == "second_wind")
+        for _ in range(index):
+            await pilot.press("down")
+        await pilot.press("enter")
+        await pilot.pause()
+        assert app.progress.wilds == ["second_wind"]
+
+        await pilot.press("escape")
+        await pilot.pause()
+        screen = await drive_to_game(app, pilot)
+
+        assert screen.state.extra_lives == 1

@@ -138,10 +138,15 @@ sidebar gets cramped below about 30 rows.
 A run is scored on three things, and walking is not one of them:
 
 ```
-kills x 100  +  floors cleared x 250        what you did
-+ speed bonus                               how quickly you did it
+floors cleared x 250                        how far you got
++ speed bonus                               how quickly you got there
 + 5000 if you got out alive                 the only ending that really counts
 ```
+
+Killing things is not in there. It pays in coin instead, and the two are kept
+apart on purpose: the score is a record of the run, the purse is what the run was
+worth to you afterwards. Running them together made every fight worth points
+whether or not it was worth fighting.
 
 The speed bonus is `(80 x floors cleared) - turns`, times ten, and never below
 zero. Eighty turns a floor is the budget; across 144 bot runs the median floor
@@ -192,6 +197,10 @@ mistake rather than a style.
 | `?` | Controls and the terrain reference |
 | `Esc` | Menu, `q` there to quit to title |
 
+On the **title screen**: any key starts a run, `s` opens the shop and `h` opens
+the scoreboard. In the **shop**: up/down choose, `enter` buys, `s` or `Esc`
+leaves.
+
 The prologue and the run summary close on a **held enter**, not a single press.
 They are the only prose in the game and the only place a run is added up, and a
 stray key should not throw either away. The arrows scroll the prologue, and the
@@ -202,12 +211,44 @@ The repeats a held key keeps sending are ignored by whatever screen comes next,
 so holding enter to start does not walk you around the first room printing
 "There is nothing here" — the next screen only acts on a new press.
 
+## Gold and the shop
+
+Monsters leave a pile of coins (`$`) where they fall. Walk over it and it goes in
+the purse; leave it and it does not. A deep floor pays better — coin scales with
+depth the same way damage does — so there is a reason to keep going down rather
+than farm the first three.
+
+Gold is banked when the run ends, and it is the first thing in the game that
+death does not take away. It is spent in the shop, which `s` opens from the title.
+
+| shelf | what it is |
+| --- | --- |
+| **Supplies** | draughts, used up next run |
+| **Gear** | a weapon or a coat, worn from the first step of the next run |
+| **Upgrades** | permanent, bought in stacks, and the only thing here a bad run cannot take back |
+| **Wild offers** | two at a time, re-rolled after every run |
+
+The wild offers are the reason to look at the shop even when the sensible things
+are bought. Each is a bargain with a catch, and both halves are on the screen:
+the blind box is something from the deep that you do not get to look at first,
+greed doubles every coin and makes everything down there a fifth tougher, second
+wind turns the first killing blow of a run into a near miss. Prices are
+placeholders and will be tuned.
+
+A bought parcel is taken off the books the moment the next run starts, so a
+draught bought for a run is drunk in that run. Upgrades and the permanent wild
+offer are not.
+
 ## High score
 
-The best score is kept in `~/.local/share/neverdeads_revenge/meta.json` (or
-`$XDG_DATA_HOME`) and shown on the title screen and the run summary. That is
-everything that is saved — no run survives being closed, and there are no
-unlocks yet.
+Every run ends by asking for a name — five slots, on a death and on an escape
+alike, because both collected points. The best ten runs are kept and `h` opens
+the scoreboard from the title.
+
+Everything is saved in `~/.local/share/neverdeads_revenge/meta.json` (or
+`$XDG_DATA_HOME`): the scoreboard, the best score, the coin, the upgrades and the
+shelf. No run survives being closed. Saves from older builds are read field by
+field, so adding a field never costs you a high score.
 
 ## Loot and equipment
 
@@ -242,11 +283,9 @@ has been done to you.
 
 ## Not implemented yet
 
-A talent tree, equipment slots beyond the two, sound, saving mid-run, and the
-meta-progression the persistence layer is shaped for (`META_UPGRADES` is still an
-empty dict, and `state._apply_upgrades` is a no-op). Two roster slots are shown
-locked and are not playable yet. There is no way to lift a curse: it is a
-decision made once and lived with.
+A talent tree, equipment slots beyond the two, sound, saving mid-run, and hero
+unlocks. Two roster slots are shown locked and are not playable yet. There is no
+way to lift a curse: it is a decision made once and lived with.
 
 The prologue is the only prose in the game, and it is shown once per session
 rather than once per run — told every run it stops being a premise and becomes a
@@ -258,7 +297,7 @@ toll.
 src/neverdeads_revenge/
 ├── core/     seeded rng, directions, energy-based turn queue
 ├── world/    tiles, dungeon map, generator, field of view
-├── game/     actors, combat, game state, actions
+├── game/     actors, combat, game state, actions, curses, the shop
 └── ui/       Textual app, screens, widgets
 ```
 

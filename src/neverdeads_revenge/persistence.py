@@ -16,6 +16,8 @@ import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from .game.shop import META_UPGRADES, MetaUpgrade
+
 __all__ = [
     "ScoreEntry",
     "SCOREBOARD_SIZE",
@@ -33,28 +35,6 @@ SAVE_VERSION = 1
 #: How many runs the scoreboard keeps. Capped because the file is rewritten on
 #: every ending and a list that grows forever is a file that grows forever.
 SCOREBOARD_SIZE = 10
-
-
-@dataclass(frozen=True, slots=True)
-class MetaUpgrade:
-    """A permanent, stackable upgrade bought between runs."""
-
-    key: str
-    name: str
-    description: str
-    #: What one stack is worth, so the UI can render "+1" without special cases.
-    unit: str = ""
-    #: How many stacks may be bought at most.
-    max_stacks: int = 3
-
-    def describe_stack(self, stacks: int) -> str:
-        """A human-readable effect line for ``stacks`` stacks."""
-        return f"{self.unit} {stacks}" if self.unit else ""
-
-
-#: Registered upgrades. Empty for milestone 1 -- the mechanism is proven, the
-#: content comes later.
-META_UPGRADES: dict[str, MetaUpgrade] = {}
 
 
 @dataclass(slots=True)
@@ -88,6 +68,12 @@ class MetaProgress:
     scores: list[ScoreEntry] = field(default_factory=list)
     #: The name used last, so the next run costs one keypress rather than five.
     last_name: str = ""
+    #: Items bought for the next run, by key. Emptied when that run starts.
+    pending: list[str] = field(default_factory=list)
+    #: Wild offers bought and not yet spent. Emptied when that run starts.
+    wilds: list[str] = field(default_factory=list)
+    #: The two wild offers currently on the shelf. Re-rolled after every run.
+    wild_stock: list[str] = field(default_factory=list)
     #: Lifetime run statistics.
     runs_started: int = 0
     runs_won: int = 0
@@ -153,6 +139,16 @@ class MetaProgress:
         """Upgrade stacks, as :func:`~neverdeads_revenge.game.state.start_run` wants them."""
         return dict(self.upgrades)
 
+    def reroll_wilds(self, rng) -> None:
+        """Put two new offers on the rotating shelf.
+
+        Called after every run, which is what makes the shelf worth walking past:
+        the fixed stock is always there, and the interesting things are not.
+        """
+        from .game.shop import roll_wild_stock
+
+        self.wild_stock = roll_wild_stock(rng)
+
 
 # -- storage ---------------------------------------------------------------
 
@@ -214,6 +210,9 @@ def load_meta(path: Path | None = None) -> MetaProgress:
                 if isinstance(entry, dict)
             ],
             last_name=str(raw.get("last_name", "")),
+            pending=[str(key) for key in raw.get("pending", [])],
+            wilds=[str(key) for key in raw.get("wilds", [])],
+            wild_stock=[str(key) for key in raw.get("wild_stock", [])],
             runs_started=int(raw.get("runs_started", 0)),
             runs_won=int(raw.get("runs_won", 0)),
             best_depth=int(raw.get("best_depth", 0)),

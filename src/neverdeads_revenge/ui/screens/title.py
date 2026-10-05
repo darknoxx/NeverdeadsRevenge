@@ -112,6 +112,7 @@ class TitleScreen(Screen[None]):
     """Press anything to begin."""
 
     BINDINGS = [
+        Binding("s", "shop", "Shop"),
         Binding("h", "scores", "Scores"),
         Binding("escape", "quit", "Quit"),
         Binding("q", "quit", "Quit"),
@@ -146,7 +147,14 @@ class TitleScreen(Screen[None]):
         """``h`` looks at old runs instead of starting a new one."""
         from .scoreboard import ScoreboardScreen
 
+        # Armed so a held ``h`` does not close the board it just opened.
+        self.app.arm_repeat_filter()
         self.app.push_screen(ScoreboardScreen(self.app.progress))
+
+    def action_shop(self) -> None:
+        """``s`` spends coin instead of starting a run."""
+        self.app.arm_repeat_filter()
+        self.app.open_shop()
 
     def on_key(self, event) -> None:
         """Any key starts the game -- no hunting for the right one.
@@ -156,7 +164,7 @@ class TitleScreen(Screen[None]):
         screen before this one -- holding enter to leave the summary would
         otherwise start a run on the way past.
         """
-        if event.key in ("h", "escape", "q"):
+        if event.key in ("s", "h", "escape", "q"):
             return  # a binding has it
         if self.app.note_key(event.key):
             event.stop()
@@ -174,7 +182,10 @@ def _centered():
         yield Static(TAGLINE, id="title-subtitle")
         yield Static(id="title-best")
         yield Static(f"\nversion {__version__}", id="title-version")
-        yield Static("press any key   ·   [bold]h[/] scores", id="title-hint")
+        yield Static(
+            "press any key   ·   [bold]s[/] shop   ·   [bold]h[/] scores",
+            id="title-hint",
+        )
 
 
 def best_line(best: int) -> str:

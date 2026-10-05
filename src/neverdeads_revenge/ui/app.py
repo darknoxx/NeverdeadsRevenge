@@ -14,10 +14,13 @@ push site, where the pairing is visible.
 
 from __future__ import annotations
 
+import random
 import time
 
 from textual.app import App
 
+from ..core.rng import Rng
+from ..game.shop import Loadout, loadout_from
 from ..game.state import GameState, RunState
 from ..persistence import load_meta, save_meta
 from .hold import REPEAT_GAP
@@ -65,6 +68,10 @@ class NeverdeadsRevenge(App[None]):
         #: What outlives a run. Loaded once, written on every ending. The file
         #: has been sitting there unread since the persistence layer was built.
         self.progress = load_meta()
+        # A save from a build without the rotating shelf has none on it, and an
+        # empty shelf is not a shop.
+        if not self.progress.wild_stock:
+            self.roll_wilds()
         self._last_key = ""
         self._last_key_time = 0.0
         self._filter_repeats = False
@@ -104,6 +111,31 @@ class NeverdeadsRevenge(App[None]):
         self._filter_repeats = False
         return False
 
+    def save_progress(self) -> None:
+        """Write the save file, best effort.
+
+        A home directory that cannot be written to is worth a shrug; it is
+        certainly not worth losing a screen over.
+        """
+        try:
+            save_meta(self.progress)
+        except OSError:
+            pass
+
+    def roll_wilds(self) -> None:
+        """Two new offers on the rotating shelf.
+
+        Seeded from the app's run seed when it has one, so a test that fixes the
+        seed gets a fixed shelf; from the system otherwise, because a shelf that
+        is the same every run is a fixed shelf with extra steps.
+        """
+        seed = (
+            self.run_seed + self.progress.runs_started
+            if self.run_seed is not None
+            else random.SystemRandom().randrange(2**32)
+        )
+        self.progress.reroll_wilds(Rng(seed))
+
     def record_run(self, state: GameState, name: str = "") -> int:
         """Fold a finished run into the saved progress. Returns the best score.
 
@@ -121,10 +153,10 @@ class NeverdeadsRevenge(App[None]):
             name=name,
             hero=state.hero.key,
         )
-        try:
-            save_meta(self.progress)
-        except OSError:
-            pass
+        # The shelf turns over with every run, which is the only reason to look
+        # at it again when the sensible things are all bought.
+        self.roll_wilds()
+        self.save_progress()
         return self.progress.best_score
 
     def on_mount(self) -> None:
@@ -159,7 +191,23 @@ class NeverdeadsRevenge(App[None]):
         # hero_key)`` silently passed the hero key as a callback and the screen
         # fell back to its default hero. That was invisible for as long as the
         # roster held exactly one.
-        self.push_screen(GameScreen(hero_key, seed=self.run_seed))
+        #
+        # The loadout is taken off the books here, at the one moment it is spent,
+        # and written down before the run begins: a run that is quit halfway
+        # through still used the draught it started with.
+        loadout: Loadout = loadout_from(self.progress)
+        self.save_progress()
+        self.push_screen(GameScreen(hero_key, seed=self.run_seed, loadout=loadout))
+
+    def open_shop(self) -> None:
+        """Spend coin, then come back here.
+
+        Pushed from the app rather than the title so the screen can be handed the
+        progress without the title having to know where it lives.
+        """
+        from .screens.shop import ShopScreen
+
+        self.push_screen(ShopScreen(self.progress))
 
     def return_to_title(self) -> None:
         """Drop every screen above the base screen and show the title.
