@@ -100,16 +100,36 @@ def terrain_legend() -> list[tuple[str, str]]:
     return [(tile.glyph, tile.description) for tile in LEGEND_TERRAIN]
 
 
-def item_legend() -> list[tuple[str, str]]:
-    """``(glyph, meaning)`` for what can be picked up.
+#: What a whole kind of equipment does, for the legend.
+#:
+#: One line per kind rather than per item: the panel is clipped rather than
+#: scrolled and the way out sits at the bottom of it, so four blades and three
+#: coats would push the goal off the screen to say four times over that a ``)``
+#: is a weapon. Which weapon it is belongs on the character sheet.
+_KIND_BLURB: dict[str, str] = {
+    "weapon": "weapon, +damage",
+    "armour": "armour, +defence",
+}
 
-    Read from ``ITEMS``, so a new draught, or a change to one, shows up here
-    without a second edit.
+
+def item_legend() -> list[tuple[str, str]]:
+    """``(glyph, meaning)`` for what can be picked up, one row per glyph.
+
+    Draughts keep a row each, because the difference between a potion and an
+    elixir is the decision the player is making; equipment collapses to a row per
+    kind, because the difference between two blades is not.
     """
-    return [
-        (template.glyph, f"{template.name}, heals {template.heal}")
-        for template in ITEMS.values()
-    ]
+    rows: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for template in ITEMS.values():
+        if template.glyph in seen:
+            continue
+        seen.add(template.glyph)
+        if template.kind in _KIND_BLURB:
+            rows.append((template.glyph, _KIND_BLURB[template.kind]))
+        else:
+            rows.append((template.glyph, f"{template.name}, heals {template.heal}"))
+    return rows
 
 
 def enemy_legend(depth: int = 1, hero: Hero | None = None) -> list[tuple[str, str]]:

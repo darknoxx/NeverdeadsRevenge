@@ -6,19 +6,18 @@ from dataclasses import dataclass, field
 
 from neverdeads_revenge.core.direction import CARDINALS, Direction, Pos
 
+from .modifiers import Modifiers
 from .tiles import Tile
 
-__all__ = ["GroundItem", "DungeonMap"]
+__all__ = ["GroundItem", "DungeonMap", "Modifiers"]
 
 
 @dataclass(slots=True)
 class GroundItem:
-    """An item lying on the floor.
+    """An item lying on the floor, or worn by somebody.
 
-    ``heal`` is the health a drink restores. Every item in the game is currently
-    a healing draught, so the field is named for what it does rather than for
-    some future general case: when a wand or a scroll exists it will need a real
-    effect, not this field stretched to fit it.
+    ``heal`` is the health a drink restores. ``modifiers`` is what wearing it
+    changes. A thing is one or the other: nothing is both a draught and a coat.
     """
 
     item_id: str
@@ -26,6 +25,13 @@ class GroundItem:
     glyph: str = "*"
     color: str = "yellow"
     heal: int = 0
+    #: What kind of thing it is: ``draught``, ``weapon`` or ``armour``. Used to
+    #: group the legend, which has room for one row per kind and not per item.
+    kind: str = "draught"
+    #: Which equipment slot it fills, or ``None`` for something you drink.
+    slot: str | None = None
+    #: What wearing it changes. Frozen, so one shared empty instance is fine.
+    modifiers: Modifiers = Modifiers()
 
 
 @dataclass(slots=True)

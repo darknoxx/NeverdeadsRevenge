@@ -47,49 +47,50 @@ def test_glyphs_are_unique_so_the_map_stays_readable():
     assert len(set(glyphs)) == len(glyphs)
 
 
-def test_loot_and_monsters_do_not_share_a_glyph_with_terrain():
-    """The map draws actors, loot and terrain in the same cells.
-
-    Two things that look alike in the same square is the one readability bug a
-    glyph-based game cannot recover from: a potion you cannot tell from a patch
-    of grass is a potion you never pick up.
-    """
-    from neverdeads_revenge.game.actors import ENEMIES, HEROES
-    from neverdeads_revenge.world.items import ITEMS
-
-    terrain = {tile.glyph for tile in Tile}
-    actors = {t.glyph for t in ENEMIES.values()} | {h.glyph for h in HEROES.values()}
-    loot = {item.glyph for item in ITEMS.values()}
-
-    assert len(loot) == len(ITEMS), "two draughts share a glyph"
-    assert not (loot & terrain), f"loot shares a glyph with terrain: {loot & terrain}"
-    assert not (loot & actors), f"loot shares a glyph with an actor: {loot & actors}"
-
-
 def test_no_actor_shares_a_glyph_with_anything_else():
-    """One glyph, one thing. The map is read at a glance or not at all.
+    """One glyph, one kind of thing. The map is read at a glance or not at all.
 
-    The hero is no longer an ``@``, so this is no longer free: a hero named by a
-    letter is only readable while no monster, draught or wall is using the same
-    letter.
+    Per *kind*, not per item: every weapon is a ``)`` and every coat is a ``[``,
+    which is the old roguelike convention and costs nothing to follow. What must
+    never happen is a weapon looking like a wall.
     """
     from neverdeads_revenge.game.actors import ENEMIES, HEROES
     from neverdeads_revenge.world.items import ITEMS
 
-    claimed: dict[str, str] = {}
+    meanings: dict[str, set[str]] = {}
     for tile in Tile:
-        claimed.setdefault(tile.glyph, f"tile {tile.name}")
+        meanings.setdefault(tile.glyph, set()).add("terrain")
     for hero in HEROES.values():
-        assert hero.glyph not in claimed, f"hero {hero.key} collides with {claimed[hero.glyph]}"
-        claimed[hero.glyph] = f"hero {hero.key}"
+        meanings.setdefault(hero.glyph, set()).add("hero")
     for template in ENEMIES.values():
-        assert template.glyph not in claimed, (
-            f"monster {template.key} collides with {claimed[template.glyph]}"
-        )
-        claimed[template.glyph] = f"monster {template.key}"
+        meanings.setdefault(template.glyph, set()).add("monster")
     for item in ITEMS.values():
-        assert item.glyph not in claimed, f"item {item.key} collides with {claimed[item.glyph]}"
-        claimed[item.glyph] = f"item {item.key}"
+        meanings.setdefault(item.glyph, set()).add(item.kind)
+
+    clashes = {glyph: kinds for glyph, kinds in meanings.items() if len(kinds) > 1}
+    assert not clashes, f"these glyphs mean more than one thing: {clashes}"
+
+
+def test_equipment_of_a_kind_looks_alike_on_purpose():
+    """Every weapon is a ``)`` and every coat is a ``[``.
+
+    Draughts are the deliberate exception: a potion and an elixir look different
+    because the difference between them is the decision -- do I spend the small
+    one or the big one. A weapon is a weapon, and which blade it is belongs on
+    the character sheet, not on the map.
+
+    Asserted so a future weapon does not quietly get its own glyph and turn the
+    floor into a wall of punctuation nobody can learn.
+    """
+    from neverdeads_revenge.world.items import ITEMS
+
+    by_kind: dict[str, set[str]] = {}
+    for item in ITEMS.values():
+        if item.kind == "draught":
+            continue
+        by_kind.setdefault(item.kind, set()).add(item.glyph)
+    for kind, glyphs in by_kind.items():
+        assert len(glyphs) == 1, f"{kind} items use several glyphs: {glyphs}"
 
 
 # -- map container ---------------------------------------------------------

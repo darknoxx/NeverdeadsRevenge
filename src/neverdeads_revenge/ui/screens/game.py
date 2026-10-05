@@ -28,6 +28,7 @@ from ..widgets.hud import Hud
 from ..widgets.legend import Legend
 from ..widgets.map_view import MapView
 from ..widgets.message_log import MessageLog
+from .character import CharacterScreen
 from .game_over import GameOverScreen
 
 __all__ = ["GameScreen"]
@@ -73,7 +74,7 @@ HELP_TEXT = f"""\
 [bold]wait       [/].  or  space
 [bold]interact   [/]enter      pick up what you are standing on, or take the stairs
 [bold]descend    [/]>          the same, when you already know you want to go down
-[bold]drink      [/]q          [bold]carried [/]i
+[bold]drink      [/]q          [bold]character [/]c          [bold]carried [/]i
 [bold]the way out[/]  {GOAL_HINT}; step into it to win
 [bold]help       [/]?          [bold]menu[/]  escape
 
@@ -88,6 +89,7 @@ class GameScreen(Screen[None]):
     BINDINGS = [
         Binding("question_mark", "help", "Help"),
         Binding("f1", "help", "Help"),
+        Binding("c", "character", "Character"),
         Binding("escape", "menu", "Menu"),
     ]
 
@@ -217,6 +219,11 @@ class GameScreen(Screen[None]):
     # -- actions ------------------------------------------------------------
     def action_help(self) -> None:
         self.app.push_screen("help")
+
+    def action_character(self) -> None:
+        """The full sheet. Costs no turn -- it is only a look."""
+        assert self.state is not None
+        self.app.push_screen(CharacterScreen(self.state))
 
     def action_menu(self) -> None:
         self.app.push_screen("pause", self._pause_result)

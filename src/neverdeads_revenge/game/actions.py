@@ -12,7 +12,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from neverdeads_revenge.core.direction import Direction, chebyshev, direction_towards
+from neverdeads_revenge.core.direction import (
+    DIRECTIONS,
+    Direction,
+    chebyshev,
+    direction_towards,
+)
+from neverdeads_revenge.world.map import GroundItem
 from neverdeads_revenge.world.tiles import Tile
 
 from .actors import Actor
@@ -255,10 +261,70 @@ def _pick_up(state: GameState) -> ActionResult:
     if item is None:
         state.say("There is nothing here to take.", LogKind.PLAIN)
         return ActionResult(consumed_turn=False, acted=False)
+
     state.dungeon_map.remove_item(state.player.position)
-    state.inventory.append(item)
-    state.say(f"You pick up the {item.name}.", LogKind.GOOD)
+    if item.slot:
+        _equip(state, item)
+    else:
+        state.inventory.append(item)
+        state.say(f"You pick up the {item.name}.", LogKind.GOOD)
     return ActionResult(consumed_turn=False, acted=False)
+
+
+def _set_down(state: GameState, item: GroundItem) -> bool:
+    """Lay ``item`` on a free tile beside the player. Returns whether it fitted.
+
+    Beside, not under. An item beneath your feet is one you pick up again the
+    next time you press enter, which turns swapping equipment into a loop that
+    never lets ``enter`` reach the stairs -- and it is also the square the
+    player has to stand on to leave. Swapping stays reversible, it just costs a
+    step: walk onto what you set down and take it back.
+    """
+    for direction in DIRECTIONS:
+        pos = direction.step(state.player.position)
+        if not state.dungeon_map.is_walkable(pos):
+            continue
+        if state.actor_at(pos) is not None:
+            continue
+        if state.dungeon_map.item_at(pos) is not None:
+            continue
+        state.dungeon_map.add_item(pos, item)
+        return True
+    return False
+
+
+def _equip(state: GameState, item: GroundItem) -> None:
+    """Wear ``item``, setting whatever it replaces down beside the player.
+
+    Setting down rather than discarding is what makes trying something on free:
+    what you took off is still on the floor, so nothing a player finds can be
+    lost by picking it up. That is the only reason auto-equipping is safe --
+    there is no comparison dialog, so there has to be an undo.
+    """
+    player = state.player
+    previous = player.equipment.get(item.slot)
+    player.equipment[item.slot] = item
+
+    changes = ", ".join(item.modifiers.describe())
+    detail = f" ({changes})" if changes else ""
+
+    if previous is None:
+        state.say(f"You take up the {item.name}{detail}.", LogKind.GOOD)
+        return
+
+    if _set_down(state, previous):
+        state.say(
+            f"You take up the {item.name}{detail} and set down the {previous.name}.",
+            LogKind.GOOD,
+        )
+        return
+
+    # Boxed in on every side. Rare, and the item is not thrown away for it.
+    state.dungeon_map.add_item(player.position, previous)
+    state.say(
+        f"You take up the {item.name}{detail}; the {previous.name} falls at your feet.",
+        LogKind.GOOD,
+    )
 
 
 def _inventory(state: GameState) -> ActionResult:

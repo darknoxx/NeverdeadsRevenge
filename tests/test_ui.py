@@ -85,7 +85,7 @@ async def drive_to_game_as(app: NeverdeadsRevenge, pilot, hero_key: str) -> Game
 
 
 async def test_legend_lists_the_rift_and_the_loot():
-    """The way out and the draughts have to be in the panel too.
+    """The way out and every kind of loot have to be in the panel too.
 
     A player who cannot look up what ``!`` is will walk past the thing that keeps
     them alive, and one who cannot look up ``%`` will not know what they are
@@ -104,8 +104,33 @@ async def test_legend_lists_the_rift_and_the_loot():
         assert Tile.RIFT.glyph in shown, "the way out is not on the legend"
         for item in ITEMS.values():
             assert item.glyph in shown, f"{item.key} missing from legend"
-            assert f"heals {item.heal}" in shown
+            if item.kind == "draught":
+                assert f"heals {item.heal}" in shown
         assert GOAL_HINT in shown, "the goal is not stated anywhere on screen"
+
+
+async def test_the_legend_says_a_weapon_is_a_weapon():
+    """Equipment is listed as a kind, not one row per blade.
+
+    Eight items by name would push the way out off the bottom of a panel that is
+    clipped rather than scrolled, and a player only needs to know what the
+    glyph means before they have stepped on it.
+    """
+    from neverdeads_revenge.ui.widgets.legend import Legend
+    from neverdeads_revenge.world.items import ITEMS
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        shown = screen.query_one(Legend).render().plain
+
+        weapons = [i for i in ITEMS.values() if i.kind == "weapon"]
+        assert len(weapons) > 1, "this test is pointless with one weapon"
+        assert "weapon" in shown
+        for weapon in weapons:
+            assert weapon.name not in shown, (
+                f"{weapon.name!r} is listed by name; equipment is grouped"
+            )
 
 
 async def test_hud_shows_how_deep_the_run_has_to_go():
@@ -426,6 +451,87 @@ async def test_the_title_becomes_the_block_art_when_the_terminal_grows():
         await pilot.resize_terminal(ART_MIN_WIDTH + 20, 24)
         await pilot.pause()
         assert str(app.screen.query_one("#title-art").render()) == TITLE_ART
+
+
+async def test_the_character_screen_shows_every_stat():
+    """The sidebar has no room for the whole sheet, so this is where it lives."""
+    from neverdeads_revenge.ui.screens.character import CharacterScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        await pilot.press("c")
+        await pilot.pause()
+
+        assert isinstance(app.screen, CharacterScreen)
+        sheet = str(app.screen.query_one("#character-body").render())
+        for label in (
+            "health",
+            "speed",
+            "damage",
+            "crit",
+            "accuracy",
+            "evasion",
+            "armour",
+            "weapon",
+            "armour",
+            "carried",
+        ):
+            assert label in sheet, f"{label} missing from the character sheet"
+
+
+async def test_the_character_screen_lists_what_is_worn_and_what_it_does():
+    """A number that moved without saying why is not much better than no number."""
+    from neverdeads_revenge.ui.screens.character import CharacterScreen
+    from neverdeads_revenge.world.items import ITEMS, make_item
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.player.equipment["weapon"] = make_item(ITEMS["blade"])
+        await pilot.press("c")
+        await pilot.pause()
+
+        sheet = str(app.screen.query_one("#character-body").render())
+        assert "serrated blade" in sheet
+        # Derived from the item, so rebalancing it does not fail this.
+        for change in ITEMS["blade"].modifiers.describe():
+            assert change in sheet, f"{change!r} is not shown on the sheet"
+
+
+async def test_the_character_screen_costs_no_turn_and_closes():
+    from neverdeads_revenge.ui.screens.character import CharacterScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        assert state is not None
+
+        await pilot.press("c")
+        await pilot.pause()
+        assert isinstance(app.screen, CharacterScreen)
+
+        await pilot.press("q")
+        await pilot.pause()
+        assert isinstance(app.screen, GameScreen)
+        assert state.turn == 0, "looking at the sheet cost a turn"
+        assert state.inventory == [], "the key was swallowed by the game"
+
+
+async def test_the_character_screen_labels_do_not_run_into_their_values():
+    """Aligned columns, checked rather than eyeballed.
+
+    "accuracy" is eight characters, so a seven-or-eight-wide column puts the
+    value straight against the label and the sheet reads as one long word.
+    """
+    from rich.text import Text
+
+    from neverdeads_revenge.ui.screens.character import _row
+
+    for label in ("health", "speed", "damage", "crit", "accuracy", "evasion", "armour"):
+        plain = Text.from_markup(_row(label, "1")).plain
+        assert plain.endswith(" 1"), f"{label!r} runs into its value: {plain!r}"
 
 
 # -- prologue ---------------------------------------------------------------
@@ -886,9 +992,15 @@ async def test_legend_lists_every_monster_and_every_draught():
         for template in ENEMIES.values():
             assert template.glyph in shown, f"{template.key} missing from legend"
             assert template.name in shown
+
+        # Every glyph is listed, but not every item by name: equipment is
+        # grouped by kind, because the sidebar has room for "a weapon" and not
+        # for four of them by name. Draughts keep a row each -- the difference
+        # between a potion and an elixir is the decision being made.
         for item in ITEMS.values():
             assert item.glyph in shown, f"{item.key} missing from legend"
-            assert item.name in shown
+            if item.kind == "draught":
+                assert item.name in shown, f"{item.key} missing from legend"
 
 
 async def test_the_legend_names_the_hero_you_actually_picked():

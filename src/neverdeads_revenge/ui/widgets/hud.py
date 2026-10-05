@@ -75,18 +75,24 @@ class Hud(Static):
         out.append("░" * (BAR_CELLS - filled), style="grey30")
         out.append(f"  {player.hp}/{player.max_hp}\n", style=colour)
 
-        # Speed and crit get a line each: together they are 34 columns and the
-        # sidebar's content box is 30, so sharing one wraps the crit multiplier
-        # onto a line of its own. The legend below has slack now that the terrain
-        # reference moved to the help.
-        bonus = player.speed_bonus
+        # Damage, crit, speed, armour and evasion each get a share of two lines.
+        # They are the numbers a fight turns on, and now that equipment moves
+        # them the player has to be able to watch them move. The full sheet, with
+        # what each piece contributes, is on the character screen behind ``c``.
+        low, high = player.damage_range
+        out.append("DMG ", style="dim")
+        out.append(f"{low}-{high}", style="bold white")
+        out.append("  CRT ", style="dim")
+        out.append(f"{player.crit_chance:.0%}\n", style="bold yellow")
+
         out.append("SPD ", style="dim")
-        out.append(f"{player.stats.speed:.2f}", style="bold white")
-        if bonus:
-            out.append(f" +{bonus:.1f}", style="bold green")
-        out.append(f"\nCRT ", style="dim")
-        out.append(f"{player.stats.crit_chance:.0%}", style="bold yellow")
-        out.append(f"  x{player.stats.crit_multiplier:.1f}\n", style="dim")
+        out.append(f"{player.speed:.2f}", style="bold white")
+        if player.speed_bonus:
+            out.append(f"+{player.speed_bonus:.1f}", style="bold green")
+        out.append("  ARM ", style="dim")
+        out.append(f"{player.armor}", style="bold white")
+        out.append("  EVA ", style="dim")
+        out.append(f"{player.evasion}\n", style="bold white")
 
         if state.revenge_stacks:
             # Name the grant, not just the count. Three heroes collect three
@@ -97,6 +103,17 @@ class Hud(Static):
                 f"  {player.trait.describe(state.revenge_stacks)}\n",
                 style="green",
             )
+
+        # What is being worn, by slot. Emptied slots are shown as a dash rather
+        # than hidden, so the sidebar does not change height the first time
+        # something is picked up.
+        for slot, label in (("weapon", "W"), ("armour", "A")):
+            item = player.equipment.get(slot)
+            out.append(f"{label} ", style="dim")
+            if item is None:
+                out.append("—\n", style="dim")
+            else:
+                out.append(f"{item.name}\n", style="bold white")
 
         out.append(f"Floor {state.depth}", style="bold cyan")
         out.append(f"/{ESCAPE_DEPTH}\n", style="dim cyan")

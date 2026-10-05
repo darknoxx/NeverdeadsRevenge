@@ -40,7 +40,7 @@ No hero can heal on their own; potions and elixirs on the floor are the only way
 back up. A run's health is therefore a budget you spend across ten floors, and
 skipping loot to save time is a real trade.
 
-Measured with two bots over 30 seeds each, because the choice of bot turned out
+Measured with two bots over 24 seeds each, because the choice of bot turned out
 to matter more than the hero:
 
 * **trade** — attack whatever is adjacent, always.
@@ -48,15 +48,19 @@ to matter more than the hero:
 
 | hero | trade | kite |
 | --- | --- | --- |
-| Noxx | 4/30 | **10/30** |
-| Yeti | **7/30** | 1/30 |
-| Walkyrion | **8/30** | 2/30 |
+| Noxx | 9/24 | **11/24** |
+| Yeti | **10/24** | 4/24 |
+| Walkyrion | **11/24** | 3/24 |
 
 Each hero played to its own strength — Noxx kites, the armoured two trade — Noxx
 is the strongest, which is what a speed-and-crit hero should be. The single
 trade-only bot used to report the opposite, and it was the instrument: it cannot
 express disengaging, so it flattered the heroes who survive by standing still.
-The numbers above are a rough read, not a verdict; 30 runs is a small sample.
+The numbers above are a rough read, not a verdict; 24 runs is a small sample.
+
+The same bot on the same seeds escapes **17–33%** when floor equipment is
+switched off, so loot roughly doubles your chances. That is the point of loot,
+but it is also why the floor tier is kept small.
 
 ## Install
 
@@ -176,9 +180,28 @@ mistake rather than a style.
 | `enter` | Interact: pick up what you are standing on, or take the stairs |
 | `>` | Descend, when you already know that is what you want |
 | `q` | Drink a potion |
+| `c` | Character sheet: every stat, and what each piece is contributing |
 | `i` | Show what you are carrying |
 | `?` | Controls and the terrain reference |
 | `Esc` | Menu, `q` there to quit to title |
+
+## Loot and equipment
+
+Two kinds of thing lie on the floor.
+
+**Draughts** — `!` a potion, `*` an elixir — go in the pack and heal when drunk
+with `q`. Health is the run's real currency, so these are the supply that decides
+how far you get.
+
+**Equipment** is worn the moment you step on it and press `enter`: a weapon (`)`)
+or a coat (`[`). Whatever it replaces is set down on the floor *beside* you, so
+nothing is ever lost and walking back onto it puts it on again. Weapons raise
+damage and crit; armour raises armour, evasion and speed. `c` opens the full
+sheet, including what each piece is contributing.
+
+Floor equipment is deliberately modest — the measured effect is already a
+doubling of the escape rate. The strong tier is meant to come out of the chests,
+and those are not built yet.
 
 ## Not implemented yet
 

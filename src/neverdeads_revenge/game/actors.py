@@ -7,11 +7,13 @@ testable without a terminal.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from enum import Enum
 
 from neverdeads_revenge.core.direction import Pos, chebyshev
 from neverdeads_revenge.core.rng import Rng
+from neverdeads_revenge.world.map import GroundItem
+from neverdeads_revenge.world.modifiers import Modifiers
 
 from .difficulty import MAX_ENEMY_SPEED, potency, weight_at_depth
 
@@ -175,6 +177,10 @@ class Actor:
     speed_bonus: float = 0.0
     armor_bonus: int = 0
     damage_bonus: int = 0
+    #: What this actor is wearing, by slot. Only the player ever fills it, but
+    #: it lives here because that is where the effective stats are computed and
+    #: a bonus that cannot go stale is worth a dict on every monster.
+    equipment: dict[str, GroundItem] = field(default_factory=dict)
     #: Which of the three REVENGE grants this actor collects. Copied from the
     #: hero so the game layer never has to look the hero up mid-fight.
     trait: Trait = Trait.SPEED
@@ -183,6 +189,10 @@ class Actor:
     behaviour: str = "aggressive"
 
     # -- combat -------------------------------------------------------------
+    #
+    # Everything below sums three layers: the base ``Stats`` the actor was built
+    # with, the temporary bonuses REVENGE grants, and what it is wearing. Keeping
+    # the sum in one place is why combat never has to ask what a stat "really" is.
     @property
     def hp(self) -> int:
         return self.stats.hp
@@ -192,31 +202,70 @@ class Actor:
         return self.stats.max_hp
 
     @property
+    def modifiers(self) -> Modifiers:
+        """Everything equipped, summed. Derived, so it cannot go stale."""
+        total = Modifiers()
+        for item in self.equipment.values():
+            total = total + item.modifiers
+        return total
+
+    @property
     def speed(self) -> float:
-        """Effective speed, including any active bonus.
+        """Effective speed.
 
         This is what the turn queue divides by, so a bonus granted by a kill
         immediately makes the holder act more often.
         """
-        return self.stats.speed + self.speed_bonus
+        return self.stats.speed + self.speed_bonus + self.modifiers.speed
+
+    @property
+    def armor(self) -> int:
+        """Armour from every source, for display and for combat."""
+        return self.stats.armor + self.armor_bonus + self.modifiers.armor
+
+    @property
+    def evasion(self) -> int:
+        return self.stats.evasion + self.modifiers.evasion
+
+    @property
+    def accuracy(self) -> int:
+        return self.stats.accuracy + self.modifiers.accuracy
+
+    @property
+    def crit_chance(self) -> float:
+        return self.stats.crit_chance + self.modifiers.crit_chance
+
+    @property
+    def crit_multiplier(self) -> float:
+        return self.stats.crit_multiplier + self.modifiers.crit_multiplier
+
+    @property
+    def damage_range(self) -> tuple[int, int]:
+        """The damage roll before the dice, bonuses included."""
+        low, high = self.stats.damage
+        bonus = self.damage_bonus + self.modifiers.damage
+        return (low + bonus, high + bonus)
 
     def distance_from(self, other: Actor) -> int:
         """Chebyshev distance to another actor."""
         return chebyshev(self.position, other.position)
 
     def damage_roll(self, rng) -> int:
-        """A damage value in this actor's range, plus any REVENGE bonus.
+        """A damage value in this actor's range, plus every flat bonus.
 
         Flat, not a multiplier: the bonus is added once to the roll, so it reads
         on screen as the same number every hit and a player can count it.
         """
-        low, high = self.stats.damage
-        return rng.between(low, high) + self.damage_bonus
+        low, high = self.damage_range
+        return rng.between(low, high)
 
-    @property
-    def armor(self) -> int:
-        """Armour including any REVENGE bonus, for display and for combat."""
-        return self.stats.armor + self.armor_bonus
+    def hurt(self, amount: int) -> int:
+        """Take a hit, after everything this actor has on.
+
+        The armour is passed down to ``Stats`` rather than subtracted here so
+        there is exactly one place that knows what armour does.
+        """
+        return self.stats.hurt(amount, self.armor_bonus + self.modifiers.armor)
 
     def __repr__(self) -> str:
         return f"Actor({self.name!r}, hp={self.hp}/{self.max_hp}, at={self.position})"

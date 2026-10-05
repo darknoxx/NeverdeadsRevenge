@@ -173,6 +173,44 @@ HelpScreen {
     color: #6b6b6b;
 }
 
+/* -- character sheet ----------------------------------------------------- */
+
+CharacterScreen {
+    align: center middle;
+    background: $background 70%;
+}
+
+#character {
+    width: 60;
+    height: auto;
+    max-height: 80%;
+    padding: 1 2;
+    border: round $panel;
+    background: $surface;
+}
+
+#character-title {
+    width: 1fr;
+    height: auto;
+    margin: 0 0 1 0;
+    text-style: bold;
+    color: $accent;
+}
+
+#character-body {
+    width: 1fr;
+    height: auto;
+    color: $foreground;
+}
+
+#character-hint {
+    width: 1fr;
+    height: auto;
+    margin: 1 0 0 0;
+    content-align: center middle;
+    color: #6b6b6b;
+}
+
 /* -- prologue ------------------------------------------------------------ */
 
 #prologue-screen {

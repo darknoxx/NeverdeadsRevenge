@@ -1,0 +1,108 @@
+"""The character sheet.
+
+The sidebar shows the numbers a fight turns on and has no room for more. This is
+where the rest lives: what each piece of equipment is contributing, what is being
+carried, and what a curse has done to you.
+
+A modal rather than a screen, so the map stays visible behind it -- somebody
+checking their stats mid-fight should not lose sight of what is standing next to
+them. Any key closes it, and it costs no turn.
+"""
+
+from __future__ import annotations
+
+from textual.app import ComposeResult
+from textual.binding import Binding
+from textual.containers import VerticalScroll
+from textual.screen import ModalScreen
+from textual.widgets import Static
+
+from ...game.state import GameState
+
+__all__ = ["CharacterScreen"]
+
+#: Slots, in the order they are shown.
+SLOTS: tuple[str, ...] = ("weapon", "armour")
+
+
+class CharacterScreen(ModalScreen[None]):
+    """Everything the sidebar has no room for. Any key closes."""
+
+    BINDINGS = [Binding("escape", "dismiss", "Close")]
+
+    DEFAULT_CSS = """
+    CharacterScreen {
+        align: center middle;
+        background: $background 70%;
+    }
+    """
+
+    def __init__(self, state: GameState) -> None:
+        super().__init__()
+        self.state = state
+
+    def compose(self) -> ComposeResult:
+        with VerticalScroll(id="character"):
+            yield Static("CHARACTER", id="character-title")
+            yield Static(self._sheet(), id="character-body")
+            yield Static("press any key", id="character-hint")
+
+    def on_key(self, event) -> None:
+        event.stop()
+        self.dismiss()
+
+    # -- the sheet ----------------------------------------------------------
+    def _sheet(self) -> str:
+        """The whole sheet as markup.
+
+        Built here rather than in the widget tree because it is a block of text
+        with aligned columns, and a dozen ``Static`` widgets would be a dozen
+        things to keep in sync for no gain.
+        """
+        state = self.state
+        player = state.player
+        low, high = player.damage_range
+
+        lines = [
+            f"[bold {player.color}]{player.name}[/]  [dim]{state.hero.title}[/]",
+            "",
+            _row("health", f"{player.hp} / {player.max_hp}"),
+            _row("speed", f"{player.speed:.2f}"),
+            _row("damage", f"{low}-{high}"),
+            _row("crit", f"{player.crit_chance:.0%}  x{player.crit_multiplier:.1f}"),
+            _row("accuracy", f"{player.accuracy}"),
+            _row("evasion", f"{player.evasion}"),
+            _row("armour", f"{player.armor}"),
+            "",
+        ]
+
+        for slot in SLOTS:
+            item = player.equipment.get(slot)
+            if item is None:
+                lines.append(f"[dim]{slot:<9}[/][dim]nothing[/]")
+                continue
+            changes = ", ".join(item.modifiers.describe()) or "no effect"
+            lines.append(f"[dim]{slot:<9}[/][bold]{item.name}[/]  [dim]{changes}[/]")
+
+        lines.append("")
+        lines.append(_row("carried", _carried(state)))
+        return "\n".join(lines)
+
+
+def _row(label: str, value: str) -> str:
+    """A label and its value, in a column.
+
+    Nine wide because "accuracy" is eight: at eight the value runs straight into
+    the label and the sheet reads as one long word.
+    """
+    return f"[dim]{label:<9}[/]{value}"
+
+
+def _carried(state: GameState) -> str:
+    """What is in the pack, counted rather than listed."""
+    counts: dict[str, int] = {}
+    for item in state.inventory:
+        counts[item.name] = counts.get(item.name, 0) + 1
+    if not counts:
+        return "[dim]nothing[/]"
+    return ", ".join(f"{count}x {name}" for name, count in sorted(counts.items()))

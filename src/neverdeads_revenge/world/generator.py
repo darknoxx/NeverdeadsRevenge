@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from neverdeads_revenge.core.direction import Pos
 from neverdeads_revenge.core.rng import Rng
 
-from .items import loot_count, make_item, roll_item
+from .items import equipment_count, loot_count, make_item, roll_item
 from .map import DungeonMap, GroundItem
 from .tiles import Tile
 
@@ -279,7 +279,7 @@ def _scatter_loot(
     candidates: list[Pos],
     depth: int,
 ) -> dict[Pos, GroundItem]:
-    """Drop a few draughts on the floor.
+    """Drop the floor's draughts and equipment.
 
     Items may land under a monster. That is deliberate: a potion you have to
     fight for is more interesting than one lying in an empty room, and the
@@ -292,9 +292,19 @@ def _scatter_loot(
     if not open_floor:
         return placed
 
-    count = min(loot_count(depth), len(open_floor))
-    for pos in rng.shuffled(open_floor)[:count]:
-        item = make_item(roll_item(rng, depth))
+    # Two pools, rolled separately and then placed together. One shared table
+    # would let equipment crowd out the healing the whole game is balanced
+    # around, which is exactly what happened the first time.
+    wanted = [
+        *(roll_item(rng, depth, kinds=("draught",)) for _ in range(loot_count(depth))),
+        *(
+            roll_item(rng, depth, kinds=("weapon", "armour"))
+            for _ in range(equipment_count(depth))
+        ),
+    ]
+
+    for pos, template in zip(rng.shuffled(open_floor), wanted):
+        item = make_item(template)
         dungeon_map.add_item(pos, item)
         placed[pos] = item
     return placed

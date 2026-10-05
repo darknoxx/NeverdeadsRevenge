@@ -89,7 +89,7 @@ _VERBS: dict[tuple[bool, bool, bool], tuple[str, str]] = {
 
 def hit_chance(attacker: Actor, defender: Actor) -> float:
     """Probability that ``attacker`` lands a blow on ``defender``."""
-    edge = attacker.stats.accuracy - defender.stats.evasion
+    edge = attacker.accuracy - defender.evasion
     chance = BASE_HIT_CHANCE + 0.1 * edge
     return max(MIN_HIT_CHANCE, min(MAX_HIT_CHANCE, chance))
 
@@ -104,10 +104,10 @@ def attack(attacker: Actor, defender: Actor, rng: Rng) -> AttackOutcome:
         return AttackOutcome(hit=False, crit=False, damage=0, killed=False, dodged=True)
 
     base = attacker.damage_roll(rng)
-    crit = rng.chance(attacker.stats.crit_chance)
-    damage = int(round(base * attacker.stats.crit_multiplier)) if crit else base
+    crit = rng.chance(attacker.crit_chance)
+    damage = int(round(base * attacker.crit_multiplier)) if crit else base
 
-    dealt = defender.stats.hurt(damage, defender.armor_bonus)
+    dealt = defender.hurt(damage)
     killed = not defender.stats.alive
     if killed:
         defender.alive = False

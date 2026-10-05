@@ -184,26 +184,33 @@ def test_the_hero_colour_is_not_another_hero_or_monster_in_disguise():
     values. This asserts each hero is actually a different colour from everything
     else on the map rather than merely a different string.
     """
+    from itertools import combinations
+
     from rich.color import Color
 
     from neverdeads_revenge.world.items import ITEMS
 
-    everything = {
-        f"monster {t.key}": t.color for t in ENEMIES.values()
-    } | {f"item {i.key}": i.color for i in ITEMS.values()}
+    # Keyed by glyph, because the glyph is the mark the eye finds. Items of a
+    # kind share both glyph and colour on purpose; across glyphs the two have to
+    # agree, or a purple N and a purple something-else are the same mark.
+    marks: dict[str, tuple[str, str]] = {}
     for hero in HEROES.values():
-        everything[f"hero {hero.key}"] = hero.color
+        marks[hero.glyph] = (f"hero {hero.key}", hero.color)
+    for template in ENEMIES.values():
+        marks[template.glyph] = (f"monster {template.key}", template.color)
+    for item in ITEMS.values():
+        marks.setdefault(item.glyph, (f"{item.kind} items", item.color))
 
-    names = list(everything)
-    for i, left in enumerate(names):
-        for right in names[i + 1 :]:
-            a = Color.parse(everything[left]).get_truecolor()
-            b = Color.parse(everything[right]).get_truecolor()
-            distance = sum((x - y) ** 2 for x, y in zip(a, b))
-            assert distance > 4000, (
-                f"{left} and {right} are the same colour to the eye "
-                f"({everything[left]} vs {everything[right]})"
-            )
+    for left, right in combinations(marks, 2):
+        left_name, left_colour = marks[left]
+        right_name, right_colour = marks[right]
+        a = Color.parse(left_colour).get_truecolor()
+        b = Color.parse(right_colour).get_truecolor()
+        distance = sum((x - y) ** 2 for x, y in zip(a, b))
+        assert distance > 4000, (
+            f"{left_name} ({left!r}) and {right_name} ({right!r}) are the same "
+            f"colour to the eye ({left_colour} vs {right_colour})"
+        )
 
 
 # -- the roster -------------------------------------------------------------
@@ -1080,11 +1087,11 @@ def _give(state: GameState, key: str) -> GroundItem:
     return item
 
 
-def test_picking_up_puts_the_item_in_the_inventory():
+def test_picking_up_a_draught_puts_it_in_the_inventory():
     """Floor loot and carried loot are different things, and both must update."""
     state = start_run(NOXX, seed=1)
-    pos = next(iter(state.dungeon_map.items))
-    state.player.position = pos
+    _place(state, make_item(ITEMS["potion"]))
+    pos = state.player.position
     item = state.dungeon_map.item_at(pos)
 
     result = perform_action(state, Action.PICK_UP)
@@ -1095,6 +1102,164 @@ def test_picking_up_puts_the_item_in_the_inventory():
     # monsters should get to answer.
     assert not result.consumed_turn
     assert state.turn == 0
+
+
+def _place(state: GameState, item) -> None:
+    """Drop ``item`` under the player and stand them on it."""
+    state.dungeon_map.add_item(state.player.position, item)
+
+
+# -- equipment --------------------------------------------------------------
+def test_equipping_fills_an_empty_slot():
+    state = start_run(NOXX, seed=1)
+    _place(state, make_item(ITEMS["blade"]))
+    before = state.player.damage_range
+
+    perform_action(state, Action.PICK_UP)
+
+    assert state.player.equipment["weapon"].name == "serrated blade"
+    assert state.inventory == [], "a weapon is worn, not carried"
+    assert state.player.damage_range > before, "the weapon changed nothing"
+    # Against the template rather than a number, so rebalancing the weapon does
+    # not fail a test that was really about the wiring.
+    assert state.player.modifiers.damage == ITEMS["blade"].modifiers.damage
+
+
+def test_equipping_sets_the_old_one_down_beside_you():
+    """Swapping has to be reversible, or auto-equipping is a trap.
+
+    Beside rather than under: there is no comparison dialog, so the undo is that
+    what you took off is on the floor next to you.
+    """
+    state = start_run(NOXX, seed=1)
+    blade = make_item(ITEMS["blade"])
+    _place(state, blade)
+    perform_action(state, Action.PICK_UP)
+    assert state.player.equipment["weapon"] is blade
+
+    _place(state, make_item(ITEMS["knife"]))
+    perform_action(state, Action.PICK_UP)
+
+    assert state.player.equipment["weapon"].name == "chipped knife"
+    assert state.dungeon_map.item_at(state.player.position) is None, (
+        "the old weapon was left under the player, where enter would pick it up"
+    )
+    assert any(item is blade for item in state.dungeon_map.items.values()), (
+        "the serrated blade was not set down anywhere"
+    )
+
+
+def test_swapping_equipment_is_not_an_infinite_loop():
+    """Pressing enter over and over must not alternate between two weapons.
+
+    It did: the replaced item landed under the player, so ``enter`` picked it up
+    again, which put the other one back down, forever -- and ``enter`` could
+    never reach the stairs. Caught by a bot that stopped descending.
+    """
+    state = start_run(NOXX, seed=1)
+    _place(state, make_item(ITEMS["blade"]))
+    perform_action(state, Action.PICK_UP)
+    _place(state, make_item(ITEMS["knife"]))
+
+    seen = []
+    for _ in range(6):
+        perform_action(state, Action.PICK_UP)
+        seen.append(state.player.equipment["weapon"].name)
+
+    assert "serrated blade" not in seen, (
+        f"enter put the old weapon back on, so the swap is still a loop: {seen}"
+    )
+    assert state.dungeon_map.item_at(state.player.position) is None
+
+
+def test_stepping_onto_the_set_down_item_puts_it_back_on():
+    """The whole of the undo: walk onto what you set down and take it back."""
+    state = start_run(NOXX, seed=1)
+    blade = make_item(ITEMS["blade"])
+    _place(state, blade)
+    perform_action(state, Action.PICK_UP)
+
+    _place(state, make_item(ITEMS["knife"]))
+    perform_action(state, Action.PICK_UP)
+    assert state.player.equipment["weapon"].name == "chipped knife"
+
+    # By identity, not by name: the floor generator can put a blade of its own
+    # down, and "the item called serrated blade" would find that one instead.
+    blade_pos = next(
+        pos for pos, item in state.dungeon_map.items.items() if item is blade
+    )
+    assert chebyshev(state.player.position, blade_pos) == 1, "it should be adjacent"
+
+    # Walk onto it and take it back.
+    state.player.position = blade_pos
+    perform_action(state, Action.PICK_UP)
+
+    assert state.player.equipment["weapon"] is blade
+
+
+def test_weapon_and_armour_are_separate_slots():
+    """A coat must not replace a blade."""
+    state = start_run(NOXX, seed=1)
+    _place(state, make_item(ITEMS["blade"]))
+    perform_action(state, Action.PICK_UP)
+    _place(state, make_item(ITEMS["leather"]))
+    perform_action(state, Action.PICK_UP)
+
+    assert state.player.equipment["weapon"].name == "serrated blade"
+    assert state.player.equipment["armour"].name == "leather coat"
+    assert state.dungeon_map.item_at(state.player.position) is None
+
+
+def test_equipment_reaches_every_effective_stat():
+    """The layer has to land in combat, not just in the modifiers object.
+
+    Each of these is read somewhere different -- damage in the roll, armour in
+    ``hurt``, evasion and accuracy in ``hit_chance``, crit in ``attack`` -- so
+    one assertion per stat is the only way to know the wiring is complete.
+    """
+    state = start_run(NOXX, seed=1)
+    player = state.player
+    base = (
+        player.damage_range,
+        player.armor,
+        player.evasion,
+        player.accuracy,
+        player.crit_chance,
+        player.crit_multiplier,
+    )
+
+    player.equipment["weapon"] = make_item(ITEMS["estoc"])
+    player.equipment["armour"] = make_item(ITEMS["cloak"])
+
+    assert player.damage_range[0] > base[0][0], "damage did not move"
+    assert player.evasion > base[2], "evasion did not move"
+    assert player.crit_chance > base[4], "crit did not move"
+    assert player.crit_multiplier > base[5], "crit damage did not move"
+
+
+def test_equipment_armour_actually_stops_a_hit():
+    """``Actor.hurt`` has to pass the worn armour down, not just report it."""
+    state = start_run(NOXX, seed=1)
+    player = state.player
+    ghoul = make_enemy(ENEMIES["ghoul"], (1, 0))
+
+    bare = make_hero(NOXX, (0, 0))
+    player.equipment["armour"] = make_item(ITEMS["leather"])
+
+    assert player.armor == bare.armor + ITEMS["leather"].modifiers.armor
+    assert player.hurt(4) <= bare.hurt(4), "the coat did not absorb anything"
+
+
+def test_an_item_that_is_not_equipment_never_fills_a_slot():
+    """Draughts stay draughts. A potion in the weapon slot would be absurd."""
+    from neverdeads_revenge.world.items import ITEMS as ALL_ITEMS
+
+    for template in ALL_ITEMS.values():
+        if template.slot is not None:
+            assert template.kind in ("weapon", "armour"), template.key
+            assert not template.heal, f"{template.key} both heals and is worn"
+        else:
+            assert template.kind == "draught", template.key
 
 
 def test_picking_up_nothing_says_so():
