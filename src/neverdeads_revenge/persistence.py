@@ -17,6 +17,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 __all__ = [
+    "ScoreEntry",
+    "SCOREBOARD_SIZE",
     "MetaProgress",
     "MetaUpgrade",
     "META_UPGRADES",
@@ -27,6 +29,10 @@ __all__ = [
 ]
 
 SAVE_VERSION = 1
+
+#: How many runs the scoreboard keeps. Capped because the file is rewritten on
+#: every ending and a list that grows forever is a file that grows forever.
+SCOREBOARD_SIZE = 10
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +58,21 @@ META_UPGRADES: dict[str, MetaUpgrade] = {}
 
 
 @dataclass(slots=True)
+class ScoreEntry:
+    """One finished run, as the scoreboard keeps it."""
+
+    name: str
+    score: int
+    depth: int
+    hero: str
+    won: bool
+
+    @property
+    def outcome(self) -> str:
+        return "escaped" if self.won else "died"
+
+
+@dataclass(slots=True)
 class MetaProgress:
     """Everything that outlives a single run."""
 
@@ -63,6 +84,10 @@ class MetaProgress:
     #: Coins banked across every run. Spent in the shop, so it is the one number
     #: that survives death and is worth something afterwards.
     gold: int = 0
+    #: The best runs, highest first.
+    scores: list[ScoreEntry] = field(default_factory=list)
+    #: The name used last, so the next run costs one keypress rather than five.
+    last_name: str = ""
     #: Lifetime run statistics.
     runs_started: int = 0
     runs_won: int = 0
@@ -97,11 +122,15 @@ class MetaProgress:
         kills: int,
         gold: int = 0,
         won: bool = False,
+        name: str = "",
+        hero: str = "",
     ) -> None:
-        """Fold a finished run into the lifetime totals.
+        """Fold a finished run into the lifetime totals and the scoreboard.
 
         ``gold`` is added rather than kept at its best: coin is a currency, and a
         bad run that still picked up a purse is a run that moved you forward.
+        The score, by contrast, is kept at its best -- a worse run does not lower
+        anything.
         """
         self.runs_started += 1
         self.total_kills += kills
@@ -110,6 +139,15 @@ class MetaProgress:
         self.best_score = max(self.best_score, score)
         if won:
             self.runs_won += 1
+
+        if not name:
+            return
+        self.last_name = name
+        self.scores.append(
+            ScoreEntry(name=name, score=score, depth=depth, hero=hero, won=won)
+        )
+        self.scores.sort(key=lambda entry: entry.score, reverse=True)
+        del self.scores[SCOREBOARD_SIZE:]
 
     def meta_upgrade_totals(self) -> dict[str, int]:
         """Upgrade stacks, as :func:`~neverdeads_revenge.game.state.start_run` wants them."""
@@ -164,6 +202,18 @@ def load_meta(path: Path | None = None) -> MetaProgress:
             unlocked_heroes=list(raw.get("unlocked_heroes", ["noxx"])),
             upgrades=dict(raw.get("upgrades", {})),
             gold=int(raw.get("gold", 0)),
+            scores=[
+                ScoreEntry(
+                    name=str(entry.get("name", "?")),
+                    score=int(entry.get("score", 0)),
+                    depth=int(entry.get("depth", 1)),
+                    hero=str(entry.get("hero", "noxx")),
+                    won=bool(entry.get("won", False)),
+                )
+                for entry in raw.get("scores", [])
+                if isinstance(entry, dict)
+            ],
+            last_name=str(raw.get("last_name", "")),
             runs_started=int(raw.get("runs_started", 0)),
             runs_won=int(raw.get("runs_won", 0)),
             best_depth=int(raw.get("best_depth", 0)),

@@ -25,6 +25,7 @@ from neverdeads_revenge.ui.hold import BAR_CELLS, HoldToContinue
 from neverdeads_revenge.ui.screens.game import GameScreen
 from neverdeads_revenge.ui.screens.game_over import GameOverScreen
 from neverdeads_revenge.ui.screens.hero_select import FUTURE_HEROES, HeroSelectScreen
+from neverdeads_revenge.ui.screens.name_entry import clean_name
 from neverdeads_revenge.ui.screens.pause import PauseScreen
 from neverdeads_revenge.ui.screens.prologue import PrologueScreen
 from neverdeads_revenge.ui.screens.title import TitleScreen
@@ -70,6 +71,18 @@ async def hold_enter(pilot, gap: float = 0.3) -> None:
     for _ in range(3):
         await pilot.press("enter")
         await asyncio.sleep(gap)
+    await pilot.pause()
+
+
+async def finish_run(pilot) -> None:
+    """Walk a finished run to the title.
+
+    Every ending goes through two screens now: the summary says what happened,
+    the name entry is what puts it on the board. Tests that only care about
+    being back at the title use this rather than spelling out both.
+    """
+    await hold_enter(pilot)  # summary -> name entry
+    await pilot.press("enter")  # keep the name (prefilled or empty)
     await pilot.pause()
 
 
@@ -302,9 +315,9 @@ async def test_stepping_into_the_rift_shows_victory_not_death():
         assert "VICTORY" in str(app.screen.query_one("#game-over-title").render())
         assert state.run_state is RunState.ESCAPED
 
-        # And it returns to the title like every other ending.
-        await hold_enter(pilot)
-        await pilot.pause()
+        # And it returns to the title like every other ending -- through the
+        # name entry, which every ending goes through now.
+        await finish_run(pilot)
         assert isinstance(app.screen, TitleScreen)
 
 
@@ -346,8 +359,7 @@ async def test_the_victory_screen_answers_the_prologue():
 
         # And the death screen must not say it: it would be a cruel lie there.
         assert "Out of the dark" in body
-        await hold_enter(pilot)
-        await pilot.pause()
+        await finish_run(pilot)
 
         # A death gets the plain summary.
         screen = await drive_to_game(app, pilot)
@@ -1060,7 +1072,7 @@ async def test_death_opens_game_over_and_returns_to_title():
         await pilot.pause()
         assert isinstance(app.screen, GameOverScreen)
 
-        await hold_enter(pilot)
+        await finish_run(pilot)
         assert isinstance(app.screen, TitleScreen)
 
 
@@ -1563,6 +1575,9 @@ async def test_a_finished_run_is_written_down():
         screen.state.floors_cleared = 3
         screen._game_over()
         await pilot.pause()
+        # The run is written down once the name is in, so the summary screen
+        # alone does not do it yet.
+        await finish_run(pilot)
 
         assert app.progress.best_score > 0
 
@@ -1580,16 +1595,16 @@ async def test_the_best_score_only_ever_goes_up():
         screen.state.floors_cleared = 9
         screen._game_over()
         await pilot.pause()
+        await finish_run(pilot)
         high = app.progress.best_score
+        assert high > 0
 
-        # Back to the title before the second run: drive_to_game starts there.
-        await hold_enter(pilot)
-        assert isinstance(app.screen, TitleScreen)
-
+        # Back to the title already: drive_to_game starts there.
         screen = await drive_to_game(app, pilot)
         screen.state.kills = 1
         screen._game_over()
         await pilot.pause()
+        await finish_run(pilot)
 
         assert app.progress.best_score == high, "a worse run lowered the best"
 
@@ -1674,3 +1689,218 @@ async def test_quit_binding_exists(key):
         await pilot.pause()
         await pilot.press(key)
         await pilot.pause()
+
+# -- the scoreboard and the name ---------------------------------------------
+def test_a_name_is_cleaned_before_it_goes_on_the_board():
+    """A table with punctuation in it is a table nobody can read."""
+    assert clean_name("noxx") == "NOXX"
+    assert clean_name("a b!c") == "ABC", "spaces and punctuation are not letters"
+    assert clean_name("abcdefgh") == "ABCDE", "five slots, not eight"
+    assert clean_name("") == ""
+    assert clean_name("123") == "123"
+
+
+async def test_h_opens_the_scoreboard_from_the_title():
+    from neverdeads_revenge.ui.screens.scoreboard import ScoreboardScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, TitleScreen)
+
+        await pilot.press("h")
+        await pilot.pause()
+        assert isinstance(app.screen, ScoreboardScreen)
+
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, TitleScreen)
+
+
+async def test_the_scoreboard_says_so_when_there_is_nothing_on_it():
+    from neverdeads_revenge.ui.screens.scoreboard import ScoreboardScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await pilot.press("h")
+        await pilot.pause()
+
+        assert isinstance(app.screen, ScoreboardScreen)
+        body = str(app.screen.query_one("#scoreboard-body").render())
+        assert "No runs yet" in body
+
+
+async def test_the_scoreboard_lists_a_run_with_how_it_ended():
+    from neverdeads_revenge.persistence import MetaProgress, save_meta
+    from neverdeads_revenge.ui.screens.scoreboard import ScoreboardScreen
+
+    progress = MetaProgress(gold=99)
+    progress.record_run(
+        depth=10, score=4200, kills=0, won=True, name="NOXX", hero="noxx"
+    )
+    progress.record_run(depth=4, score=900, kills=0, won=False, name="YETI", hero="yeti")
+    save_meta(progress)
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await pilot.press("h")
+        await pilot.pause()
+
+        assert isinstance(app.screen, ScoreboardScreen)
+        body = str(app.screen.query_one("#scoreboard-body").render())
+        assert "NOXX" in body and "4200" in body
+        assert "escaped" in body, "a win is not marked as one"
+        assert "YETI" in body and "died" in body
+        assert "99" in body, "the banked coin is not shown"
+
+
+async def test_a_finished_run_asks_for_a_name():
+    from neverdeads_revenge.ui.screens.name_entry import NameEntryScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.kills = 3
+        screen._game_over()
+        await pilot.pause()
+        assert isinstance(app.screen, GameOverScreen)
+
+        await hold_enter(pilot)
+        assert isinstance(app.screen, NameEntryScreen)
+
+
+async def test_the_name_goes_on_the_board_with_the_score():
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.floors_cleared = 4
+        screen.state.total_turns = 0
+        expected = screen.state.score
+
+        screen._game_over()
+        await pilot.pause()
+        await hold_enter(pilot)          # summary -> name entry
+        await pilot.press("a")
+        await pilot.press("b")
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert isinstance(app.screen, TitleScreen)
+        assert [e.name for e in app.progress.scores] == ["AB"]
+        assert app.progress.scores[0].score == expected
+        assert app.progress.last_name == "AB"
+
+
+async def test_a_death_is_recorded_just_like_a_win():
+    """Both collected points, so both get a name."""
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.kills = 2
+        screen._game_over(won=False)
+        await pilot.pause()
+        await hold_enter(pilot)
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert app.progress.scores, "a losing run was not recorded"
+        assert app.progress.scores[0].won is False
+
+
+async def test_the_name_entry_is_prefilled_with_the_last_name():
+    from neverdeads_revenge.persistence import MetaProgress, save_meta
+    from neverdeads_revenge.ui.screens.name_entry import NameEntryScreen
+
+    save_meta(MetaProgress(last_name="NXX"))
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen._game_over()
+        await pilot.pause()
+        await hold_enter(pilot)
+
+        assert isinstance(app.screen, NameEntryScreen)
+        assert app.screen._name == "NXX", "the last name was not offered"
+
+
+async def test_an_empty_name_becomes_something_readable():
+    from neverdeads_revenge.ui.screens.name_entry import NameEntryScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen._game_over()
+        await pilot.pause()
+        await hold_enter(pilot)
+
+        assert isinstance(app.screen, NameEntryScreen)
+        # Nothing typed: enter alone must not leave a blank row on the board.
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert app.progress.scores[0].name == "???"
+
+
+async def test_backspace_takes_a_letter_back():
+    from neverdeads_revenge.ui.screens.name_entry import NameEntryScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen._game_over()
+        await pilot.pause()
+        await hold_enter(pilot)
+        assert isinstance(app.screen, NameEntryScreen)
+
+        await pilot.press("a")
+        await pilot.press("b")
+        await pilot.press("backspace")
+        await pilot.pause()
+
+        assert app.screen._name == "A"
+
+
+async def test_the_name_entry_takes_five_letters_and_no_more():
+    from neverdeads_revenge.ui.screens.name_entry import NameEntryScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen._game_over()
+        await pilot.pause()
+        await hold_enter(pilot)
+        assert isinstance(app.screen, NameEntryScreen)
+
+        for letter in "ABCDEFGH":
+            await pilot.press(letter)
+        await pilot.pause()
+
+        assert app.screen._name == "ABCDE"
+
+
+async def test_a_repeated_enter_does_not_type_into_the_name():
+    """The same leak as the game screen, one screen later.
+
+    A held enter is still repeating when the name entry appears, and an ``Input``
+    would take those as typing. This handles its own keys so it can drop them.
+    """
+    from neverdeads_revenge.ui.screens.name_entry import NameEntryScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen._game_over()
+        await pilot.pause()
+        await hold_enter(pilot)
+        assert isinstance(app.screen, NameEntryScreen)
+
+        before = app.screen._name
+        app.note_key = lambda key: True
+        await pilot.press("a")
+        await pilot.pause()
+
+        assert app.screen._name == before, "a repeat typed a letter"

@@ -104,12 +104,13 @@ class NeverdeadsRevenge(App[None]):
         self._filter_repeats = False
         return False
 
-    def record_run(self, state: GameState) -> int:
+    def record_run(self, state: GameState, name: str = "") -> int:
         """Fold a finished run into the saved progress. Returns the best score.
 
-        Saving is best-effort on purpose: a home directory that cannot be
-        written to is worth a shrug, and it is certainly not worth losing the
-        summary screen over.
+        Called once the name is in, because the scoreboard wants the name and
+        there is no point writing the file twice. Saving is best-effort on
+        purpose: a home directory that cannot be written to is worth a shrug,
+        and it is certainly not worth losing the summary screen over.
         """
         self.progress.record_run(
             depth=state.depth,
@@ -117,6 +118,8 @@ class NeverdeadsRevenge(App[None]):
             kills=state.kills,
             gold=state.gold,
             won=state.run_state is RunState.ESCAPED,
+            name=name,
+            hero=state.hero.key,
         )
         try:
             save_meta(self.progress)

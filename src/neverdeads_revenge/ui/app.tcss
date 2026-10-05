@@ -228,6 +228,83 @@ CharacterScreen {
     color: #6b6b6b;
 }
 
+/* -- name entry / scoreboard --------------------------------------------- */
+
+NameEntryScreen, ScoreboardScreen {
+    align: center middle;
+    background: $background 70%;
+}
+
+#name-entry {
+    width: 44;
+    height: auto;
+    padding: 1 2;
+    border: round $accent;
+    background: $surface;
+}
+
+#name-entry-title {
+    width: 1fr;
+    height: auto;
+    content-align: center middle;
+    text-style: bold;
+    color: $accent;
+}
+
+#name-entry-score {
+    width: 1fr;
+    height: auto;
+    margin: 0 0 1 0;
+    content-align: center middle;
+    color: #8f8f8f;
+}
+
+#name-entry-slots {
+    width: 1fr;
+    height: auto;
+    margin: 1 0 1 0;
+    content-align: center middle;
+    text-style: bold;
+}
+
+#name-entry-hint {
+    width: 1fr;
+    height: auto;
+    content-align: center middle;
+    color: #6b6b6b;
+}
+
+#scoreboard {
+    width: 60;
+    height: auto;
+    max-height: 80%;
+    padding: 1 2;
+    border: round $panel;
+    background: $surface;
+}
+
+#scoreboard-title {
+    width: 1fr;
+    height: auto;
+    margin: 0 0 1 0;
+    text-style: bold;
+    color: $accent;
+}
+
+#scoreboard-body {
+    width: 1fr;
+    height: auto;
+    color: $foreground;
+}
+
+#scoreboard-hint {
+    width: 1fr;
+    height: auto;
+    margin: 1 0 0 0;
+    content-align: center middle;
+    color: #6b6b6b;
+}
+
 /* -- chest --------------------------------------------------------------- */
 
 ChestScreen {

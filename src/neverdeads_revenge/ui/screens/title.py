@@ -112,6 +112,7 @@ class TitleScreen(Screen[None]):
     """Press anything to begin."""
 
     BINDINGS = [
+        Binding("h", "scores", "Scores"),
         Binding("escape", "quit", "Quit"),
         Binding("q", "quit", "Quit"),
     ]
@@ -141,13 +142,22 @@ class TitleScreen(Screen[None]):
         wide = self.app.size.width >= ART_MIN_WIDTH
         self.query_one("#title-art", Static).update(TITLE_ART if wide else PLAIN_TITLE)
 
+    def action_scores(self) -> None:
+        """``h`` looks at old runs instead of starting a new one."""
+        from .scoreboard import ScoreboardScreen
+
+        self.app.push_screen(ScoreboardScreen(self.app.progress))
+
     def on_key(self, event) -> None:
         """Any key starts the game -- no hunting for the right one.
 
-        A repeat of a key held on the screen before this one does not count:
-        holding enter to leave the summary would otherwise start a run on the
-        way past.
+        Two exceptions, and they have to be named here because "any key" would
+        otherwise swallow them: the bound keys, and a repeat of a key held on the
+        screen before this one -- holding enter to leave the summary would
+        otherwise start a run on the way past.
         """
+        if event.key in ("h", "escape", "q"):
+            return  # a binding has it
         if self.app.note_key(event.key):
             event.stop()
             return
@@ -164,7 +174,7 @@ def _centered():
         yield Static(TAGLINE, id="title-subtitle")
         yield Static(id="title-best")
         yield Static(f"\nversion {__version__}", id="title-version")
-        yield Static("press any key", id="title-hint")
+        yield Static("press any key   ·   [bold]h[/] scores", id="title-hint")
 
 
 def best_line(best: int) -> str:

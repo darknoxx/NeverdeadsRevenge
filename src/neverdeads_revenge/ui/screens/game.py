@@ -31,6 +31,7 @@ from ..widgets.message_log import MessageLog
 from .character import CharacterScreen
 from .chest import ChestScreen
 from .game_over import GameOverScreen
+from .name_entry import NameEntryScreen
 
 __all__ = ["GameScreen"]
 
@@ -230,9 +231,10 @@ class GameScreen(Screen[None]):
             # them. This is the answer: they went and found the other way out.
             summary.append("\nYou were not granted death.\n", style="italic")
 
-        # Recorded before the screen is built, so the summary can show the best
-        # this run just became part of.
-        best = self.app.record_run(state)
+        # The best *including* this run, which is what the player is looking
+        # for. The run itself is written down after the name, so the file is
+        # touched once.
+        best = max(self.app.progress.best_score, state.score)
 
         self.app.push_screen(
             GameOverScreen(
@@ -242,8 +244,19 @@ class GameScreen(Screen[None]):
                 won=won,
                 best=best,
             ),
-            lambda _result: self.app.return_to_title(),
+            lambda _result: self._ask_for_a_name(state),
         )
+
+    def _ask_for_a_name(self, state: GameState) -> None:
+        """Every run gets a name, win or lose -- both collected points."""
+        self.app.push_screen(
+            NameEntryScreen(state.score, self.app.progress.last_name),
+            lambda name: self._record(state, name),
+        )
+
+    def _record(self, state: GameState, name: str) -> None:
+        self.app.record_run(state, name or "???")
+        self.app.return_to_title()
 
     # -- actions ------------------------------------------------------------
     def action_help(self) -> None:

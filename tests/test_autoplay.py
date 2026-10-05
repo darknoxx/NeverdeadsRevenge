@@ -24,7 +24,7 @@ from neverdeads_revenge.ui.screens.game_over import GameOverScreen
 from neverdeads_revenge.ui.screens.title import TitleScreen
 from neverdeads_revenge.world.tiles import Tile
 
-from .test_ui import drive_to_game, hold_enter
+from .test_ui import drive_to_game, finish_run, hold_enter
 
 SIZE = (100, 34)
 
@@ -132,8 +132,7 @@ async def test_a_won_run_can_be_restarted():
         screen.state.player.position = screen.state.exit_pos
         await pilot.press(">")
         await pilot.pause()
-        await hold_enter(pilot)
-        await pilot.pause()
+        await finish_run(pilot)
 
         assert isinstance(app.screen, TitleScreen)
         await pilot.press("x")
