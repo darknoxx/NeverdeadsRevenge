@@ -18,7 +18,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import Footer, Static
+from textual.widgets import Footer
 
 from ...game.actions import Action, perform_action
 from ...game.actors import HEROES

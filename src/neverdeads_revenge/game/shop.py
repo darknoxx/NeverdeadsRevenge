@@ -25,7 +25,6 @@ from dataclasses import dataclass, field
 
 from neverdeads_revenge.core.rng import Rng
 from neverdeads_revenge.world.items import ITEMS, ItemTemplate, make_item
-from neverdeads_revenge.world.modifiers import Modifiers
 
 __all__ = [
     "MetaUpgrade",
@@ -422,12 +421,3 @@ def buy(progress, offer: Offer) -> str:
     where = "pack" if template.kind == "draught" else "hands"
     return f"{template.name} set aside for the next run, for the {where}."
 
-
-def modifiers_of(key: str) -> Modifiers:
-    """What an item key does, for a caller that has only the key."""
-    return ITEMS[key].modifiers
-
-
-def make_bought(key: str):
-    """The floor item a bought key stands for."""
-    return make_item(ITEMS[key])

@@ -19,7 +19,7 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
-from ...game.shop import SECTIONS, Offer, ShopError, build_stock, buy
+from ...game.shop import Offer, ShopError, build_stock, buy
 
 __all__ = ["ShopScreen"]
 

@@ -69,6 +69,22 @@ Measured stage by stage, on the same seeds:
 Loot doubles your chances and then the curses take it back. That is the bargain
 working: a chest is worth opening and worth thinking about.
 
+The shop is measured with the same instrument, over 40 seeds a hero:
+
+| | escapes |
+| --- | --- |
+| nothing bought | 38% Noxx · 48% Yeti · 62% Walkyrion |
+| every permanent upgrade, a bought weapon and a bought coat | 75% Noxx · 88% Yeti · 75% Walkyrion |
+
+A run banks 50–90 coin, and the full set of permanent upgrades costs 580 — so
+seven to ten runs before a hero is kitted out. That is meta-progression doing
+what it is for: the early runs are the hard ones, and the score is what you play
+for once they are not.
+
+The rare finds and the springs were measured the same way, by turning each off
+and playing the same seeds again. Both move the escape rate by less than the
+noise on a thirty-run sample, so neither of them is quietly carrying the game.
+
 ## Install
 
 ```bash

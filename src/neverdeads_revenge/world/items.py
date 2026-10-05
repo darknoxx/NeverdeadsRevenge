@@ -13,7 +13,7 @@ do not exist yet.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from neverdeads_revenge.core.rng import Rng
 
