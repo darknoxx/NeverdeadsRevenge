@@ -191,6 +191,13 @@ class GameScreen(Screen[None]):
         summary.append(f"Monsters slain  {state.kills}\n")
         summary.append(f"Turns taken     {state.total_turns}\n")
         summary.append(f"Cells walked    {state.player.steps}\n")
+        # Shown on its own line, with a sign, so it reads as something earned
+        # rather than another statistic. Speed is now part of the score and the
+        # player should be able to see that it was.
+        summary.append(
+            f"Speed bonus     {state.speed_bonus:+d}\n",
+            style="bold green" if state.speed_bonus else "dim",
+        )
         summary.append(f"Score           {state.score}\n")
         if won:
             # The prologue opened by telling the player death was not granted to

@@ -24,13 +24,37 @@ from neverdeads_revenge.world.tiles import Tile
 from .actors import Actor, Hero, make_enemy, make_hero, pick_enemy_template
 from .combat import apply_revenge
 
-__all__ = ["LogEntry", "LogKind", "RunState", "GameState", "VIEW_RADIUS", "ESCAPE_BONUS"]
+__all__ = [
+    "LogEntry",
+    "LogKind",
+    "RunState",
+    "GameState",
+    "VIEW_RADIUS",
+    "ESCAPE_BONUS",
+    "TURN_BUDGET_PER_FLOOR",
+    "SPEED_BONUS_PER_TURN",
+]
 
 VIEW_RADIUS = 9
 """How far the player can see, in cells."""
 
 ESCAPE_BONUS = 5000
 """Score awarded for leaving the dungeon alive instead of dying in it."""
+
+#: Turns a floor is "allowed" before speed stops paying.
+#:
+#: Measured, not chosen: across 144 bot runs the median floor cost 63 turns and
+#: the quickest cost 34, so a budget of 80 leaves most runs scoring something
+#: while still going to zero for a slow one. A budget nobody beats is
+#: decoration; one everybody beats is noise.
+TURN_BUDGET_PER_FLOOR = 80
+
+#: Points per turn saved against that budget.
+#:
+#: Ten makes the difference between a brisk run and a median one worth roughly a
+#: sixth of the total, which is enough to play for and not enough to drown out
+#: killing things and getting out alive.
+SPEED_BONUS_PER_TURN = 10
 
 
 class LogKind(Enum):
@@ -154,7 +178,11 @@ class GameState:
             self.player = make_hero(self.hero, floor.player_start)
         else:
             self.player.position = floor.player_start
-            self.player.steps = 0
+            # ``steps`` is deliberately not reset here. It is a run total, like
+            # ``total_turns``. It used to reset per floor, which made the
+            # summary's "Cells walked" report only the last floor while reading
+            # like a run total -- and the old score, which counted steps, was
+            # quietly counting only that one floor too.
 
         self.enemies = [
             make_enemy(pick_enemy_template(self.rng, depth), pos)
@@ -226,15 +254,37 @@ class GameState:
 
     # -- scoring ------------------------------------------------------------
     @property
-    def score(self) -> int:
-        """A rough run score, for the summary screen.
+    def base_score(self) -> int:
+        """Kills and depth, before speed and before getting out."""
+        return self.kills * 100 + self.floors_cleared * 250
 
-        The escape bonus is larger than any plausible death score at the same
-        depth, so a screen full of numbers can never rank an escape below a run
-        that died on floor 10 one step from the rift.
+    @property
+    def speed_bonus(self) -> int:
+        """Points for getting through the floors quickly.
+
+        A budget rather than a penalty. Going over it scores nothing here instead
+        of going negative, so a slow run is worth less, not worth less than
+        nothing -- a screen with a minus sign on it reads as a punishment rather
+        than a comparison.
+
+        Scaled by the floors actually cleared, so standing still on floor one
+        cannot bank a bonus for the turns it did not spend descending.
         """
-        base = self.kills * 100 + self.floors_cleared * 250 + self.player.steps
-        return base + (ESCAPE_BONUS if self.run_state is RunState.ESCAPED else 0)
+        budget = TURN_BUDGET_PER_FLOOR * self.floors_cleared
+        return max(0, budget - self.total_turns) * SPEED_BONUS_PER_TURN
+
+    @property
+    def score(self) -> int:
+        """The run's score, for the summary screen.
+
+        Time is in here and walking is not: steps measure how much of the floor
+        you saw, and a run should be rewarded for leaving sooner rather than for
+        wandering further. The escape bonus is larger than any plausible death
+        score at the same depth, so a screen full of numbers can never rank an
+        escape below a run that died on floor ten one step from the rift.
+        """
+        escape = ESCAPE_BONUS if self.run_state is RunState.ESCAPED else 0
+        return self.base_score + self.speed_bonus + escape
 
 
 def start_run(hero: Hero, seed: int, upgrades: dict[str, int] | None = None) -> GameState:

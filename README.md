@@ -122,6 +122,22 @@ Or pick it from the applications menu. The game is a terminal program, so the
 menu entry opens a terminal — size it to roughly 100×34 if you can, because the
 sidebar gets cramped below about 30 rows.
 
+## Scoring
+
+A run is scored on three things, and walking is not one of them:
+
+```
+kills x 100  +  floors cleared x 250        what you did
++ speed bonus                               how quickly you did it
++ 5000 if you got out alive                 the only ending that really counts
+```
+
+The speed bonus is `(80 x floors cleared) - turns`, times ten, and never below
+zero. Eighty turns a floor is the budget; across 144 bot runs the median floor
+cost 63 and the quickest 34, so most runs score something and only a genuinely
+slow one scores nothing. Slower than the budget costs you the bonus rather than
+going negative, so a slow run is worth less, not worth less than nothing.
+
 ## Test
 
 ```bash

@@ -165,7 +165,9 @@ class Actor:
     color: str = "white"
     is_player: bool = False
     alive: bool = True
-    #: Cells entered since the run started. Feeds the end-of-run score.
+    #: Cells entered since the run started. A run total, like ``total_turns``,
+    #: and a statistic rather than a score input: the score rewards time, and
+    #: walking further is the opposite of that.
     steps: int = 0
     #: Temporary additive bonuses granted by REVENGE. Kept on the actor rather
     #: than folded into ``stats`` so that lapsing is one assignment and cannot

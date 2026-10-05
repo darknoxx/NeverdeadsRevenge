@@ -45,6 +45,8 @@ from neverdeads_revenge.game.difficulty import (
 )
 from neverdeads_revenge.game.state import (
     ESCAPE_BONUS,
+    SPEED_BONUS_PER_TURN,
+    TURN_BUDGET_PER_FLOOR,
     GameState,
     LogKind,
     RunState,
@@ -982,8 +984,92 @@ def test_score_rewards_kills_and_depth():
     assert state.score == 0
     state.kills = 3
     state.floors_cleared = 2
-    state.player.steps = 10
-    assert state.score == 3 * 100 + 2 * 250 + 10
+    # Spend the whole turn budget, so this is testing the base and nothing else.
+    state.total_turns = TURN_BUDGET_PER_FLOOR * state.floors_cleared
+    assert state.base_score == 3 * 100 + 2 * 250
+    assert state.speed_bonus == 0
+    assert state.score == 800
+
+
+def test_score_rewards_speed():
+    """The whole point of the change: fewer turns, more points."""
+    fast = start_run(NOXX, seed=6)
+    slow = start_run(NOXX, seed=6)
+    for state in (fast, slow):
+        state.kills = 5
+        state.floors_cleared = 3
+    fast.total_turns = 60
+    slow.total_turns = 200
+
+    assert fast.speed_bonus > slow.speed_bonus
+    assert fast.score > slow.score
+
+
+def test_the_speed_bonus_cannot_go_negative():
+    """Slower than the budget scores nothing, not less than nothing.
+
+    A negative line on a summary screen reads as a punishment rather than a
+    comparison, and it would let a slow run fall below a run that died earlier.
+    """
+    state = start_run(NOXX, seed=6)
+    state.floors_cleared = 3
+    state.total_turns = TURN_BUDGET_PER_FLOOR * 3 + 500
+
+    assert state.speed_bonus == 0
+    assert state.score == state.base_score
+
+
+def test_the_speed_bonus_scales_with_the_floors_actually_cleared():
+    """Standing still on floor one must not bank a budget it never spent.
+
+    Without the per-floor scaling, a player who never descends would be handed a
+    bonus for the turns they did not use getting anywhere.
+    """
+    idle = start_run(NOXX, seed=6)
+    idle.total_turns = 0
+    assert idle.floors_cleared == 0
+    assert idle.speed_bonus == 0
+
+    deep = start_run(NOXX, seed=6)
+    deep.floors_cleared = 5
+    deep.total_turns = 0
+    assert deep.speed_bonus == 5 * TURN_BUDGET_PER_FLOOR * SPEED_BONUS_PER_TURN
+
+
+def test_walking_further_does_not_score():
+    """Steps are a run statistic now, not a score input.
+
+    The old formula paid per cell, which rewarded combing every corner of a floor
+    over getting out of it -- the opposite of what the run is about.
+    """
+    walker = start_run(NOXX, seed=6)
+    runner = start_run(NOXX, seed=6)
+    for state in (walker, runner):
+        state.kills = 4
+        state.floors_cleared = 2
+        state.total_turns = 100
+    walker.player.steps = 900
+    runner.player.steps = 12
+
+    assert walker.score == runner.score
+    assert walker.base_score == runner.base_score
+
+
+def test_steps_are_a_run_total_not_a_floor_one():
+    """The summary says "Cells walked" and now means it.
+
+    ``steps`` used to reset on every descent, so the number reported was the
+    last floor's walking -- and the old score, which counted steps, was quietly
+    counting only that one floor too.
+    """
+    state = start_run(NOXX, seed=3)
+    state.player.steps = 42
+    state.player.position = state.stairs
+
+    perform_action(state, Action.DESCEND)
+
+    assert state.depth == 2
+    assert state.player.steps == 42, "the walk was reset by the descent"
 
 
 # -- loot and drinking ------------------------------------------------------
