@@ -14,10 +14,13 @@ push site, where the pairing is visible.
 
 from __future__ import annotations
 
+import time
+
 from textual.app import App
 
 from ..game.state import GameState, RunState
 from ..persistence import load_meta, save_meta
+from .hold import REPEAT_GAP
 from .screens.game import GameScreen
 from .screens.game_over import GameOverScreen
 from .screens.help import HelpScreen
@@ -62,6 +65,44 @@ class NeverdeadsRevenge(App[None]):
         #: What outlives a run. Loaded once, written on every ending. The file
         #: has been sitting there unread since the persistence layer was built.
         self.progress = load_meta()
+        self._last_key = ""
+        self._last_key_time = 0.0
+        self._filter_repeats = False
+
+    def arm_repeat_filter(self) -> None:
+        """Swallow the rest of a key held on the screen that just went away.
+
+        Armed by a hold-to-continue dismissal, because that is the only time a
+        key is known to be down as the screen changes.
+        """
+        self._filter_repeats = True
+
+    def note_key(self, key: str) -> bool:
+        """Record a key event. True when it is a repeat of the one before.
+
+        A held key keeps arriving after the screen that was waiting for it has
+        gone, and those leftovers would otherwise be read as new presses: hold
+        enter to leave the prologue and the hero walks around the first room
+        printing "There is nothing here" until the key comes up.
+
+        The terminal repeats a held key tens of times a second and nobody presses
+        one twice on purpose that fast, so the gap is all it takes to tell them
+        apart -- and it needs no timer, which matters: a timer driving this was
+        the first attempt and it hung the test harness.
+        """
+        now = time.monotonic()
+        repeat = key == self._last_key and now - self._last_key_time < REPEAT_GAP
+        self._last_key = key
+        self._last_key_time = now
+
+        if not self._filter_repeats:
+            return False
+        if repeat:
+            return True
+        # A gap: the key came up, so the burst that crossed the screen change is
+        # over and everything after it is somebody pressing on purpose.
+        self._filter_repeats = False
+        return False
 
     def record_run(self, state: GameState) -> int:
         """Fold a finished run into the saved progress. Returns the best score.

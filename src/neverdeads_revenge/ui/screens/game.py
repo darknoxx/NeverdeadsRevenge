@@ -165,6 +165,12 @@ class GameScreen(Screen[None]):
         if self.state is None:
             return
 
+        # A key still being repeated from the screen before this one is not a
+        # new press and must not act. See App.note_key.
+        if event.key in ("enter", "return") and self.app.note_key(event.key):
+            event.stop()
+            return
+
         action = KEY_BINDINGS.get(event.key) or KEY_BINDINGS.get(event.key.lower())
         if action is None and event.character:
             action = KEY_BINDINGS.get(event.character)

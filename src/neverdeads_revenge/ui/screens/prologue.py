@@ -12,13 +12,12 @@ prose in the game. Now the arrows scroll it and only a held enter lets it go.
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.css.query import NoMatches
 from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Static
 
 from ...game.prologue import PROLOGUE, PROLOGUE_HINT, PROLOGUE_TITLE
-from ..hold import HoldToContinue
+from ..hold import BAR_CELLS, HoldToContinue
 
 __all__ = ["PrologueScreen"]
 
@@ -32,6 +31,8 @@ SCROLL_KEYS: dict[str, str] = {
     "home": "scroll_home",
     "end": "scroll_end",
 }
+
+_FILLED = "#a855f7"
 
 
 class PrologueScreen(Screen[None]):
@@ -58,60 +59,39 @@ class PrologueScreen(Screen[None]):
             # it means, and running them together buries the one line the player
             # is meant to leave with.
             yield Static(PROLOGUE_HINT, id="prologue-hint")
-            yield Static(id="prologue-dismiss")
-
-    def on_mount(self) -> None:
-        # The bar is driven by a clock rather than by key presses, so a held key
-        # fills it smoothly instead of in jumps.
-        self._timer = self.set_interval(0.05, self._advance)
-        self._draw_hint()
-
-    def on_unmount(self) -> None:
-        # A timer outliving its screen fires into a widget tree that is gone.
-        self._timer.stop()
+            yield Static(self._hint(), id="prologue-dismiss")
 
     # -- input --------------------------------------------------------------
     def on_key(self, event) -> None:
-        scroller = self.query_one("#prologue-screen", VerticalScroll)
-
         method = SCROLL_KEYS.get(event.key)
         if method is not None:
-            getattr(scroller, method)()
+            getattr(self.query_one("#prologue-screen", VerticalScroll), method)()
             event.stop()
             return
 
         if event.key in (*self._hold.keys, "escape"):
+            # Told to the app as well, so the screen that comes next can tell a
+            # repeat of this press from a new one. Without that, holding enter
+            # here goes on to walk the hero around the first room.
+            self.app.note_key(event.key)
             event.stop()
             if self._hold.press(event.key):
+                self.app.arm_repeat_filter()
                 self.dismiss()
+                return
+            self._draw_hint()
             return
 
         # Anything else is left alone. Swallowing it would take ctrl+q with it,
         # and there is nothing here worth trapping somebody in.
 
-    def _advance(self) -> None:
-        if not self.is_mounted:
-            return
-        if self._hold.tick():
-            self.dismiss()
-            return
-        self._draw_hint()
-
     def _draw_hint(self) -> None:
-        if not self.is_mounted:
-            return
-        filled = round(self._hold.progress * 10)
+        self.query_one("#prologue-dismiss", Static).update(self._hint())
+
+    def _hint(self) -> str:
+        filled = round(self._hold.progress * BAR_CELLS)
         bar = self._hold.bar()
-        try:
-            hint = self.query_one("#prologue-dismiss", Static)
-        except NoMatches:
-            # Teardown race: the screen is still "mounted" for a moment after
-            # its children are gone, and the timer can land in that window.
-            return
-        hint.update(
-            f"hold [bold]enter[/] to begin   "
+        return (
+            "hold [bold]enter[/] to begin   "
             f"[{_FILLED}]{bar[:filled]}[/][#4a4a4a]{bar[filled:]}[/]"
         )
-
-
-_FILLED = "#a855f7"

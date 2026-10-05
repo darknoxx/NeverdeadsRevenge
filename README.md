@@ -198,6 +198,10 @@ stray key should not throw either away. The arrows scroll the prologue, and the
 bar under the hint fills as you hold. Terminals that do not repeat a held key
 are covered too: three presses do the same thing.
 
+The repeats a held key keeps sending are ignored by whatever screen comes next,
+so holding enter to start does not walk you around the first room printing
+"There is nothing here" — the next screen only acts on a new press.
+
 ## High score
 
 The best score is kept in `~/.local/share/neverdeads_revenge/meta.json` (or

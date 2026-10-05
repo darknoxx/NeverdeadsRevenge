@@ -13,14 +13,15 @@ from __future__ import annotations
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.css.query import NoMatches
 from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
-from ..hold import HoldToContinue
+from ..hold import BAR_CELLS, HoldToContinue
 
 __all__ = ["GameOverScreen"]
+
+_FILLED = "#a855f7"
 
 
 class GameOverScreen(ModalScreen[None]):
@@ -62,53 +63,37 @@ class GameOverScreen(ModalScreen[None]):
             )
             yield Static(self.summary, id="game-over-body")
             yield Static(f"Best  {self.best}", id="game-over-best")
-            yield Static(id="game-over-hint")
-
-    def on_mount(self) -> None:
-        self._timer = self.set_interval(0.05, self._advance)
-        self._draw_hint()
-
-    def on_unmount(self) -> None:
-        # A timer outliving its screen fires into a widget tree that is gone.
-        self._timer.stop()
+            yield Static(self._hint(), id="game-over-hint")
 
     # -- input --------------------------------------------------------------
     def on_key(self, event) -> None:
         if event.key in (*self._hold.keys, "escape"):
+            self.app.note_key(event.key)
             event.stop()
             if self._hold.press(event.key):
+                self.app.arm_repeat_filter()
                 self.dismiss()
+                return
+            self._draw_hint()
             return
         # Everything else is left alone: ctrl+q still has to work.
 
     def action_close(self) -> None:
         """The escape binding is a hold like any other, not an instant exit."""
+        self.app.note_key("escape")
         if self._hold.press("escape"):
-            self.dismiss()
-
-    def _advance(self) -> None:
-        if not self.is_mounted:
-            return
-        if self._hold.tick():
+            self.app.arm_repeat_filter()
             self.dismiss()
             return
         self._draw_hint()
 
     def _draw_hint(self) -> None:
-        if not self.is_mounted:
-            return
-        filled = round(self._hold.progress * 10)
+        self.query_one("#game-over-hint", Static).update(self._hint())
+
+    def _hint(self) -> str:
+        filled = round(self._hold.progress * BAR_CELLS)
         bar = self._hold.bar()
-        try:
-            hint = self.query_one("#game-over-hint", Static)
-        except NoMatches:
-            # Teardown race: the screen is still "mounted" for a moment after
-            # its children are gone, and the timer can land in that window.
-            return
-        hint.update(
-            f"hold [bold]enter[/] to continue   "
+        return (
+            "hold [bold]enter[/] to continue   "
             f"[{_FILLED}]{bar[:filled]}[/][#4a4a4a]{bar[filled:]}[/]"
         )
-
-
-_FILLED = "#a855f7"

@@ -146,6 +146,10 @@ Screen {
     border: round $panel;
     padding: 0 1;
     background: $surface;
+    /* No scrollbar. It is a tail view -- the newest lines, auto-scrolled -- and
+       the keys belong to the game, so a bar implying you can scroll it is a
+       decoration that only invites the question of what it is for. */
+    scrollbar-size-vertical: 0;
 }
 
 /* -- help ---------------------------------------------------------------- */

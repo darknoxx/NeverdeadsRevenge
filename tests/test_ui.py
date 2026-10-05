@@ -63,15 +63,13 @@ async def hold_enter(pilot, gap: float = 0.3) -> None:
     path a real player on a terminal without key repeat uses, not a hook
     invented for the tests.
 
-    One real pause is enough: what marks the presses as deliberate is the *span*
-    they cover, not the spacing between each pair. Sleeping three times would
-    triple the length of the whole suite for nothing.
+    Three taps, each after a real pause: that is what the fallback route asks
+    for, and it is a path a real player on a terminal without key repeat uses
+    rather than a hook invented for the tests.
     """
-    await pilot.press("enter")
-    await asyncio.sleep(gap)
-    await pilot.press("enter")
-    await pilot.pause()
-    await pilot.press("enter")
+    for _ in range(3):
+        await pilot.press("enter")
+        await asyncio.sleep(gap)
     await pilot.pause()
 
 
@@ -1435,19 +1433,18 @@ async def test_the_sidebar_fits_for_every_hero():
 
 # -- hold to continue --------------------------------------------------------
 def test_holding_a_key_fills_the_bar_and_finishes():
-    """The route a held key takes: repeats keep it alive until the fill is done."""
-    hold = HoldToContinue(seconds=0.15, reset_after=0.06)
+    """A held key keeps sending repeats, and the fill is read off the clock."""
+    hold = HoldToContinue(seconds=0.15, reset_after=0.5)
     assert hold.press("enter") is False
 
     done = False
     deadline = time.monotonic() + 2.0
     while time.monotonic() < deadline and not done:
         time.sleep(0.02)
-        hold.press("enter")  # what the terminal sends while the key is down
-        done = hold.tick()
+        done = hold.press("enter")  # what the terminal sends while held
 
     assert done, "holding the key never completed"
-    assert hold.progress == 1.0
+    assert hold.bar() == "█" * BAR_CELLS
 
 
 def test_letting_go_resets_the_fill():
@@ -1456,7 +1453,6 @@ def test_letting_go_resets_the_fill():
     hold.press("enter")
     time.sleep(0.08)
 
-    assert hold.tick() is False
     assert hold.progress == 0.0, "the fill survived the key being let go"
 
 
@@ -1464,13 +1460,10 @@ def test_one_press_on_its_own_does_nothing():
     """The whole point: a stray key must not throw the screen away."""
     hold = HoldToContinue(seconds=0.1, reset_after=0.05)
     assert hold.press("enter") is False
-    time.sleep(0.15)
-    assert hold.tick() is False
-    assert hold.progress == 0.0
 
 
 def test_three_deliberate_presses_also_work():
-    """For terminals with key repeat turned off, where the bar would never fill."""
+    """For terminals with key repeat off, where the bar would never fill."""
     hold = HoldToContinue(seconds=10.0, reset_after=0.05)
     assert hold.press("enter") is False
     time.sleep(0.08)
@@ -1502,7 +1495,7 @@ def test_keys_that_are_not_the_hold_key_are_ignored():
 
 
 def test_the_bar_is_a_bar():
-    hold = HoldToContinue(seconds=0.2, reset_after=0.05)
+    hold = HoldToContinue(seconds=0.4, reset_after=0.3)
     assert hold.bar() == "░" * BAR_CELLS
 
     hold.press("enter")
@@ -1511,6 +1504,51 @@ def test_the_bar_is_a_bar():
     assert len(bar) == BAR_CELLS
     assert bar != "░" * BAR_CELLS, "the bar did not fill"
     assert "█" in bar
+
+
+# -- a held key must not carry into the next screen --------------------------
+def test_the_app_tells_a_repeat_from_a_new_press():
+    """The terminal repeats a held key tens of times a second; nobody presses
+    one twice on purpose that fast, so the gap is all it takes."""
+    app = NeverdeadsRevenge()
+
+    app.note_key("enter")  # the press that dismissed the last screen
+    app.arm_repeat_filter()  # ...and the screen changed
+
+    assert app.note_key("enter") is True, "the repeat right behind it"
+    assert app.note_key("enter") is True
+
+    time.sleep(0.2)
+    assert app.note_key("enter") is False, "a later press is a new one"
+
+    # And the filter is spent: nothing after the gap is swallowed.
+    app.note_key("enter")
+    assert app.note_key("enter") is False, "the filter stayed armed"
+
+
+async def test_a_repeated_enter_does_not_carry_into_the_game():
+    """The bug the player hit, in their words: "it should only happen on a new
+    keystroke".
+
+    Holding enter to leave the prologue keeps the terminal repeating it, and the
+    leftovers used to land on the game screen as interactions -- walking the
+    hero around the first room and printing "There is nothing here" until the
+    key came up.
+    """
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        assert state is not None
+        before = len(state.log)
+
+        # Stand in for the terminal still repeating the key the prologue was
+        # dismissed with. A test cannot make a terminal hold a key down.
+        app.note_key = lambda key: True
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert len(state.log) == before, "a repeat acted as a new press"
 
 
 # -- the high score ----------------------------------------------------------

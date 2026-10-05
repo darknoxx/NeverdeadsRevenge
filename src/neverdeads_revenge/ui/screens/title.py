@@ -142,7 +142,15 @@ class TitleScreen(Screen[None]):
         self.query_one("#title-art", Static).update(TITLE_ART if wide else PLAIN_TITLE)
 
     def on_key(self, event) -> None:
-        """Any key starts the game -- no hunting for the right one."""
+        """Any key starts the game -- no hunting for the right one.
+
+        A repeat of a key held on the screen before this one does not count:
+        holding enter to leave the summary would otherwise start a run on the
+        way past.
+        """
+        if self.app.note_key(event.key):
+            event.stop()
+            return
         event.stop()
         self.app.open_hero_select()
 
