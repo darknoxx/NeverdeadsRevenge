@@ -48,9 +48,9 @@ to matter more than the hero:
 
 | hero | trade | kite |
 | --- | --- | --- |
-| Noxx | 9/24 | **11/24** |
-| Yeti | **10/24** | 4/24 |
-| Walkyrion | **11/24** | 3/24 |
+| Noxx | 4/24 | **11/24** |
+| Yeti | **8/24** | 4/24 |
+| Walkyrion | **8/24** | 3/24 |
 
 Each hero played to its own strength — Noxx kites, the armoured two trade — Noxx
 is the strongest, which is what a speed-and-crit hero should be. The single
@@ -58,9 +58,16 @@ trade-only bot used to report the opposite, and it was the instrument: it cannot
 express disengaging, so it flattered the heroes who survive by standing still.
 The numbers above are a rough read, not a verdict; 24 runs is a small sample.
 
-The same bot on the same seeds escapes **17–33%** when floor equipment is
-switched off, so loot roughly doubles your chances. That is the point of loot,
-but it is also why the floor tier is kept small.
+Measured stage by stage, on the same seeds:
+
+| | escapes |
+| --- | --- |
+| no equipment at all | 17–33% |
+| equipment, no chests | 38–46% |
+| equipment and chests | 17–33% |
+
+Loot doubles your chances and then the curses take it back. That is the bargain
+working: a chest is worth opening and worth thinking about.
 
 ## Install
 
@@ -196,19 +203,33 @@ how far you get.
 **Equipment** is worn the moment you step on it and press `enter`: a weapon (`)`)
 or a coat (`[`). Whatever it replaces is set down on the floor *beside* you, so
 nothing is ever lost and walking back onto it puts it on again. Weapons raise
-damage and crit; armour raises armour, evasion and speed. `c` opens the full
-sheet, including what each piece is contributing.
+damage and crit; armour raises armour, evasion and speed.
 
-Floor equipment is deliberately modest — the measured effect is already a
-doubling of the escape rate. The strong tier is meant to come out of the chests,
-and those are not built yet.
+**Chests** (`&`) are not loot, they are a question. Standing on one and pressing
+`enter` stops the game and shows you the price — and only the price. Whatever is
+inside is better than anything lying around, and it is not free. Say yes and you
+get both: the strong tier of weapons and armour, and a curse that lasts the rest
+of the run.
+
+| curse | what it takes |
+| --- | --- |
+| WITHER | a quarter of your health, taken now and for good |
+| BLEED | a drop of blood every third step |
+| FRAIL | two points of armour, gone |
+| HEAVY | a quarter of your speed |
+| DIM | your sight, cut to five paces |
+| FAMINE | half of what every draught is worth |
+
+`c` opens the full sheet: every stat, what each piece is contributing, and what
+has been done to you.
 
 ## Not implemented yet
 
-A talent tree, equipment, sound, saving mid-run, and the meta-progression the
-persistence layer is shaped for (`META_UPGRADES` is still an empty dict, and
-`state._apply_upgrades` is a no-op). Two roster slots are shown locked and are
-not playable yet.
+A talent tree, equipment slots beyond the two, sound, saving mid-run, and the
+meta-progression the persistence layer is shaped for (`META_UPGRADES` is still an
+empty dict, and `state._apply_upgrades` is a no-op). Two roster slots are shown
+locked and are not playable yet. There is no way to lift a curse: it is a
+decision made once and lived with.
 
 The prologue is the only prose in the game, and it is shown once per session
 rather than once per run — told every run it stops being a premise and becomes a

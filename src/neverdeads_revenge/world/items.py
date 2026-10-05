@@ -24,9 +24,18 @@ __all__ = [
     "ItemTemplate",
     "ITEMS",
     "make_item",
+    "make_chest",
     "roll_item",
+    "roll_chest_contents",
     "loot_count",
     "equipment_count",
+    "chest_count",
+    "WEAPON_GLYPH",
+    "WEAPON_COLOR",
+    "ARMOUR_GLYPH",
+    "ARMOUR_COLOR",
+    "CHEST_GLYPH",
+    "CHEST_COLOR",
 ]
 
 
@@ -53,6 +62,8 @@ class ItemTemplate:
     #: common as you go down, which is what makes a deep floor's loot worth the
     #: risk of the deep floor.
     weight_growth: float = 1.0
+    #: Never rolled onto a floor. Chests hand these out, and only chests.
+    chest_only: bool = False
 
 
 #: Glyph and colour per kind of thing. Weapons and armour follow the old
@@ -166,7 +177,76 @@ ITEMS: dict[str, ItemTemplate] = {
         weight=2.0,
         weight_growth=1.15,
     ),
+    # -- out of the chests -------------------------------------------------
+    #
+    # A tier of their own, never rolled onto a floor. Clearly better than
+    # anything lying around, because the player paid for them with something
+    # they cannot get back.
+    "runed": ItemTemplate(
+        key="runed",
+        name="runed blade",
+        glyph=WEAPON_GLYPH,
+        color=WEAPON_COLOR,
+        kind="weapon",
+        slot="weapon",
+        modifiers=Modifiers(damage=4, crit_chance=0.10),
+        chest_only=True,
+    ),
+    "grave": ItemTemplate(
+        key="grave",
+        name="grave iron",
+        glyph=WEAPON_GLYPH,
+        color=WEAPON_COLOR,
+        kind="weapon",
+        slot="weapon",
+        modifiers=Modifiers(damage=6, speed=-0.20),
+        chest_only=True,
+    ),
+    "plate": ItemTemplate(
+        key="plate",
+        name="warden plate",
+        glyph=ARMOUR_GLYPH,
+        color=ARMOUR_COLOR,
+        kind="armour",
+        slot="armour",
+        modifiers=Modifiers(armor=3),
+        chest_only=True,
+    ),
+    "shade": ItemTemplate(
+        key="shade",
+        name="shade cloak",
+        glyph=ARMOUR_GLYPH,
+        color=ARMOUR_COLOR,
+        kind="armour",
+        slot="armour",
+        modifiers=Modifiers(evasion=3),
+        chest_only=True,
+    ),
 }
+
+
+#: What a chest looks like. Gold, because a chest is treasure before it is a
+#: trap, and the dialog is where the trap gets said out loud.
+CHEST_GLYPH = "&"
+CHEST_COLOR = "bright_yellow"
+
+
+def make_chest(curse_key: str, contents: ItemTemplate) -> GroundItem:
+    """A locked chest holding ``contents`` and owing ``curse_key``.
+
+    Rolled when the floor is built rather than when the lid opens, so a seed
+    still determines a whole run: what is in the chest is decided before the
+    player has done anything to change the dice.
+    """
+    return GroundItem(
+        item_id="chest",
+        name="ominous chest",
+        glyph=CHEST_GLYPH,
+        color=CHEST_COLOR,
+        kind="chest",
+        curse=curse_key,
+        contents=make_item(contents),
+    )
 
 
 def make_item(template: ItemTemplate) -> GroundItem:
@@ -198,9 +278,27 @@ def roll_item(
     rather than from one table, and that is not a detail: a single table cut the
     supply of healing to a quarter the moment equipment was added, and the game
     became far harder without anything obviously having changed.
+
+    Chest-only things are never in the pool. They are not rarer, they are
+    elsewhere.
     """
-    pool = [t for t in ITEMS.values() if kinds is None or t.kind in kinds]
+    pool = [
+        t
+        for t in ITEMS.values()
+        if not t.chest_only and (kinds is None or t.kind in kinds)
+    ]
     return rng.choice_weighted([(t, _weight_at(t, depth)) for t in pool])
+
+
+def roll_chest_contents(rng: Rng) -> ItemTemplate:
+    """What is inside a chest: one of the strong things, evenly.
+
+    Evenly rather than weighted, because a chest is already a gamble on the
+    curse. Making the reward a second lottery on top of the first is two
+    surprises where the player was promised one.
+    """
+    strong = [t for t in ITEMS.values() if t.chest_only]
+    return rng.pick(strong)
 
 
 def loot_count(depth: int) -> int:
@@ -222,3 +320,13 @@ def equipment_count(depth: int) -> int:
     that only has ten floors. The strong tier is meant to be the chests.
     """
     return min(1 + depth // 5, 2)
+
+
+def chest_count(depth: int) -> int:
+    """How many chests a floor holds.
+
+    Stingier than the equipment, and flatter: a chest is worth several floor
+    finds and costs something permanent, so two on one floor is already a lot of
+    deciding.
+    """
+    return min(1 + depth // 6, 2)

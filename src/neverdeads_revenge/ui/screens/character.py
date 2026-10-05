@@ -86,6 +86,15 @@ class CharacterScreen(ModalScreen[None]):
 
         lines.append("")
         lines.append(_row("carried", _carried(state)))
+
+        if state.curses:
+            # Given their own block rather than a column, because a price is a
+            # sentence and the player needs to be reminded what they agreed to.
+            lines.append("")
+            lines.append("[dim]curses[/]")
+            for curse in state.curses:
+                lines.append(f"  [bold red]{curse.name}[/]  [dim]{curse.price}[/]")
+
         return "\n".join(lines)
 
 

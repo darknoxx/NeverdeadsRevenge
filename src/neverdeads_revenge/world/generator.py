@@ -17,7 +17,15 @@ from dataclasses import dataclass, field
 from neverdeads_revenge.core.direction import Pos
 from neverdeads_revenge.core.rng import Rng
 
-from .items import equipment_count, loot_count, make_item, roll_item
+from .items import (
+    chest_count,
+    equipment_count,
+    loot_count,
+    make_chest,
+    make_item,
+    roll_chest_contents,
+    roll_item,
+)
 from .map import DungeonMap, GroundItem
 from .tiles import Tile
 
@@ -206,6 +214,7 @@ def generate_floor(
     height: int = 39,
     room_attempts: int = 140,
     enemy_budget: int | None = None,
+    curse_keys: tuple[str, ...] = (),
 ) -> GeneratedFloor:
     """Build one complete, validated dungeon floor.
 
@@ -260,7 +269,7 @@ def generate_floor(
 
     # Loot last, and on whatever is still plain floor. Placing it after the decor
     # means an item can never be swallowed by a patch of grass.
-    items = _scatter_loot(rng, dungeon_map, candidates, depth)
+    items = _scatter_loot(rng, dungeon_map, candidates, depth, curse_keys)
 
     return GeneratedFloor(
         map=dungeon_map,
@@ -278,33 +287,43 @@ def _scatter_loot(
     dungeon_map: DungeonMap,
     candidates: list[Pos],
     depth: int,
+    curse_keys: tuple[str, ...] = (),
 ) -> dict[Pos, GroundItem]:
-    """Drop the floor's draughts and equipment.
+    """Drop the floor's draughts, equipment and chests.
 
     Items may land under a monster. That is deliberate: a potion you have to
     fight for is more interesting than one lying in an empty room, and the
     player can always kill the occupant and come back. What they may *not* do is
     land on the player's own room -- ``candidates`` already excludes it -- or on
     the exit.
+
+    ``curse_keys`` is passed in rather than imported: the generator places a
+    chest holding *a* curse and does not need to know what any of them do. The
+    game layer owns the meanings, ``world/`` owns the furniture.
     """
     placed: dict[Pos, GroundItem] = {}
     open_floor = [pos for pos in candidates if dungeon_map.tile_at(pos) is Tile.FLOOR]
     if not open_floor:
         return placed
 
-    # Two pools, rolled separately and then placed together. One shared table
-    # would let equipment crowd out the healing the whole game is balanced
+    # Separate pools, rolled separately and then placed together. One shared
+    # table would let equipment crowd out the healing the whole game is balanced
     # around, which is exactly what happened the first time.
-    wanted = [
-        *(roll_item(rng, depth, kinds=("draught",)) for _ in range(loot_count(depth))),
-        *(
-            roll_item(rng, depth, kinds=("weapon", "armour"))
-            for _ in range(equipment_count(depth))
-        ),
+    to_place: list[GroundItem] = [
+        make_item(roll_item(rng, depth, kinds=("draught",)))
+        for _ in range(loot_count(depth))
     ]
+    to_place += [
+        make_item(roll_item(rng, depth, kinds=("weapon", "armour")))
+        for _ in range(equipment_count(depth))
+    ]
+    if curse_keys:
+        to_place += [
+            make_chest(rng.pick(curse_keys), roll_chest_contents(rng))
+            for _ in range(chest_count(depth))
+        ]
 
-    for pos, template in zip(rng.shuffled(open_floor), wanted):
-        item = make_item(template)
+    for pos, item in zip(rng.shuffled(open_floor), to_place):
         dungeon_map.add_item(pos, item)
         placed[pos] = item
     return placed

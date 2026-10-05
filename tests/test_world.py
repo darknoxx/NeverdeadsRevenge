@@ -245,6 +245,86 @@ def test_flood_fill_respects_walls():
     assert (6, 1) not in reachable
 
 
+# -- chests -----------------------------------------------------------------
+CURSE_KEYS = ("wither", "bleed", "frail", "heavy", "dim", "famine")
+
+
+def test_chest_contents_are_decided_when_the_floor_is_built():
+    """Determinism: the seed fixes what is in the chest before anyone looks.
+
+    Rolled at generation rather than at the lid, so a run is still reproducible
+    from its seed and the player cannot reroll a chest by walking off and back.
+    """
+    first = generate_floor(Rng(9), depth=3, curse_keys=CURSE_KEYS)
+    second = generate_floor(Rng(9), depth=3, curse_keys=CURSE_KEYS)
+
+    def chests(floor):
+        return sorted(
+            (item.curse, item.contents.item_id)
+            for item in floor.items.values()
+            if item.kind == "chest"
+        )
+
+    assert chests(first), "no chests on this floor to compare"
+    assert chests(first) == chests(second)
+
+
+def test_the_strong_tier_only_comes_out_of_chests():
+    """Nothing worth having is lying around for free."""
+    from neverdeads_revenge.world.items import ITEMS
+
+    strong = {t.key for t in ITEMS.values() if t.chest_only}
+    assert strong, "there is no strong tier"
+
+    for seed in range(20):
+        floor = generate_floor(Rng(seed), depth=6, curse_keys=CURSE_KEYS)
+        for item in floor.items.values():
+            if item.kind == "chest":
+                assert item.contents is not None
+                assert item.contents.item_id in strong, "a chest held weak loot"
+            else:
+                assert item.item_id not in strong, "the strong tier was lying around"
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_chests_are_reachable_and_never_on_the_exit(seed):
+    floor = generate_floor(Rng(seed), depth=5, curse_keys=CURSE_KEYS)
+    reachable = _reachable(floor.player_start, floor.map)
+    for pos, item in floor.items.items():
+        if item.kind == "chest":
+            assert pos in reachable, "a chest is walled off"
+            assert pos != floor.stairs_down
+
+
+def test_chests_get_more_common_deeper():
+    def chests(depth: int) -> int:
+        floor = generate_floor(Rng(5), depth=depth, curse_keys=CURSE_KEYS)
+        return len([i for i in floor.items.values() if i.kind == "chest"])
+
+    assert chests(1) <= chests(6)
+
+
+def test_a_floor_with_no_curses_has_no_chests():
+    """The generator is told which curses exist; told about none, it places none.
+
+    Better an empty floor than a chest that costs nothing, which would make the
+    whole bargain a lie.
+    """
+    floor = generate_floor(Rng(4), depth=3)
+    assert not [i for i in floor.items.values() if i.kind == "chest"]
+
+
+def test_every_chest_names_a_curse_the_game_knows():
+    """A typo in a key would be a chest that opens for free."""
+    from neverdeads_revenge.game.curses import CURSES
+
+    for seed in range(20):
+        floor = generate_floor(Rng(seed), depth=4, curse_keys=CURSE_KEYS)
+        for item in floor.items.values():
+            if item.kind == "chest":
+                assert item.curse in CURSES
+
+
 # -- the way out -----------------------------------------------------------
 def test_the_rift_only_appears_on_the_escape_floor():
     """Every floor before the last holds stairs down, not a win condition.

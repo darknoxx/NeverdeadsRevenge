@@ -44,6 +44,7 @@ from neverdeads_revenge.game.difficulty import (
     weight_at_depth,
 )
 from neverdeads_revenge.game.state import (
+    VIEW_RADIUS,
     ESCAPE_BONUS,
     SPEED_BONUS_PER_TURN,
     TURN_BUDGET_PER_FLOOR,
@@ -1077,6 +1078,262 @@ def test_steps_are_a_run_total_not_a_floor_one():
 
     assert state.depth == 2
     assert state.player.steps == 42, "the walk was reset by the descent"
+
+
+# -- curses -----------------------------------------------------------------
+def test_every_curse_states_a_price():
+    """The dialog shows this sentence and nothing else. A blank one is a trap."""
+    from neverdeads_revenge.game.curses import CURSES
+
+    assert CURSES, "there are no curses to test"
+    for key, curse in CURSES.items():
+        assert curse.key == key
+        assert curse.name, key
+        assert curse.price and curse.price[0].islower(), key
+        assert not curse.price.endswith("."), "the dialog adds the full stop"
+
+
+def test_every_curse_actually_does_something():
+    """A curse with no effect is a chest that costs nothing."""
+    from dataclasses import fields
+
+    from neverdeads_revenge.game.curses import CURSES
+
+    for key, curse in CURSES.items():
+        active = not curse.modifiers.is_empty
+        active = active or any(
+            getattr(curse, field.name)
+            for field in fields(curse)
+            if field.name in ("wither", "bleed_every", "sight")
+        )
+        active = active or curse.heal_scale != 1.0
+        assert active, f"{key} does nothing"
+
+
+def test_wither_takes_a_quarter_of_your_health_for_good():
+    from neverdeads_revenge.game.curses import CURSES
+
+    state = start_run(NOXX, seed=1)
+    before_hp, before_max = state.player.hp, state.player.max_hp
+
+    state.add_curse(CURSES["wither"])
+
+    assert state.player.max_hp == before_max - round(before_max * 0.25)
+    assert state.player.hp <= state.player.max_hp
+    assert state.player.max_hp < before_max, "the maximum came back"
+
+
+def _walk_one_step(state: GameState) -> bool:
+    """Move in any direction that works. Returns whether the player moved."""
+    before = state.player.position
+    for action in (
+        Action.MOVE_NORTH,
+        Action.MOVE_SOUTH,
+        Action.MOVE_EAST,
+        Action.MOVE_WEST,
+    ):
+        perform_action(state, action)
+        if state.player.position != before:
+            return True
+    return False
+
+
+def test_bleed_costs_blood_on_a_cadence():
+    """Every third step, not every step: a drip, not a waterfall."""
+    from neverdeads_revenge.game.curses import CURSES
+
+    state = start_run(NOXX, seed=1)
+    state.add_curse(CURSES["bleed"])
+    every = state.bleed_every
+    assert every == 3
+
+    # One step short of the next payment.
+    state.player.steps = every - 1
+    hp = state.player.hp
+
+    assert _walk_one_step(state)
+    assert state.player.hp == hp - 1, "the step did not cost anything"
+
+    state.player.steps = 2 * every - 1
+    hp = state.player.hp
+    assert _walk_one_step(state)
+    assert state.player.hp == hp - 1
+
+    # And a step that is not on the cadence costs nothing.
+    hp = state.player.hp
+    assert _walk_one_step(state)
+    assert state.player.hp == hp
+
+
+def test_bleed_can_kill():
+    """A price the player chose has to be able to finish them, or it is not one."""
+    from neverdeads_revenge.game.curses import CURSES
+
+    state = start_run(NOXX, seed=1)
+    state.add_curse(CURSES["bleed"])
+    state.player.stats.hp = 1
+    state.player.steps = state.bleed_every - 1
+
+    assert _walk_one_step(state)
+
+    assert state.run_state is RunState.DEAD
+    assert not state.player.alive
+
+
+def test_frail_and_heavy_land_in_the_effective_stats():
+    from neverdeads_revenge.game.curses import CURSES
+
+    state = start_run(NOXX, seed=1)
+    player = state.player
+    armor, speed = player.armor, player.speed
+
+    state.add_curse(CURSES["frail"])
+    state.add_curse(CURSES["heavy"])
+
+    assert player.armor == armor - 2
+    assert player.speed == pytest.approx(speed - 0.25)
+
+
+def test_dim_narrows_what_the_player_can_see():
+    """Not just a number on a sheet: the field of view has to actually shrink."""
+    from neverdeads_revenge.game.curses import CURSES
+
+    state = start_run(NOXX, seed=1)
+    wide = len(state.dungeon_map.visible)
+    assert state.sight_radius == VIEW_RADIUS
+
+    state.add_curse(CURSES["dim"])
+    state.refresh_vision()
+
+    assert state.sight_radius == 5
+    assert len(state.dungeon_map.visible) < wide, "the dark did not close in"
+
+
+def test_famine_halves_what_a_draught_is_worth():
+    from neverdeads_revenge.game.curses import CURSES
+
+    state = start_run(NOXX, seed=1)
+    state.add_curse(CURSES["famine"])
+    _give(state, "elixir")
+    state.player.stats.hp = 1
+
+    perform_action(state, Action.QUAFF)
+
+    assert state.player.hp == 1 + round(ITEMS["elixir"].heal * 0.5)
+    assert state.heal_scale == 0.5
+
+
+def test_curse_changes_are_kept_apart_from_equipment():
+    """The sheet has to be able to say "you are wearing this" and "this was done
+    to you" as two different sentences."""
+    from neverdeads_revenge.game.curses import CURSES
+
+    state = start_run(NOXX, seed=1)
+    state.player.equipment["armour"] = make_item(ITEMS["leather"])
+    state.add_curse(CURSES["frail"])
+
+    assert state.player.curse_modifiers.armor == -2
+    assert state.player.modifiers.armor == -1, "worn + cursed, summed"
+    assert state.player.armor == NOXX.stats.armor - 1
+
+
+def test_curses_survive_a_descent():
+    """Run-long, like the health they cost. A floor change is not a cure."""
+    from neverdeads_revenge.game.curses import CURSES
+
+    state = start_run(NOXX, seed=1)
+    state.add_curse(CURSES["dim"])
+    state.add_curse(CURSES["famine"])
+    state.player.position = state.stairs
+
+    perform_action(state, Action.DESCEND)
+
+    assert state.depth == 2
+    assert [c.key for c in state.curses] == ["dim", "famine"]
+    assert state.sight_radius == 5
+    assert state.heal_scale == 0.5
+
+
+# -- chests -----------------------------------------------------------------
+def _put_a_chest(state: GameState, curse: str = "wither", contents: str = "runed"):
+    """Stand the player on a chest with known contents."""
+    from neverdeads_revenge.world.items import make_chest
+
+    chest = make_chest(curse, ITEMS[contents])
+    state.dungeon_map.add_item(state.player.position, chest)
+    return chest
+
+
+def test_a_chest_asks_before_it_opens():
+    """``enter`` on a chest is a question, not an action. No turn, no lid."""
+    state = start_run(NOXX, seed=1)
+    chest = _put_a_chest(state)
+
+    result = perform_action(state, Action.INTERACT)
+
+    assert result.prompt is not None
+    assert not result.consumed_turn
+    assert state.total_turns == 0
+    assert state.dungeon_map.item_at(state.player.position) is chest, "it opened"
+    assert state.curses == []
+
+
+def test_the_question_names_the_price_and_not_the_reward():
+    """Showing both would turn daring into arithmetic.
+
+    The reward has to stay behind the lid: the player is weighing a cost against
+    a hope, not comparing two numbers.
+    """
+    from neverdeads_revenge.game.curses import CURSES
+
+    state = start_run(NOXX, seed=1)
+    _put_a_chest(state, curse="dim", contents="plate")
+
+    prompt = perform_action(state, Action.INTERACT).prompt
+    assert prompt is not None
+    assert CURSES["dim"].price in prompt
+    assert "plate" not in prompt
+    assert "warden" not in prompt
+
+
+def test_opening_pays_the_price_and_hands_over_the_reward():
+    from neverdeads_revenge.game.curses import CURSES
+
+    state = start_run(NOXX, seed=1)
+    _put_a_chest(state, curse="wither", contents="runed")
+    perform_action(state, Action.INTERACT)
+
+    perform_action(state, Action.OPEN_CHEST)
+
+    assert [c.key for c in state.curses] == ["wither"]
+    assert state.player.equipment["weapon"].name == "runed blade"
+    assert state.dungeon_map.item_at(state.player.position) is None, "the chest stayed"
+
+
+def test_opening_nothing_does_nothing():
+    """``OPEN_CHEST`` is only reachable from the dialog, but it is still a verb."""
+    state = start_run(NOXX, seed=1)
+    state.player.position = next(
+        pos
+        for pos in state.dungeon_map.floor_positions()
+        if state.dungeon_map.item_at(pos) is None
+    )
+
+    result = perform_action(state, Action.OPEN_CHEST)
+
+    assert not result.acted
+    assert state.curses == []
+    assert state.player.equipment == {}
+
+
+def test_a_chest_cannot_be_picked_up():
+    """It is furniture, not loot. ``PICK_UP`` must not put it in the pack."""
+    state = start_run(NOXX, seed=1)
+    _put_a_chest(state)
+
+    perform_action(state, Action.PICK_UP)
+
+    assert state.inventory == []
 
 
 # -- loot and drinking ------------------------------------------------------

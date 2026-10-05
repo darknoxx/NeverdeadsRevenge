@@ -181,6 +181,10 @@ class Actor:
     #: it lives here because that is where the effective stats are computed and
     #: a bonus that cannot go stale is worth a dict on every monster.
     equipment: dict[str, GroundItem] = field(default_factory=dict)
+    #: Stat changes from curses. Kept apart from the equipment so the character
+    #: sheet can say which is which -- "you are wearing this" and "this was done
+    #: to you" are different sentences.
+    curse_modifiers: Modifiers = Modifiers()
     #: Which of the three REVENGE grants this actor collects. Copied from the
     #: hero so the game layer never has to look the hero up mid-fight.
     trait: Trait = Trait.SPEED
@@ -203,8 +207,9 @@ class Actor:
 
     @property
     def modifiers(self) -> Modifiers:
-        """Everything equipped, summed. Derived, so it cannot go stale."""
-        total = Modifiers()
+        """Everything worn and everything owed, summed. Derived, so it cannot
+        go stale."""
+        total = self.curse_modifiers
         for item in self.equipment.values():
             total = total + item.modifiers
         return total

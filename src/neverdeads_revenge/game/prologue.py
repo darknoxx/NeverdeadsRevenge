@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from ..game.actors import ENEMIES, HEROES, Hero, scale_template
 from ..world.generator import ESCAPE_DEPTH
-from ..world.items import ITEMS
+from ..world.items import CHEST_GLYPH, ITEMS
 from ..world.tiles import Tile
 
 __all__ = [
@@ -117,18 +117,20 @@ def item_legend() -> list[tuple[str, str]]:
 
     Draughts keep a row each, because the difference between a potion and an
     elixir is the decision the player is making; equipment collapses to a row per
-    kind, because the difference between two blades is not.
+    kind, because the difference between two blades is not. The chest is a row
+    of its own: it is not loot, it is a question.
     """
     rows: list[tuple[str, str]] = []
     seen: set[str] = set()
     for template in ITEMS.values():
-        if template.glyph in seen:
+        if template.chest_only or template.glyph in seen:
             continue
         seen.add(template.glyph)
         if template.kind in _KIND_BLURB:
             rows.append((template.glyph, _KIND_BLURB[template.kind]))
         else:
             rows.append((template.glyph, f"{template.name}, heals {template.heal}"))
+    rows.append((CHEST_GLYPH, "a chest, and a price"))
     return rows
 
 
@@ -188,8 +190,12 @@ def legend_rows(depth: int = 1, hero: Hero | None = None) -> list[tuple[str, str
 
     A row with an empty glyph is a section break, or a continuation line when it
     carries text of its own; the widget decides how to render it.
+
+    No blank line between the monsters and the loot: the panel is clipped, and
+    the chest row made it one line too long. The glyphs separate the sections
+    well enough without spending a row on it.
     """
-    return [*enemy_legend(depth, hero), ("", ""), *item_legend()]
+    return [*enemy_legend(depth, hero), *item_legend()]
 
 
 def terrain_help() -> str:

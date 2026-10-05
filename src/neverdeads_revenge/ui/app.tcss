@@ -125,10 +125,14 @@ Screen {
 /* The log sits under the map, full width, at a fixed height. The map above it
    takes whatever is left, which is why the legend lives in the sidebar instead
    of beside the log: a bottom-row legend leaves the map about ten rows to work
-   with, and the map is the thing that needs the rows. */
+   with, and the map is the thing that needs the rows.
+
+   Six, not seven: the legend gained the chest row and the sidebar needed the
+   line back. The log still shows the last four messages, which is what a fight
+   needs. */
 #message-log {
     width: 1fr;
-    height: 7;
+    height: 6;
     min-height: 4;
     border: round $panel;
     padding: 0 1;
@@ -207,6 +211,44 @@ CharacterScreen {
     width: 1fr;
     height: auto;
     margin: 1 0 0 0;
+    content-align: center middle;
+    color: #6b6b6b;
+}
+
+/* -- chest --------------------------------------------------------------- */
+
+ChestScreen {
+    align: center middle;
+    background: $background 70%;
+}
+
+#chest {
+    width: 64;
+    height: auto;
+    padding: 1 2;
+    border: round $warning;
+    background: $surface;
+}
+
+#chest-title {
+    width: 1fr;
+    height: auto;
+    margin: 0 0 1 0;
+    content-align: center middle;
+    text-style: bold;
+    color: $warning;
+}
+
+#chest-body {
+    width: 1fr;
+    height: auto;
+    margin: 0 0 1 0;
+    color: $foreground;
+}
+
+#chest-hint {
+    width: 1fr;
+    height: auto;
     content-align: center middle;
     color: #6b6b6b;
 }

@@ -23,6 +23,7 @@ from neverdeads_revenge.world.tiles import Tile
 
 from .actors import Actor
 from .combat import apply_revenge, attack
+from .curses import curse_by_key
 from .state import GameState, LogKind, RunState
 
 __all__ = [
@@ -57,6 +58,10 @@ class Action(Enum):
     INTERACT = "interact"
     PICK_UP = "pickup"
     DESCEND = "descend"
+    #: Open the chest underfoot. Never bound to a key: it only happens after the
+    #: player has been shown the price and said yes, so the dialog is the only
+    #: thing that issues it.
+    OPEN_CHEST = "open_chest"
     QUAFF = "quaff"
     INVENTORY = "inventory"
 
@@ -86,6 +91,11 @@ class ActionResult:
     acted: bool
     died: bool = False
     escaped: bool = False
+    #: Set when the player has to decide something before the action can happen.
+    #:
+    #: The domain never draws a dialog. It says one is needed, and the UI asks --
+    #: which is what keeps the whole decision tree testable without a terminal.
+    prompt: str | None = None
 
 
 # -- helpers ---------------------------------------------------------------
@@ -175,6 +185,8 @@ def perform_action(state: GameState, action: Action) -> ActionResult:
             return _interact(state)
         case Action.PICK_UP:
             return _pick_up(state)
+        case Action.OPEN_CHEST:
+            return _open_chest(state)
         case Action.QUAFF:
             return _quaff(state)
         case Action.INVENTORY:
@@ -221,7 +233,32 @@ def _try_move(state: GameState, direction: Direction) -> bool:
 
     state.player.position = target
     state.player.steps += 1
+    _bleed(state)
     return True
+
+
+def _bleed(state: GameState) -> None:
+    """Lose a point of blood every so many steps, if cursed to.
+
+    Cadenced on the run's step count rather than a counter of its own, so the
+    drip is even across floors and a descent does not reset it.
+
+    It can kill. A curse the player chose should be able to finish them, or it
+    is not a price -- and the message says plainly what happened.
+    """
+    every = state.bleed_every
+    if not every or state.player.steps % every:
+        return
+    if not state.player.alive:
+        return
+
+    state.player.stats.hp = max(0, state.player.stats.hp - 1)
+    if state.player.hp <= 0:
+        state.player.alive = False
+        state.run_state = RunState.DEAD
+        state.say("You bleed out between one step and the next.", LogKind.BAD)
+        return
+    state.say("You are bleeding.", LogKind.DAMAGE)
 
 
 def _resolve_player_attack(state: GameState, target: Actor) -> None:
@@ -247,6 +284,12 @@ def _interact(state: GameState) -> ActionResult:
     monsters should get to answer.
     """
     if state.dungeon_map.item_at(state.player.position) is not None:
+        item = state.dungeon_map.item_at(state.player.position)
+        assert item is not None
+        if item.kind == "chest":
+            # Not a refusal and not an action: the player has been asked to
+            # decide, and the domain does not decide for them.
+            return ActionResult(consumed_turn=False, acted=False, prompt=chest_prompt(item))
         return _pick_up(state)
 
     if state.on_exit:
@@ -256,10 +299,52 @@ def _interact(state: GameState) -> ActionResult:
     return ActionResult(consumed_turn=False, acted=False)
 
 
+def chest_prompt(chest: GroundItem) -> str:
+    """What the dialog says about a chest: the price, and nothing else.
+
+    The reward stays hidden until the lid is up. Showing both would turn daring
+    into arithmetic -- and the player is meant to be weighing a cost against a
+    hope, not comparing two numbers.
+    """
+    curse = curse_by_key(chest.curse)
+    if curse is None:
+        return "Whatever is inside is not free."
+    return f"The price: {curse.price}."
+
+
+def _open_chest(state: GameState) -> ActionResult:
+    """Prise open the chest underfoot: the reward, and the bill.
+
+    Only ever reached from the dialog, so there is no key that opens a chest by
+    accident -- walking onto one and pressing enter asks first.
+    """
+    chest = state.dungeon_map.item_at(state.player.position)
+    if chest is None or chest.kind != "chest":
+        return ActionResult(consumed_turn=False, acted=False)
+
+    state.dungeon_map.remove_item(state.player.position)
+    state.say("The lid gives, and something in the dark takes note.", LogKind.SYSTEM)
+
+    curse = curse_by_key(chest.curse)
+    if curse is not None:
+        state.add_curse(curse)
+
+    if chest.contents is not None:
+        _equip(state, chest.contents)
+
+    return ActionResult(consumed_turn=False, acted=False)
+
+
 def _pick_up(state: GameState) -> ActionResult:
     item = state.dungeon_map.item_at(state.player.position)
     if item is None:
         state.say("There is nothing here to take.", LogKind.PLAIN)
+        return ActionResult(consumed_turn=False, acted=False)
+
+    if item.kind == "chest":
+        # It is furniture, not loot. Without this the whole chest -- contents
+        # and all -- went into the pack, and the curse went with it unread.
+        state.say("It is not going anywhere. It has to be opened.", LogKind.PLAIN)
         return ActionResult(consumed_turn=False, acted=False)
 
     state.dungeon_map.remove_item(state.player.position)
@@ -371,11 +456,17 @@ def _quaff(state: GameState) -> ActionResult:
     )
 
     state.inventory.remove(item)
-    healed = player.stats.heal(item.heal)
+    amount = max(1, round(item.heal * state.heal_scale))
+    healed = player.stats.heal(amount)
     state.say(f"You drink the {item.name} and recover {healed}.", LogKind.GOOD)
-    if healed < item.heal:
+    if amount < item.heal:
         state.say(
-            f"Its power spills past the wound; {item.heal - healed} is lost.",
+            f"It should have been more. The curse takes its share.",
+            LogKind.BAD,
+        )
+    elif healed < amount:
+        state.say(
+            f"Its power spills past the wound; {amount - healed} is lost.",
             LogKind.PLAIN,
         )
 

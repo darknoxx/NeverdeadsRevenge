@@ -29,6 +29,7 @@ from ..widgets.legend import Legend
 from ..widgets.map_view import MapView
 from ..widgets.message_log import MessageLog
 from .character import CharacterScreen
+from .chest import ChestScreen
 from .game_over import GameOverScreen
 
 __all__ = ["GameScreen"]
@@ -179,6 +180,22 @@ class GameScreen(Screen[None]):
         result = perform_action(self.state, action)
         self._refresh_all()
 
+        if result.prompt is not None:
+            # The domain says a decision is needed; the UI asks for it. Opening
+            # happens only if the answer comes back yes, which is why there is no
+            # key bound to it.
+            self.app.push_screen(ChestScreen(result.prompt), self._chest_answer)
+            return
+
+        if result.died or result.escaped:
+            self._game_over(won=result.escaped)
+
+    def _chest_answer(self, open_it: bool | None) -> None:
+        """Act on the answer. Walking away costs nothing at all."""
+        if not open_it or self.state is None:
+            return
+        result = perform_action(self.state, Action.OPEN_CHEST)
+        self._refresh_all()
         if result.died or result.escaped:
             self._game_over(won=result.escaped)
 

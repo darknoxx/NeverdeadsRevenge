@@ -23,6 +23,7 @@ from neverdeads_revenge.world.tiles import Tile
 
 from .actors import Actor, Hero, make_enemy, make_hero, pick_enemy_template
 from .combat import apply_revenge
+from .curses import CURSES, Curse
 
 __all__ = [
     "LogEntry",
@@ -109,6 +110,62 @@ class GameState:
     #: reserve, and a floor that stripped it would make every descent a fresh
     #: start rather than a cost.
     inventory: list[GroundItem] = field(default_factory=list)
+    #: What chests have taken. Run-long: there is no cure, so a curse is a
+    #: decision made once and lived with.
+    curses: list[Curse] = field(default_factory=list)
+
+    # -- curses -------------------------------------------------------------
+    def add_curse(self, curse: Curse) -> None:
+        """Take on ``curse``, for good.
+
+        The stat changes are folded into the player's ``curse_modifiers`` here
+        rather than derived on every read, because the effective stats are asked
+        for constantly -- every attack, every turn of the queue -- and a list of
+        curses walked each time is a cost paid in the hot path for a value that
+        changes at most twice a run.
+
+        Wither is the exception: it is not a modifier but a subtraction, taken
+        once, from the health the hero will never get back.
+        """
+        self.curses.append(curse)
+        player = self.player
+        player.curse_modifiers = player.curse_modifiers + curse.modifiers
+
+        if curse.wither:
+            lost = max(1, round(player.max_hp * curse.wither))
+            player.stats.max_hp = max(1, player.stats.max_hp - lost)
+            player.stats.hp = min(player.stats.hp, player.stats.max_hp)
+
+        self.say(f"{curse.name}: {curse.price}.", LogKind.BAD)
+
+    @property
+    def sight_radius(self) -> int:
+        """How far the player can see, after anything that narrows it.
+
+        The tightest curse wins rather than the last one applied: two things
+        closing the dark in should not open it back up.
+        """
+        radius = VIEW_RADIUS
+        for curse in self.curses:
+            if curse.sight is not None:
+                radius = min(radius, curse.sight)
+        return radius
+
+    @property
+    def bleed_every(self) -> int:
+        """Steps between losing a point of blood, or 0 for none."""
+        return min(
+            (curse.bleed_every for curse in self.curses if curse.bleed_every),
+            default=0,
+        )
+
+    @property
+    def heal_scale(self) -> float:
+        """What a draught is worth, as a fraction of what it says on the tin."""
+        scale = 1.0
+        for curse in self.curses:
+            scale *= curse.heal_scale
+        return scale
 
     # -- logging ------------------------------------------------------------
     def say(self, text: str, kind: LogKind = LogKind.PLAIN) -> None:
@@ -160,7 +217,7 @@ class GameState:
         self.dungeon_map.clear_visibility()
         visible, explored = compute_fov_full(
             self.player.position,
-            VIEW_RADIUS,
+            self.sight_radius,
             self.dungeon_map.is_opaque,
             self.dungeon_map.in_bounds,
         )
@@ -171,7 +228,7 @@ class GameState:
     def build_floor(self, depth: int) -> GeneratedFloor:
         """Generate the next floor and move everyone onto it."""
         self.depth = depth
-        floor = generate_floor(self.rng, depth=depth)
+        floor = generate_floor(self.rng, depth=depth, curse_keys=tuple(CURSES))
         self.dungeon_map = floor.map
 
         if self.player is None:

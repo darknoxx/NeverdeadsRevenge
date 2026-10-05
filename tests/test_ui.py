@@ -534,6 +534,106 @@ async def test_the_character_screen_labels_do_not_run_into_their_values():
         assert plain.endswith(" 1"), f"{label!r} runs into its value: {plain!r}"
 
 
+# -- chests -----------------------------------------------------------------
+async def test_the_chest_dialog_shows_the_price_and_hides_the_reward():
+    """The reward stays behind the lid, so the decision is daring, not sums."""
+    from neverdeads_revenge.game.curses import CURSES
+    from neverdeads_revenge.ui.screens.chest import ChestScreen
+    from neverdeads_revenge.world.items import ITEMS, make_chest
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.dungeon_map.add_item(
+            screen.state.player.position, make_chest("dim", ITEMS["plate"])
+        )
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert isinstance(app.screen, ChestScreen)
+        body = str(app.screen.query_one("#chest-body").render())
+        assert CURSES["dim"].price in body
+        assert "warden" not in body and "plate" not in body
+
+
+async def test_saying_yes_opens_the_chest():
+    from neverdeads_revenge.ui.screens.chest import ChestScreen
+    from neverdeads_revenge.world.items import ITEMS, make_chest
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        state.dungeon_map.add_item(state.player.position, make_chest("dim", ITEMS["plate"]))
+
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, ChestScreen)
+
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert isinstance(app.screen, GameScreen)
+        assert [c.key for c in state.curses] == ["dim"]
+        assert state.player.equipment["armour"].name == "warden plate"
+        assert state.sight_radius == 5, "the price was not paid"
+
+
+async def test_walking_away_costs_nothing():
+    """Declining has to be free, or it is not a choice."""
+    from neverdeads_revenge.world.items import ITEMS, make_chest
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        chest = make_chest("wither", ITEMS["runed"])
+        state.dungeon_map.add_item(state.player.position, chest)
+
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert isinstance(app.screen, GameScreen)
+        assert state.curses == []
+        assert state.player.max_hp == actors_module.NOXX.stats.max_hp
+        assert state.total_turns == 0, "the question cost a turn"
+        assert state.dungeon_map.item_at(state.player.position) is chest, (
+            "the chest vanished when it was declined"
+        )
+
+
+async def test_the_legend_lists_the_chest():
+    from neverdeads_revenge.ui.widgets.legend import Legend
+    from neverdeads_revenge.world.items import CHEST_GLYPH
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        shown = screen.query_one(Legend).render().plain
+        assert CHEST_GLYPH in shown
+        assert "chest" in shown
+
+
+async def test_the_character_sheet_lists_what_has_been_done_to_you():
+    from neverdeads_revenge.game.curses import CURSES
+    from neverdeads_revenge.ui.screens.character import CharacterScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.add_curse(CURSES["bleed"])
+        await pilot.press("c")
+        await pilot.pause()
+
+        assert isinstance(app.screen, CharacterScreen)
+        sheet = str(app.screen.query_one("#character-body").render())
+        assert "curses" in sheet
+        assert "BLEED" in sheet
+        assert CURSES["bleed"].price in sheet, "the price is not spelled out"
+
+
 # -- prologue ---------------------------------------------------------------
 async def test_prologue_appears_on_the_first_run_only():
     """The premise is stated once per session, not once per run.

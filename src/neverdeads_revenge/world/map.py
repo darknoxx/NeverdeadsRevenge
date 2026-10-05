@@ -25,13 +25,19 @@ class GroundItem:
     glyph: str = "*"
     color: str = "yellow"
     heal: int = 0
-    #: What kind of thing it is: ``draught``, ``weapon`` or ``armour``. Used to
-    #: group the legend, which has room for one row per kind and not per item.
+    #: What kind of thing it is: ``draught``, ``weapon``, ``armour`` or
+    #: ``chest``. Used to group the legend, which has room for one row per kind
+    #: and not per item.
     kind: str = "draught"
     #: Which equipment slot it fills, or ``None`` for something you drink.
     slot: str | None = None
     #: What wearing it changes. Frozen, so one shared empty instance is fine.
     modifiers: Modifiers = Modifiers()
+    #: A chest's curse, by key. Only ``game/`` knows what the key means, which
+    #: is why this is a string and not a :class:`Curse`.
+    curse: str | None = None
+    #: What is inside a chest. ``None`` for everything else.
+    contents: GroundItem | None = None
 
 
 @dataclass(slots=True)
