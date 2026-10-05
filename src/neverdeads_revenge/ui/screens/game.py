@@ -223,12 +223,17 @@ class GameScreen(Screen[None]):
             # them. This is the answer: they went and found the other way out.
             summary.append("\nYou were not granted death.\n", style="italic")
 
+        # Recorded before the screen is built, so the summary can show the best
+        # this run just became part of.
+        best = self.app.record_run(state)
+
         self.app.push_screen(
             GameOverScreen(
                 summary=str(summary),
                 depth=state.depth,
                 score=state.score,
                 won=won,
+                best=best,
             ),
             lambda _result: self.app.return_to_title(),
         )

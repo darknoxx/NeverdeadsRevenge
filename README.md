@@ -192,6 +192,19 @@ mistake rather than a style.
 | `?` | Controls and the terrain reference |
 | `Esc` | Menu, `q` there to quit to title |
 
+The prologue and the run summary close on a **held enter**, not a single press.
+They are the only prose in the game and the only place a run is added up, and a
+stray key should not throw either away. The arrows scroll the prologue, and the
+bar under the hint fills as you hold. Terminals that do not repeat a held key
+are covered too: three presses do the same thing.
+
+## High score
+
+The best score is kept in `~/.local/share/neverdeads_revenge/meta.json` (or
+`$XDG_DATA_HOME`) and shown on the title screen and the run summary. That is
+everything that is saved — no run survives being closed, and there are no
+unlocks yet.
+
 ## Loot and equipment
 
 Two kinds of thing lie on the floor.

@@ -10,6 +10,9 @@ point is the flow, not the layout.
 
 from __future__ import annotations
 
+import asyncio
+import time
+
 from pathlib import Path
 
 import pytest
@@ -18,6 +21,7 @@ from neverdeads_revenge.game import actors as actors_module
 from neverdeads_revenge.game.actions import Action
 from neverdeads_revenge.game.state import GameState, RunState
 from neverdeads_revenge.ui.app import NeverdeadsRevenge
+from neverdeads_revenge.ui.hold import BAR_CELLS, HoldToContinue
 from neverdeads_revenge.ui.screens.game import GameScreen
 from neverdeads_revenge.ui.screens.game_over import GameOverScreen
 from neverdeads_revenge.ui.screens.hero_select import FUTURE_HEROES, HeroSelectScreen
@@ -45,11 +49,30 @@ async def drive_to_game(app: NeverdeadsRevenge, pilot) -> GameScreen:
     await pilot.press("enter")
     await pilot.pause()
     if isinstance(app.screen, PrologueScreen):
-        await pilot.press("enter")
-        await pilot.pause()
+        await hold_enter(pilot)
 
     assert isinstance(app.screen, GameScreen)
     return app.screen
+
+
+async def hold_enter(pilot, gap: float = 0.3) -> None:
+    """Do the hold-to-continue gesture the way a test can.
+
+    The pilot sends one key event per press and never a repeat, so the held-key
+    route cannot fire here. Three presses take the fallback route instead -- a
+    path a real player on a terminal without key repeat uses, not a hook
+    invented for the tests.
+
+    One real pause is enough: what marks the presses as deliberate is the *span*
+    they cover, not the spacing between each pair. Sleeping three times would
+    triple the length of the whole suite for nothing.
+    """
+    await pilot.press("enter")
+    await asyncio.sleep(gap)
+    await pilot.press("enter")
+    await pilot.pause()
+    await pilot.press("enter")
+    await pilot.pause()
 
 
 async def drive_to_game_as(app: NeverdeadsRevenge, pilot, hero_key: str) -> GameScreen:
@@ -76,8 +99,7 @@ async def drive_to_game_as(app: NeverdeadsRevenge, pilot, hero_key: str) -> Game
     await pilot.press("enter")
     await pilot.pause()
     if isinstance(app.screen, PrologueScreen):
-        await pilot.press("enter")
-        await pilot.pause()
+        await hold_enter(pilot)
 
     assert isinstance(app.screen, GameScreen)
     assert app.screen.state.hero is HEROES[hero_key]
@@ -283,7 +305,7 @@ async def test_stepping_into_the_rift_shows_victory_not_death():
         assert state.run_state is RunState.ESCAPED
 
         # And it returns to the title like every other ending.
-        await pilot.press(" ")
+        await hold_enter(pilot)
         await pilot.pause()
         assert isinstance(app.screen, TitleScreen)
 
@@ -326,7 +348,7 @@ async def test_the_victory_screen_answers_the_prologue():
 
         # And the death screen must not say it: it would be a cruel lie there.
         assert "Out of the dark" in body
-        await pilot.press(" ")
+        await hold_enter(pilot)
         await pilot.pause()
 
         # A death gets the plain summary.
@@ -650,8 +672,7 @@ async def test_prologue_appears_on_the_first_run_only():
         await pilot.pause()
         assert isinstance(app.screen, PrologueScreen), "first run must tell the story"
 
-        await pilot.press("enter")
-        await pilot.pause()
+        await hold_enter(pilot)
         assert isinstance(app.screen, GameScreen)
 
         await pilot.press("escape")
@@ -662,8 +683,7 @@ async def test_prologue_appears_on_the_first_run_only():
 
         await pilot.press("x")
         await pilot.pause()
-        await pilot.press("enter")
-        await pilot.pause()
+        await hold_enter(pilot)
         assert isinstance(app.screen, GameScreen), "prologue shown twice"
 
 
@@ -684,18 +704,16 @@ async def test_prologue_sits_between_the_hero_and_the_dungeon():
         await pilot.pause()
         assert isinstance(app.screen, PrologueScreen)
 
-        await pilot.press("enter")
-        await pilot.pause()
+        await hold_enter(pilot)
         assert isinstance(app.screen, GameScreen)
 
 
 async def test_the_whole_prologue_fits_without_scrolling():
     """The last line of the story is the point of the story, so it must show.
 
-    The pane does not scroll: any key dismisses the screen, so a player who
-    needed to scroll could not. That makes the story's length a layout
-    constraint, not just an editorial one, and this is the assertion that keeps
-    a future line from silently pushing the ending off the bottom.
+    It scrolls now, so a long story is no longer unreadable -- but a story that
+    fits is still better than one that has to be scrolled, and this keeps a
+    future line from quietly pushing the ending out of sight.
     """
     from neverdeads_revenge.ui.screens.prologue import PrologueScreen
 
@@ -739,7 +757,12 @@ async def test_the_prologue_shows_every_line_of_the_story():
             assert line in shown
 
 
-async def test_prologue_is_skipped_by_any_key():
+async def test_the_prologue_takes_a_held_enter_and_not_a_stray_key():
+    """It used to close on any key, which cost the player the only prose here.
+
+    Now the arrows scroll it and only a held enter lets it go -- so a keypress
+    that was meant for something else cannot throw the story away.
+    """
     app = NeverdeadsRevenge()
     async with app.run_test(size=SIZE) as pilot:
         await pilot.pause()
@@ -747,10 +770,52 @@ async def test_prologue_is_skipped_by_any_key():
         await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()
+        assert isinstance(app.screen, PrologueScreen)
 
-        await pilot.press("q")
+        # A stray key does nothing at all.
+        for key in ("q", "a", "space", "escape"):
+            await pilot.press(key)
+            await pilot.pause()
+            assert isinstance(app.screen, PrologueScreen), f"{key} closed it"
+
+        # One enter is not enough either.
+        await pilot.press("enter")
         await pilot.pause()
+        assert isinstance(app.screen, PrologueScreen), "a single press closed it"
+
+        await hold_enter(pilot)
         assert isinstance(app.screen, GameScreen)
+
+
+async def test_the_prologue_scrolls_with_the_arrows():
+    """The story does not fit every terminal, so it has to be scrollable.
+
+    And the keys that scroll it must not be the keys that close it, or the only
+    way to read the end of it is to skip it.
+    """
+    from textual.containers import VerticalScroll
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await pilot.press("x")
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, PrologueScreen)
+
+        scroller = app.screen.query_one("#prologue-screen", VerticalScroll)
+        # Force it scrollable, so the test does not depend on the terminal being
+        # small enough to overflow.
+        scroller.styles.max_height = 5
+        await pilot.pause()
+        scroller.scroll_home()
+        await pilot.pause()
+
+        await pilot.press("down")
+        await pilot.pause()
+        assert scroller.scroll_offset.y > 0, "the down arrow did not scroll"
+        assert isinstance(app.screen, PrologueScreen), "scrolling closed the screen"
 
 
 
@@ -997,8 +1062,7 @@ async def test_death_opens_game_over_and_returns_to_title():
         await pilot.pause()
         assert isinstance(app.screen, GameOverScreen)
 
-        await pilot.press("enter")
-        await pilot.pause()
+        await hold_enter(pilot)
         assert isinstance(app.screen, TitleScreen)
 
 
@@ -1367,6 +1431,165 @@ async def test_the_sidebar_fits_for_every_hero():
                 f"{key}: the legend needs {len(lines)} rows and has "
                 f"{legend.content_size.height}"
             )
+
+
+# -- hold to continue --------------------------------------------------------
+def test_holding_a_key_fills_the_bar_and_finishes():
+    """The route a held key takes: repeats keep it alive until the fill is done."""
+    hold = HoldToContinue(seconds=0.15, reset_after=0.06)
+    assert hold.press("enter") is False
+
+    done = False
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and not done:
+        time.sleep(0.02)
+        hold.press("enter")  # what the terminal sends while the key is down
+        done = hold.tick()
+
+    assert done, "holding the key never completed"
+    assert hold.progress == 1.0
+
+
+def test_letting_go_resets_the_fill():
+    """Terminals never report a release; a moment of silence stands in for one."""
+    hold = HoldToContinue(seconds=0.5, reset_after=0.05)
+    hold.press("enter")
+    time.sleep(0.08)
+
+    assert hold.tick() is False
+    assert hold.progress == 0.0, "the fill survived the key being let go"
+
+
+def test_one_press_on_its_own_does_nothing():
+    """The whole point: a stray key must not throw the screen away."""
+    hold = HoldToContinue(seconds=0.1, reset_after=0.05)
+    assert hold.press("enter") is False
+    time.sleep(0.15)
+    assert hold.tick() is False
+    assert hold.progress == 0.0
+
+
+def test_three_deliberate_presses_also_work():
+    """For terminals with key repeat turned off, where the bar would never fill."""
+    hold = HoldToContinue(seconds=10.0, reset_after=0.05)
+    assert hold.press("enter") is False
+    time.sleep(0.08)
+    assert hold.press("enter") is False
+    time.sleep(0.08)
+    assert hold.press("enter") is True
+
+
+def test_a_burst_of_presses_is_not_a_deliberate_one():
+    """Mashing is the hold route's business; the fallback must not double-fire."""
+    hold = HoldToContinue(seconds=10.0, reset_after=0.05)
+    for _ in range(5):
+        assert hold.press("enter") is False
+
+
+def test_a_held_key_never_looks_deliberate():
+    """A repeat arrives milliseconds after the last, so its span is nothing."""
+    hold = HoldToContinue(seconds=10.0, reset_after=0.5)
+    for _ in range(20):
+        time.sleep(0.004)
+        assert hold.press("enter") is False, "a repeat tripped the fallback"
+
+
+def test_keys_that_are_not_the_hold_key_are_ignored():
+    hold = HoldToContinue()
+    for key in ("q", "a", "space", "escape"):
+        assert hold.press(key) is False
+    assert hold.progress == 0.0
+
+
+def test_the_bar_is_a_bar():
+    hold = HoldToContinue(seconds=0.2, reset_after=0.05)
+    assert hold.bar() == "░" * BAR_CELLS
+
+    hold.press("enter")
+    time.sleep(0.1)
+    bar = hold.bar()
+    assert len(bar) == BAR_CELLS
+    assert bar != "░" * BAR_CELLS, "the bar did not fill"
+    assert "█" in bar
+
+
+# -- the high score ----------------------------------------------------------
+async def test_a_finished_run_is_written_down():
+    """The score outlives the run, which is the point of writing it down."""
+    from neverdeads_revenge.persistence import load_meta
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.kills = 5
+        screen.state.floors_cleared = 3
+        screen._game_over()
+        await pilot.pause()
+
+        assert app.progress.best_score > 0
+
+    # And it is on disk, not just in memory.
+    assert load_meta().best_score == app.progress.best_score
+
+
+async def test_the_best_score_only_ever_goes_up():
+    from neverdeads_revenge.persistence import load_meta
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.kills = 40
+        screen.state.floors_cleared = 9
+        screen._game_over()
+        await pilot.pause()
+        high = app.progress.best_score
+
+        # Back to the title before the second run: drive_to_game starts there.
+        await hold_enter(pilot)
+        assert isinstance(app.screen, TitleScreen)
+
+        screen = await drive_to_game(app, pilot)
+        screen.state.kills = 1
+        screen._game_over()
+        await pilot.pause()
+
+        assert app.progress.best_score == high, "a worse run lowered the best"
+
+    assert load_meta().best_score == high
+
+
+async def test_the_title_screen_shows_the_best_run():
+    from neverdeads_revenge.persistence import MetaProgress, save_meta
+
+    save_meta(MetaProgress(best_score=4242))
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, TitleScreen)
+        shown = str(app.screen.query_one("#title-best").render())
+        assert "4242" in shown
+
+
+async def test_the_title_screen_says_nothing_before_the_first_run():
+    """\"best 0\" on a first launch is a worse welcome than saying nothing."""
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        assert app.progress.best_score == 0
+        assert str(app.screen.query_one("#title-best").render()).strip() == ""
+
+
+async def test_the_summary_shows_the_best():
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.kills = 7
+        screen._game_over()
+        await pilot.pause()
+
+        shown = str(app.screen.query_one("#game-over-best").render())
+        assert str(app.progress.best_score) in shown
 
 
 # -- theming -----------------------------------------------------------------

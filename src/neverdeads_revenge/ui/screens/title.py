@@ -121,10 +121,19 @@ class TitleScreen(Screen[None]):
 
     def on_mount(self) -> None:
         self._fit_title()
+        self._show_best()
 
     def on_resize(self) -> None:
         """Swap between the block art and the plain name as the width allows."""
         self._fit_title()
+
+    def _show_best(self) -> None:
+        from textual.widgets import Static
+
+        best = getattr(self.app, "progress", None)
+        self.query_one("#title-best", Static).update(
+            best_line(best.best_score if best else 0)
+        )
 
     def _fit_title(self) -> None:
         from textual.widgets import Static
@@ -145,5 +154,15 @@ def _centered():
     with Vertical(id="title-screen"):
         yield Static(TITLE_ART, id="title-art")
         yield Static(TAGLINE, id="title-subtitle")
+        yield Static(id="title-best")
         yield Static(f"\nversion {__version__}", id="title-version")
         yield Static("press any key", id="title-hint")
+
+
+def best_line(best: int) -> str:
+    """What the title screen says about the best run so far.
+
+    Blank when there has never been a run. "best 0" on a first launch is a worse
+    welcome than saying nothing at all.
+    """
+    return f"best  {best}" if best else ""

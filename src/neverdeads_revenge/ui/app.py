@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from textual.app import App
 
+from ..game.state import GameState, RunState
+from ..persistence import load_meta, save_meta
 from .screens.game import GameScreen
 from .screens.game_over import GameOverScreen
 from .screens.help import HelpScreen
@@ -57,6 +59,28 @@ class NeverdeadsRevenge(App[None]):
         #: seventy, on the seeds where an enemy can see the player from across a
         #: corridor at spawn.
         self.run_seed = seed
+        #: What outlives a run. Loaded once, written on every ending. The file
+        #: has been sitting there unread since the persistence layer was built.
+        self.progress = load_meta()
+
+    def record_run(self, state: GameState) -> int:
+        """Fold a finished run into the saved progress. Returns the best score.
+
+        Saving is best-effort on purpose: a home directory that cannot be
+        written to is worth a shrug, and it is certainly not worth losing the
+        summary screen over.
+        """
+        self.progress.record_run(
+            depth=state.depth,
+            score=state.score,
+            kills=state.kills,
+            won=state.run_state is RunState.ESCAPED,
+        )
+        try:
+            save_meta(self.progress)
+        except OSError:
+            pass
+        return self.progress.best_score
 
     def on_mount(self) -> None:
         self.push_screen("title")

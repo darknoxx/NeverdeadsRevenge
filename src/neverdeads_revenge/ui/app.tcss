@@ -37,6 +37,15 @@ Screen {
     color: #6b6b6b;
 }
 
+/* Blank until there has been a run, so it is styled but usually empty. */
+#title-best {
+    width: 1fr;
+    height: auto;
+    margin: 1 0 0 0;
+    content-align: center middle;
+    color: $accent;
+}
+
 /* -- hero select ------------------------------------------------------- */
 
 #hero-select {

@@ -11,6 +11,8 @@ are fixed, so a failure is reproducible.
 
 from __future__ import annotations
 
+import asyncio
+
 import random
 
 import pytest
@@ -22,7 +24,7 @@ from neverdeads_revenge.ui.screens.game_over import GameOverScreen
 from neverdeads_revenge.ui.screens.title import TitleScreen
 from neverdeads_revenge.world.tiles import Tile
 
-from .test_ui import drive_to_game
+from .test_ui import drive_to_game, hold_enter
 
 SIZE = (100, 34)
 
@@ -130,7 +132,7 @@ async def test_a_won_run_can_be_restarted():
         screen.state.player.position = screen.state.exit_pos
         await pilot.press(">")
         await pilot.pause()
-        await pilot.press(" ")
+        await hold_enter(pilot)
         await pilot.pause()
 
         assert isinstance(app.screen, TitleScreen)
