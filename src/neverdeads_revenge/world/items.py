@@ -31,6 +31,9 @@ __all__ = [
     "loot_count",
     "equipment_count",
     "chest_count",
+    "rare_find_count",
+    "RARE_FIND_CHANCE",
+    "RARE_FIND_DEPTH",
     "WEAPON_GLYPH",
     "WEAPON_COLOR",
     "ARMOUR_GLYPH",
@@ -339,6 +342,30 @@ def equipment_count(depth: int) -> int:
     that only has ten floors. The strong tier is meant to be the chests.
     """
     return min(1 + depth // 5, 2)
+
+
+#: How often a floor holds one of the chest-only things lying in the open.
+RARE_FIND_CHANCE = 0.22
+
+#: The floor a rare find can first appear on.
+RARE_FIND_DEPTH = 4
+
+
+def rare_find_count(rng: Rng, depth: int) -> int:
+    """Whether this floor holds a strong thing lying around, uncursed.
+
+    Never on the shallow floors. The strong tier is what a chest pays for with a
+    curse, and handing one out free on floor two would make the chest the fool's
+    bargain. Deeper down it starts to turn up, which is one more reason the deep
+    floors are worth the risk of being deep.
+
+    Takes the generator rather than being a plain probability so that it is
+    decided by the run's seed like everything else: a floor has to be the same
+    floor when it is regenerated.
+    """
+    if depth < RARE_FIND_DEPTH:
+        return 0
+    return 1 if rng.chance(RARE_FIND_CHANCE) else 0
 
 
 def chest_count(depth: int) -> int:

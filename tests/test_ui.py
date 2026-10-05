@@ -2066,3 +2066,113 @@ async def test_a_wild_offer_bought_in_the_shop_is_felt_in_the_run():
         screen = await drive_to_game(app, pilot)
 
         assert screen.state.extra_lives == 1
+
+
+# -- the spring --------------------------------------------------------------
+async def _stand_in_a_spring(app, pilot, gold: int, *curses):
+    from neverdeads_revenge.game.curses import CURSES
+    from neverdeads_revenge.world.tiles import Tile
+
+    screen = await drive_to_game(app, pilot)
+    state = screen.state
+    state.dungeon_map.set_tile(state.player.position, Tile.SPRING)
+    for key in curses:
+        state.add_curse(CURSES[key])
+    state.gold = gold
+    return screen, state
+
+
+async def test_the_legend_lists_the_spring():
+    """The one tile with a rule attached, so it earns a row next to the map."""
+    from neverdeads_revenge.ui.widgets.legend import Legend
+    from neverdeads_revenge.world.tiles import Tile
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        shown = screen.query_one(Legend).render().plain
+        assert Tile.SPRING.glyph in shown
+        assert "spring" in shown
+
+
+async def test_standing_in_a_spring_asks_before_spending_coin():
+    from neverdeads_revenge.game.state import CLEANSE_COST
+    from neverdeads_revenge.ui.screens.spring import SpringScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen, state = await _stand_in_a_spring(app, pilot, CLEANSE_COST, "heavy")
+
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert isinstance(app.screen, SpringScreen)
+        body = str(app.screen.query_one("#spring-body").render())
+        assert str(CLEANSE_COST) in body
+        assert state.gold == CLEANSE_COST, "asking must not cost anything yet"
+
+
+async def test_washing_a_curse_off_in_the_ui():
+    from neverdeads_revenge.game.state import CLEANSE_COST
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen, state = await _stand_in_a_spring(app, pilot, 100, "heavy")
+        before = state.player.speed
+
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert state.gold == 100 - CLEANSE_COST
+        assert state.curses == []
+        assert state.player.speed > before, "the speed came back"
+        assert isinstance(app.screen, GameScreen)
+
+
+async def test_leaving_the_spring_alone_costs_nothing():
+    from neverdeads_revenge.game.state import CLEANSE_COST
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen, state = await _stand_in_a_spring(app, pilot, 100, "heavy")
+
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert state.gold == 100
+        assert len(state.curses) == 1
+        assert isinstance(app.screen, GameScreen)
+        assert state.turn == 0, "walking away must not cost a turn"
+
+
+async def test_a_spring_you_cannot_afford_never_opens_a_dialog():
+    """Stating the price beats offering something and then refusing it."""
+    from neverdeads_revenge.game.state import CLEANSE_COST
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen, state = await _stand_in_a_spring(
+            app, pilot, CLEANSE_COST - 1, "heavy"
+        )
+
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert isinstance(app.screen, GameScreen), "a dialog opened anyway"
+        assert str(CLEANSE_COST) in state.log[-1].text
+
+
+async def test_a_clean_hero_gets_no_dialog_either():
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen, state = await _stand_in_a_spring(app, pilot, 100)
+
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert isinstance(app.screen, GameScreen)
+        assert "nothing on you" in state.log[-1].text

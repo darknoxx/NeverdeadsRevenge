@@ -353,6 +353,41 @@ ShopScreen {
     color: #6b6b6b;
 }
 
+/* -- spring -------------------------------------------------------------- */
+
+SpringScreen {
+    align: center middle;
+    background: $background 70%;
+}
+
+#spring {
+    width: 62;
+    height: auto;
+    padding: 1 2;
+    border: round #2ee6a8;
+    background: $surface;
+}
+
+#spring-title {
+    width: 1fr;
+    height: auto;
+    text-style: bold;
+    color: #2ee6a8;
+}
+
+#spring-body {
+    width: 1fr;
+    height: auto;
+    margin: 1 0 1 0;
+}
+
+#spring-hint {
+    width: 1fr;
+    height: auto;
+    content-align: center middle;
+    color: #6b6b6b;
+}
+
 /* -- chest --------------------------------------------------------------- */
 
 ChestScreen {

@@ -269,9 +269,15 @@ def test_chest_contents_are_decided_when_the_floor_is_built():
     assert chests(first) == chests(second)
 
 
-def test_the_strong_tier_only_comes_out_of_chests():
-    """Nothing worth having is lying around for free."""
-    from neverdeads_revenge.world.items import ITEMS
+def test_the_strong_tier_is_a_chest_reward_and_a_rare_find():
+    """What a chest pays for -- and, deep down, occasionally a find of its own.
+
+    Free strong loot on the shallow floors would make the chest the fool's
+    bargain, so the rare find is fenced off below floor four. Both halves are
+    asserted: that it happens at all, and that it stays rare enough to be worth
+    the surprise.
+    """
+    from neverdeads_revenge.world.items import ITEMS, RARE_FIND_DEPTH
 
     strong = {t.key for t in ITEMS.values() if t.chest_only}
     assert strong, "there is no strong tier"
@@ -282,8 +288,27 @@ def test_the_strong_tier_only_comes_out_of_chests():
             if item.kind == "chest":
                 assert item.contents is not None
                 assert item.contents.item_id in strong, "a chest held weak loot"
-            else:
-                assert item.item_id not in strong, "the strong tier was lying around"
+
+    for seed in range(40):
+        for depth in range(1, RARE_FIND_DEPTH):
+            floor = generate_floor(Rng(seed), depth=depth, curse_keys=CURSE_KEYS)
+            for item in floor.items.values():
+                assert item.item_id not in strong, (
+                    f"the strong tier was lying around on floor {depth}"
+                )
+
+    found = sum(
+        1
+        for seed in range(40)
+        if any(
+            item.item_id in strong
+            for item in generate_floor(
+                Rng(seed), depth=8, curse_keys=CURSE_KEYS
+            ).items.values()
+        )
+    )
+    assert found, "the rare find never happens at all"
+    assert found < 40, "the rare find is not rare"
 
 
 @pytest.mark.parametrize("seed", range(20))

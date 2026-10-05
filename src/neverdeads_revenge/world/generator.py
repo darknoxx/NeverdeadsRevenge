@@ -23,6 +23,7 @@ from .items import (
     loot_count,
     make_chest,
     make_item,
+    rare_find_count,
     roll_chest_contents,
     roll_item,
 )
@@ -37,6 +38,14 @@ __all__ = ["GeneratedFloor", "generate_floor", "ESCAPE_DEPTH"]
 #: player can plan against -- "I need to reach ten" is a decision, "keep going
 #: until you die" is not.
 ESCAPE_DEPTH = 10
+
+#: How likely a floor is to hold a cleansing spring.
+#:
+#: Not every floor, on purpose. A curse that can be washed off at the next
+#: staircase costs a walk; one you have to carry for three floors is a decision
+#: about whether the chest was worth opening at all, which is the decision the
+#: chest is meant to be.
+SPRING_CHANCE = 0.30
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +110,8 @@ class GeneratedFloor:
     exit_tile: Tile = Tile.STAIRS_DOWN
     #: Where the loot ended up, for tests and for the map to draw.
     items: dict[Pos, GroundItem] = field(default_factory=dict)
+    #: Where the cleansing spring is, or ``None`` on a floor without one.
+    spring: Pos | None = None
 
     @property
     def is_final(self) -> bool:
@@ -267,6 +278,10 @@ def generate_floor(
 
     _scatter_decor(rng, dungeon_map, rooms, count=len(dungeon_map.walkable_positions()) // 18)
 
+    # The spring before the loot, so that the loot's "plain floor only" rule
+    # keeps it clear without a second exclusion list.
+    spring = _place_spring(rng, dungeon_map, candidates, exit_pos, depth)
+
     # Loot last, and on whatever is still plain floor. Placing it after the decor
     # means an item can never be swallowed by a patch of grass.
     items = _scatter_loot(rng, dungeon_map, candidates, depth, curse_keys)
@@ -279,7 +294,37 @@ def generate_floor(
         depth=depth,
         exit_tile=exit_tile,
         items=items,
+        spring=spring,
     )
+
+
+def _place_spring(
+    rng: Rng,
+    dungeon_map: DungeonMap,
+    candidates: list[Pos],
+    exit_pos: Pos,
+    depth: int,
+) -> Pos | None:
+    """Put a cleansing spring somewhere reachable, or decide not to.
+
+    Never on the first floor and never on the exit. The first floor is the one
+    floor where nobody can be carrying anything worth washing off, and a spring
+    standing on the way out is a spring the player has to choose to walk past.
+    """
+    if depth < 2 or not rng.chance(SPRING_CHANCE):
+        return None
+
+    spots = [
+        pos
+        for pos in candidates
+        if pos != exit_pos and dungeon_map.tile_at(pos) is Tile.FLOOR
+    ]
+    if not spots:
+        return None
+
+    pos = rng.pick(spots)
+    dungeon_map.set_tile(pos, Tile.SPRING)
+    return pos
 
 
 def _scatter_loot(
@@ -322,6 +367,10 @@ def _scatter_loot(
             make_chest(rng.pick(curse_keys), roll_chest_contents(rng))
             for _ in range(chest_count(depth))
         ]
+    # And, rarely, the strong tier lying in the open with nothing owed for it.
+    to_place += [
+        make_item(roll_chest_contents(rng)) for _ in range(rare_find_count(rng, depth))
+    ]
 
     for pos, item in zip(rng.shuffled(open_floor), to_place):
         dungeon_map.add_item(pos, item)

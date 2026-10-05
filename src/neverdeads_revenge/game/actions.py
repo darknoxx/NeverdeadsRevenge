@@ -63,6 +63,9 @@ class Action(Enum):
     #: player has been shown the price and said yes, so the dialog is the only
     #: thing that issues it.
     OPEN_CHEST = "open_chest"
+    #: Wash a curse off in the spring. Like OPEN_CHEST, never bound to a key:
+    #: it only happens after the player has been shown the price and said yes.
+    CLEANSE = "cleanse"
     QUAFF = "quaff"
     INVENTORY = "inventory"
 
@@ -97,6 +100,10 @@ class ActionResult:
     #: The domain never draws a dialog. It says one is needed, and the UI asks --
     #: which is what keeps the whole decision tree testable without a terminal.
     prompt: str | None = None
+    #: Set when the thing underfoot is the spring rather than a chest. The two
+    #: need different dialogs and different answers, and a string cannot say
+    #: which one it is.
+    spring: bool = False
 
 
 # -- helpers ---------------------------------------------------------------
@@ -212,6 +219,8 @@ def perform_action(state: GameState, action: Action) -> ActionResult:
             return _pick_up(state)
         case Action.OPEN_CHEST:
             return _open_chest(state)
+        case Action.CLEANSE:
+            return _cleanse(state)
         case Action.QUAFF:
             return _quaff(state)
         case Action.INVENTORY:
@@ -315,6 +324,9 @@ def _interact(state: GameState) -> ActionResult:
             return ActionResult(consumed_turn=False, acted=False, prompt=chest_prompt(item))
         return _pick_up(state)
 
+    if state.at_the_spring:
+        return _spring(state)
+
     if state.on_exit:
         return _try_descend(state)
 
@@ -333,6 +345,77 @@ def chest_prompt(chest: GroundItem) -> str:
     if curse is None:
         return "Whatever is inside is not free."
     return f"The price: {curse.price}."
+
+
+def spring_prompt(state: GameState) -> str:
+    """What the spring says before it costs anything.
+
+    Which curse comes off is the water's decision, not the player's, so the
+    dialog says so -- and when there is only one curse there is nothing random
+    about it, so it names it.
+    """
+    if len(state.curses) == 1:
+        return (
+            f"The water will take {state.curses[0].name} off you, "
+            f"for {state.cleanse_cost} coins."
+        )
+    return (
+        "The water will take one of your curses, whichever it chooses, "
+        f"for {state.cleanse_cost} coins."
+    )
+
+
+def _spring(state: GameState) -> ActionResult:
+    """Standing in the spring. Ask before it costs anything.
+
+    Three answers and all three are said plainly: nothing to wash off, not
+    enough coin, or the question. The middle one is stated rather than offered
+    and then refused, because a dialog that ends in "you cannot afford this" is
+    a dialog that wasted the player's time.
+    """
+    if not state.curses:
+        state.say(
+            "The water is clear and cold. There is nothing on you to wash off.",
+            LogKind.PLAIN,
+        )
+        return ActionResult(consumed_turn=False, acted=False)
+
+    if state.gold < state.cleanse_cost:
+        state.say(
+            f"The water would take a curse off you, for {state.cleanse_cost} "
+            f"coins, and you have {state.gold}.",
+            LogKind.PLAIN,
+        )
+        return ActionResult(consumed_turn=False, acted=False)
+
+    return ActionResult(
+        consumed_turn=False,
+        acted=False,
+        prompt=spring_prompt(state),
+        spring=True,
+    )
+
+
+def _cleanse(state: GameState) -> ActionResult:
+    """Wash one curse off, chosen by the water.
+
+    Only ever reached from the dialog, so there is no key that spends forty
+    coins by accident. Costs no turn: being clean should not be something the
+    monsters get to answer.
+    """
+    if not state.at_the_spring or not state.curses:
+        return ActionResult(consumed_turn=False, acted=False)
+    if state.gold < state.cleanse_cost:
+        return ActionResult(consumed_turn=False, acted=False)
+
+    curse = state.rng.pick(state.curses)
+    state.gold -= state.cleanse_cost
+    state.remove_curse(curse)
+    state.say(
+        f"The water closes over {curse.name} and takes it with it.",
+        LogKind.GOOD,
+    )
+    return ActionResult(consumed_turn=False, acted=False)
 
 
 def _open_chest(state: GameState) -> ActionResult:

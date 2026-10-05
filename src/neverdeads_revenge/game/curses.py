@@ -35,6 +35,11 @@ class Curse:
     modifiers: Modifiers = Modifiers()
     #: Fraction of maximum health taken the moment the curse lands, for good.
     wither: float = 0.0
+    #: What the wither above actually took, in points, filled in when it lands.
+    #: The fraction is of the maximum *at that moment*, so recomputing it later
+    #: would hand back a different number -- and a spring that gives back the
+    #: wrong amount is a spring nobody trusts twice.
+    wither_taken: int = 0
     #: Health lost per this many steps, or 0 for none.
     bleed_every: int = 0
     #: What the sight radius becomes, or ``None`` to leave it alone.

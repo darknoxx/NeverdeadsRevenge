@@ -189,7 +189,7 @@ mistake rather than a style.
 | --- | --- |
 | `w` `a` `s` `d` / `h` `j` `k` `l` / arrows | Move (walk into an enemy to attack) |
 | `.` or `space` | Wait a turn |
-| `enter` | Interact: pick up what you are standing on, or take the stairs |
+| `enter` | Interact: pick up what you are standing on, take the stairs, or use the spring |
 | `>` | Descend, when you already know that is what you want |
 | `q` | Drink a potion |
 | `c` | Character sheet: every stat, and what each piece is contributing |
@@ -266,17 +266,32 @@ damage and crit; armour raises armour, evasion and speed.
 **Chests** (`&`) are not loot, they are a question. Standing on one and pressing
 `enter` stops the game and shows you the price — and only the price. Whatever is
 inside is better than anything lying around, and it is not free. Say yes and you
-get both: the strong tier of weapons and armour, and a curse that lasts the rest
-of the run.
+get both: the strong tier of weapons and armour, and a curse.
+
+**Springs** (`{`) are the only tile that undoes something instead of doing it.
+Standing in one and pressing `enter` offers to take one curse off you, for coin.
+*Which* curse is the water's decision, not yours — and the water says so when you
+are carrying more than one. The price is stated plainly rather than offered and
+then refused, and walking away costs nothing at all.
+
+**Rare finds.** The strong tier usually costs a curse. From floor 4 down it very
+occasionally does not: one of those blades or coats turns up lying on the floor
+with nothing owed for it. Rare enough to be a surprise, common enough to be worth
+the detour.
 
 | curse | what it takes |
 | --- | --- |
-| WITHER | a quarter of your health, taken now and for good |
+| WITHER | a quarter of your health, taken now |
 | BLEED | a drop of blood every third step |
 | FRAIL | two points of armour, gone |
 | HEAVY | a quarter of your speed |
 | DIM | your sight, cut to five paces |
 | FAMINE | half of what every draught is worth |
+
+Every curse can be lifted at a spring, and lifting one gives back *exactly* what
+it took. WITHER is why that is worth saying: "a quarter of your health" is a
+quarter of whatever the maximum was the moment it landed, so the amount is
+written down when it lands rather than recomputed on the way out.
 
 `c` opens the full sheet: every stat, what each piece is contributing, and what
 has been done to you.
@@ -284,8 +299,9 @@ has been done to you.
 ## Not implemented yet
 
 A talent tree, equipment slots beyond the two, sound, saving mid-run, and hero
-unlocks. Two roster slots are shown locked and are not playable yet. There is no
-way to lift a curse: it is a decision made once and lived with.
+unlocks. Two roster slots are shown locked and are not playable yet. A spring
+lifts a curse but the curses themselves are still only ever handed out by chests,
+and the wild offers are the same six every time they come round.
 
 The prologue is the only prose in the game, and it is shown once per session
 rather than once per run — told every run it stops being a premise and becomes a

@@ -115,8 +115,13 @@ class Hud(Static):
             else:
                 out.append(f"{item.name}\n", style="bold white")
 
+        # Where the run stands, and what it has scored. One line rather than two:
+        # the sidebar is clipped and the legend gained the spring row, so the
+        # line had to come from somewhere.
         out.append(f"Floor {state.depth}", style="bold cyan")
-        out.append(f"/{ESCAPE_DEPTH}\n", style="dim cyan")
+        out.append(f"/{ESCAPE_DEPTH}", style="dim cyan")
+        out.append("  Score ", style="dim")
+        out.append(f"{state.score}\n", style="bold white")
         if state.at_the_rift:
             out.append("The rift hums.\n", style="bold bright_cyan")
 
@@ -133,6 +138,5 @@ class Hud(Static):
         out.append("\n")
 
         out.append(f"Kills {state.kills}  Turns {state.total_turns}\n", style="dim")
-        out.append(f"Score {state.score}\n", style="dim")
 
         self.update(out)

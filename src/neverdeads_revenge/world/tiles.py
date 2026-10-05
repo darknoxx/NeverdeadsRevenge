@@ -28,6 +28,9 @@ class Tile(Enum):
     #: purpose: the map should not make the player wonder whether pressing down
     #: here drops them another floor or takes them home.
     RIFT = "%"
+    #: A spring. Walkable, unlike WATER: the player has to stand in it, and it
+    #: is the only tile in the game that undoes something rather than doing it.
+    SPRING = "{"
 
     # -- presentation -------------------------------------------------------
     @property
@@ -68,6 +71,9 @@ _COLORS: dict[Tile, str] = {
     Tile.GRASS: "green",
     Tile.WATER: "blue",
     Tile.RIFT: "bright_cyan",
+    # Teal, and a hex rather than "cyan": named colours get snapped to the
+    # terminal's nearest palette entry and "cyan" is the rift's already.
+    Tile.SPRING: "#2ee6a8",
 }
 
 _BACKGROUNDS: dict[Tile, str] = {
@@ -80,6 +86,7 @@ _BACKGROUNDS: dict[Tile, str] = {
     Tile.GRASS: "grey11",
     Tile.WATER: "grey11",
     Tile.RIFT: "grey11",
+    Tile.SPRING: "grey11",
 }
 
 _DESCRIPTIONS: dict[Tile, str] = {
@@ -92,6 +99,7 @@ _DESCRIPTIONS: dict[Tile, str] = {
     Tile.GRASS: "patchy grass",
     Tile.WATER: "shallow water",
     Tile.RIFT: "a rift out of the dark",
+    Tile.SPRING: "a spring of clear water",
 }
 
 # Rubble is walkable but opaque; everything else opaque is solid.

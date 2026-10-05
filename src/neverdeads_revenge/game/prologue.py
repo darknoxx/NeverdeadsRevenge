@@ -92,6 +92,7 @@ LEGEND_TERRAIN: tuple[Tile, ...] = (
     Tile.RUBBLE,
     Tile.STAIRS_DOWN,
     Tile.RIFT,
+    Tile.SPRING,
 )
 
 
@@ -132,6 +133,9 @@ def item_legend() -> list[tuple[str, str]]:
             rows.append((template.glyph, f"{template.name}, heals {template.heal}"))
     rows.append((CHEST_GLYPH, "a chest, and a price"))
     rows.append((COIN_GLYPH, "coins, for the shop"))
+    # The spring is terrain, but it is the one tile with a rule attached, so it
+    # earns a row here rather than living only in the help screen.
+    rows.append((Tile.SPRING.glyph, "a spring, lifts a curse"))
     return rows
 
 

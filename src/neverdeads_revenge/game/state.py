@@ -10,7 +10,7 @@ Permanent progress between runs lives in :mod:`neverdeads_revenge.persistence`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 
 from neverdeads_revenge.core.direction import Pos
@@ -20,6 +20,7 @@ from neverdeads_revenge.world.fov import compute_fov_full
 from neverdeads_revenge.world.generator import GeneratedFloor, generate_floor
 from neverdeads_revenge.world.items import ITEMS, make_item
 from neverdeads_revenge.world.map import DungeonMap, GroundItem
+from neverdeads_revenge.world.modifiers import Modifiers
 from neverdeads_revenge.world.tiles import Tile
 
 from .actors import Actor, Hero, make_enemy, make_hero, pick_enemy_template
@@ -36,6 +37,7 @@ __all__ = [
     "ESCAPE_BONUS",
     "TURN_BUDGET_PER_FLOOR",
     "SPEED_BONUS_PER_TURN",
+    "CLEANSE_COST",
 ]
 
 VIEW_RADIUS = 9
@@ -58,6 +60,13 @@ TURN_BUDGET_PER_FLOOR = 80
 #: sixth of the total, which is enough to play for and not enough to drown out
 #: killing things and getting out alive.
 SPEED_BONUS_PER_TURN = 10
+
+#: What the spring charges to take one curse off.
+#:
+#: A flat price, and deliberately a real one: coin is the only thing in the game
+#: that outlives the run, so spending it on the run in progress is a genuine
+#: trade rather than a formality. Placeholder, like every other price.
+CLEANSE_COST = 40
 
 
 class LogKind(Enum):
@@ -155,8 +164,37 @@ class GameState:
             lost = max(1, round(player.max_hp * curse.wither))
             player.stats.max_hp = max(1, player.stats.max_hp - lost)
             player.stats.hp = min(player.stats.hp, player.stats.max_hp)
+            # Written down, because the fraction is of the maximum at this
+            # moment and recomputing it later would give a different number.
+            self.curses[-1] = replace(curse, wither_taken=lost)
 
         self.say(f"{curse.name}: {curse.price}.", LogKind.BAD)
+
+    def remove_curse(self, curse: Curse) -> None:
+        """Lift a curse, and give back exactly what it took.
+
+        Exactly, because "a quarter of your health" is a quarter of whatever the
+        maximum was the moment it landed. Recomputed later it is a quarter of a
+        different number, and a spring that hands back the wrong amount is a
+        spring nobody trusts twice.
+        """
+        if curse not in self.curses:
+            return
+        self.curses.remove(curse)
+
+        player = self.player
+        # Rebuilt rather than subtracted. Floats do not subtract back to where
+        # they started, and a residue of 0.0000001 on the speed would be
+        # invisible right up until it was not.
+        player.curse_modifiers = Modifiers()
+        for remaining in self.curses:
+            player.curse_modifiers = player.curse_modifiers + remaining.modifiers
+
+        if curse.wither_taken:
+            player.stats.max_hp += curse.wither_taken
+            player.stats.hp = min(
+                player.stats.max_hp, player.stats.hp + curse.wither_taken
+            )
 
     @property
     def sight_radius(self) -> int:
@@ -303,6 +341,22 @@ class GameState:
     def on_exit(self) -> bool:
         """Standing on whatever takes you onward, stairs or rift alike."""
         return self.exit_pos is not None and self.player.position == self.exit_pos
+
+    @property
+    def spring_pos(self) -> Pos | None:
+        """Where the cleansing spring is, if this floor has one."""
+        found = self.dungeon_map.find_tile(Tile.SPRING)
+        return found[0] if found else None
+
+    @property
+    def at_the_spring(self) -> bool:
+        """Standing in the spring, which is the only way to use it."""
+        return self.dungeon_map.tile_at(self.player.position) is Tile.SPRING
+
+    @property
+    def cleanse_cost(self) -> int:
+        """What one curse costs to wash off, right now."""
+        return CLEANSE_COST
 
     @property
     def at_the_rift(self) -> bool:

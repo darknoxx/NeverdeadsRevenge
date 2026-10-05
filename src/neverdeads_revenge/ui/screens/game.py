@@ -33,6 +33,7 @@ from .character import CharacterScreen
 from .chest import ChestScreen
 from .game_over import GameOverScreen
 from .name_entry import NameEntryScreen
+from .spring import SpringScreen
 
 __all__ = ["GameScreen"]
 
@@ -196,12 +197,24 @@ class GameScreen(Screen[None]):
         self._refresh_all()
 
         if result.prompt is not None:
-            # The domain says a decision is needed; the UI asks for it. Opening
-            # happens only if the answer comes back yes, which is why there is no
-            # key bound to it.
-            self.app.push_screen(ChestScreen(result.prompt), self._chest_answer)
+            # The domain says a decision is needed; the UI asks for it. The deed
+            # happens only if the answer comes back yes, which is why neither
+            # opening a chest nor washing a curse is bound to a key.
+            if result.spring:
+                self.app.push_screen(SpringScreen(result.prompt), self._spring_answer)
+            else:
+                self.app.push_screen(ChestScreen(result.prompt), self._chest_answer)
             return
 
+        if result.died or result.escaped:
+            self._game_over(won=result.escaped)
+
+    def _spring_answer(self, wash_it: bool | None) -> None:
+        """Act on the answer. Walking away costs nothing at all."""
+        if not wash_it or self.state is None:
+            return
+        result = perform_action(self.state, Action.CLEANSE)
+        self._refresh_all()
         if result.died or result.escaped:
             self._game_over(won=result.escaped)
 
