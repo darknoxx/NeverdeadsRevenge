@@ -67,6 +67,11 @@ class ItemTemplate:
     #: How much ``weight`` grows per floor descended. Better things get more
     #: common as you go down, which is what makes a deep floor's loot worth the
     #: risk of the deep floor.
+    #:
+    #: For a ``chest_only`` item there is no floor table to grow on, so the same
+    #: curve is applied to the chest's own table instead: a deep chest hands out
+    #: the top of its tier. Without it a chest on floor nine gives the same
+    #: thing as a chest on floor two, and by then every slot is filled.
     weight_growth: float = 1.0
     #: Never rolled onto a floor. Chests hand these out, and only chests.
     chest_only: bool = False
@@ -268,6 +273,7 @@ ITEMS: dict[str, ItemTemplate] = {
         slot="amulet",
         amulet="rune_heart",
         chest_only=True,
+        weight_growth=1.15
     ),
     "mirror": ItemTemplate(
         key="mirror",
@@ -278,6 +284,7 @@ ITEMS: dict[str, ItemTemplate] = {
         slot="amulet",
         amulet="mirror",
         chest_only=True,
+        weight_growth=1.0
     ),
     "grave_ward": ItemTemplate(
         key="grave_ward",
@@ -288,6 +295,7 @@ ITEMS: dict[str, ItemTemplate] = {
         slot="amulet",
         amulet="grave_ward",
         chest_only=True,
+        weight_growth=1.08
     ),
     "deathwatch": ItemTemplate(
         key="deathwatch",
@@ -298,6 +306,7 @@ ITEMS: dict[str, ItemTemplate] = {
         slot="amulet",
         amulet="deathwatch",
         chest_only=True,
+        weight_growth=1.0
     ),
     "long_hunger": ItemTemplate(
         key="long_hunger",
@@ -308,6 +317,7 @@ ITEMS: dict[str, ItemTemplate] = {
         slot="amulet",
         amulet="long_hunger",
         chest_only=True,
+        weight_growth=1.15
     ),
     "patience": ItemTemplate(
         key="patience",
@@ -318,6 +328,7 @@ ITEMS: dict[str, ItemTemplate] = {
         slot="amulet",
         amulet="patience",
         chest_only=True,
+        weight_growth=1.15
     ),
     "second_mouth": ItemTemplate(
         key="second_mouth",
@@ -328,6 +339,7 @@ ITEMS: dict[str, ItemTemplate] = {
         slot="amulet",
         amulet="second_mouth",
         chest_only=True,
+        weight_growth=1.08
     ),
     "dead_weight": ItemTemplate(
         key="dead_weight",
@@ -340,6 +352,7 @@ ITEMS: dict[str, ItemTemplate] = {
         # The one amulet that costs a stat, and the reason it can afford to.
         modifiers=Modifiers(speed=-0.20),
         chest_only=True,
+        weight_growth=1.08
     ),
     "patient_knife": ItemTemplate(
         key="patient_knife",
@@ -350,6 +363,7 @@ ITEMS: dict[str, ItemTemplate] = {
         slot="amulet",
         amulet="patient_knife",
         chest_only=True,
+        weight_growth=1.15
     ),
     "borrowed_face": ItemTemplate(
         key="borrowed_face",
@@ -360,6 +374,7 @@ ITEMS: dict[str, ItemTemplate] = {
         slot="amulet",
         amulet="borrowed_face",
         chest_only=True,
+        weight_growth=1.15
     ),
     # -- out of the chests -------------------------------------------------
     #
@@ -375,6 +390,7 @@ ITEMS: dict[str, ItemTemplate] = {
         slot="weapon",
         modifiers=Modifiers(damage=4, crit_chance=0.10),
         chest_only=True,
+        weight_growth=1.0
     ),
     "argument": ItemTemplate(
         key="argument",
@@ -387,6 +403,7 @@ ITEMS: dict[str, ItemTemplate] = {
         # is not grave iron, and the one that asks nothing of you for it.
         modifiers=Modifiers(damage=5, armor=1),
         chest_only=True,
+        weight_growth=1.12
     ),
     "grave": ItemTemplate(
         key="grave",
@@ -397,6 +414,7 @@ ITEMS: dict[str, ItemTemplate] = {
         slot="weapon",
         modifiers=Modifiers(damage=6, speed=-0.20),
         chest_only=True,
+        weight_growth=1.2
     ),
     "warden": ItemTemplate(
         key="warden",
@@ -407,6 +425,7 @@ ITEMS: dict[str, ItemTemplate] = {
         slot="armour",
         modifiers=Modifiers(armor=3),
         chest_only=True,
+        weight_growth=1.0
     ),
     "shade": ItemTemplate(
         key="shade",
@@ -417,6 +436,7 @@ ITEMS: dict[str, ItemTemplate] = {
         slot="armour",
         modifiers=Modifiers(evasion=3),
         chest_only=True,
+        weight_growth=1.05
     ),
     "burial": ItemTemplate(
         key="burial",
@@ -429,6 +449,7 @@ ITEMS: dict[str, ItemTemplate] = {
         # decided the fight is going to be long.
         modifiers=Modifiers(armor=2, evasion=2, speed=-0.10),
         chest_only=True,
+        weight_growth=1.15
     ),
 }
 
@@ -527,15 +548,35 @@ def roll_item(
 CHEST_GEAR_BIAS = 4.0
 
 
-def roll_chest_contents(rng: Rng) -> ItemTemplate:
-    """What is inside a chest: one of the strong things."""
+def roll_chest_contents(
+    rng: Rng, depth: int = 1, filled_slots: tuple[str, ...] = ()
+) -> ItemTemplate:
+    """What is inside a chest.
+
+    Three things decide it, and all three exist because a chest that stops being
+    worth opening is a chest the player learns to walk past:
+
+    * A slot the player has not filled is preferred. The second chest should not
+      be a second coat -- that was the complaint that started this.
+    * A blade or a coat is likelier than an amulet, because there are more
+      amulets than blades and an even split makes the blade the rare find.
+    * Deeper chests hold better things, by each item's own ``weight_growth``.
+
+    ``filled_slots`` comes from the game rather than from the map, the same way
+    ``curse_keys`` does. The floor still decides what is in the chest -- the lid
+    does not roll anything -- it just knows what you are already carrying when it
+    decides.
+    """
     strong = [t for t in ITEMS.values() if t.chest_only]
-    return rng.choice_weighted(
-        [
-            (t, CHEST_GEAR_BIAS if t.kind in ("weapon", "armour") else 1.0)
-            for t in strong
-        ]
-    )
+    unfilled = [t for t in strong if t.slot not in filled_slots]
+    pool = unfilled or strong
+    return rng.choice_weighted([(t, _chest_weight_at(t, depth)) for t in pool])
+
+
+def _chest_weight_at(template: ItemTemplate, depth: int) -> float:
+    """How likely a strong item is, in a chest at ``depth``."""
+    base = CHEST_GEAR_BIAS if template.kind in ("weapon", "armour") else 1.0
+    return base * template.weight_growth ** max(0, depth - 1)
 
 
 def loot_count(depth: int) -> int:

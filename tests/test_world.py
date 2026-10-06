@@ -493,3 +493,88 @@ def test_every_weapon_and_coat_can_actually_be_found():
         assert equipment_count(1) >= 1
         rolled = {roll_item(Rng(seed), 8, kinds=(kind,)).key for seed in range(60)}
         assert rolled, f"nothing of kind {kind} ever rolled"
+
+
+# -- what a chest holds ------------------------------------------------------
+def test_a_chest_prefers_a_slot_you_have_not_filled():
+    """The complaint that started the third slot.
+
+    A second chest handing out a second coat is a chest the player learns to
+    walk past, and no amount of better numbers on the coat fixes that.
+    """
+    from neverdeads_revenge.world.items import roll_chest_contents
+
+    worn = ("weapon", "armour")
+    for seed in range(120):
+        contents = roll_chest_contents(Rng(seed), depth=5, filled_slots=worn)
+        assert contents.slot == "amulet", contents.key
+
+
+def test_a_chest_gives_anything_once_every_slot_is_full():
+    from neverdeads_revenge.world.items import roll_chest_contents
+
+    full = ("weapon", "armour", "amulet")
+    kinds = {
+        roll_chest_contents(Rng(seed), depth=5, filled_slots=full).slot
+        for seed in range(120)
+    }
+    assert len(kinds) > 1, "the chest refused to give anything at all"
+
+
+def test_a_deeper_chest_holds_the_top_of_its_tier():
+    """Or a chest on floor nine is worth exactly what a chest on floor two was,
+    and by floor nine every slot is already full.
+
+    Measured on the share of one item rather than on the average power of the
+    pool: half the strong tier is amulets, whose strength is a rule rather than
+    a number, so an average over all of it measures the gear/amulet split and
+    nothing about depth.
+    """
+    from neverdeads_revenge.world.items import ITEMS, roll_chest_contents
+
+    full = ("weapon", "armour", "amulet")
+
+    def share(key: str, depth: int) -> float:
+        rolls = [
+            roll_chest_contents(Rng(seed), depth, full) for seed in range(600)
+        ]
+        return sum(1 for template in rolls if template.key == key) / len(rolls)
+
+    # grave iron is the top of the blade ladder, the runed edge the bottom.
+    assert share("grave", 9) > share("grave", 2) * 1.4
+    assert share("edge", 9) < share("edge", 2)
+    assert ITEMS["grave"].weight_growth > ITEMS["edge"].weight_growth
+
+
+def test_the_floor_passes_the_slots_to_the_chests():
+    """``build_floor`` has to tell the generator what is worn, or the generator
+    cannot ask."""
+    from neverdeads_revenge.game.actors import NOXX
+    from neverdeads_revenge.game.shop import Loadout
+    from neverdeads_revenge.game.state import start_run
+
+    state = start_run(
+        NOXX, seed=3, loadout=Loadout(pending=("bite", "hide"))
+    )
+    state.build_floor(5)
+
+    held = {
+        item.contents.slot
+        for item in state.dungeon_map.items.values()
+        if item.kind == "chest" and item.contents is not None
+    }
+    assert held <= {"amulet"}, f"a chest held something already worn: {held}"
+
+
+def test_a_floor_with_nothing_worn_can_hold_anything():
+    from neverdeads_revenge.game.actors import NOXX
+    from neverdeads_revenge.game.state import start_run
+
+    held = set()
+    for seed in range(60):
+        state = start_run(NOXX, seed=seed)
+        state.build_floor(5)
+        for item in state.dungeon_map.items.values():
+            if item.kind == "chest" and item.contents is not None:
+                held.add(item.contents.slot)
+    assert len(held) > 1, "with nothing worn the chest should have a choice"

@@ -226,6 +226,7 @@ def generate_floor(
     room_attempts: int = 140,
     enemy_budget: int | None = None,
     curse_keys: tuple[str, ...] = (),
+    filled_slots: tuple[str, ...] = (),
 ) -> GeneratedFloor:
     """Build one complete, validated dungeon floor.
 
@@ -235,6 +236,11 @@ def generate_floor(
         width, height: Map dimensions.
         room_attempts: How many random rooms to try before giving up.
         enemy_budget: Overrides the enemy count. Defaults to scaling with depth.
+        curse_keys: Which curses a chest may hold. Passed in rather than imported
+            for the same reason ``filled_slots`` is.
+        filled_slots: Equipment slots the player already has something in. What a
+            chest holds is decided here, at build time, and a chest that hands
+            out a third coat is a chest nobody opens twice.
 
     Raises:
         RuntimeError: If no connected layout could be produced. With the default
@@ -284,7 +290,9 @@ def generate_floor(
 
     # Loot last, and on whatever is still plain floor. Placing it after the decor
     # means an item can never be swallowed by a patch of grass.
-    items = _scatter_loot(rng, dungeon_map, candidates, depth, curse_keys)
+    items = _scatter_loot(
+        rng, dungeon_map, candidates, depth, curse_keys, filled_slots
+    )
 
     return GeneratedFloor(
         map=dungeon_map,
@@ -333,6 +341,7 @@ def _scatter_loot(
     candidates: list[Pos],
     depth: int,
     curse_keys: tuple[str, ...] = (),
+    filled_slots: tuple[str, ...] = (),
 ) -> dict[Pos, GroundItem]:
     """Drop the floor's draughts, equipment and chests.
 
@@ -364,12 +373,18 @@ def _scatter_loot(
     ]
     if curse_keys:
         to_place += [
-            make_chest(rng.pick(curse_keys), roll_chest_contents(rng))
+            make_chest(
+                rng.pick(curse_keys),
+                roll_chest_contents(rng, depth, filled_slots),
+            )
             for _ in range(chest_count(depth))
         ]
     # And, rarely, the strong tier lying in the open with nothing owed for it.
+    # The same two questions are asked of it: what are you missing, and how deep
+    # is this.
     to_place += [
-        make_item(roll_chest_contents(rng)) for _ in range(rare_find_count(rng, depth))
+        make_item(roll_chest_contents(rng, depth, filled_slots))
+        for _ in range(rare_find_count(rng, depth))
     ]
 
     for pos, item in zip(rng.shuffled(open_floor), to_place):

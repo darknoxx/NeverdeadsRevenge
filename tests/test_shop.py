@@ -13,6 +13,7 @@ import pytest
 from neverdeads_revenge.core.rng import Rng
 from neverdeads_revenge.game.actors import NOXX, YETI
 from neverdeads_revenge.game.curses import CURSES
+from neverdeads_revenge.game.actions import take_turn
 from neverdeads_revenge.game.shop import (
     GEAR,
     META_UPGRADES,
@@ -361,3 +362,183 @@ def test_a_run_without_a_loadout_is_the_run_it_always_was():
     assert plain.enemy_hp_multiplier == 1.0
     assert plain.extra_lives == 0
     assert plain.sight_radius == explicit.sight_radius
+
+
+# -- the wild offers that are not about numbers ------------------------------
+def _wearing_wild(key: str, seed: int = 3):
+    return start_run(NOXX, seed=seed, loadout=Loadout(wilds=(key,)))
+
+
+def _one_weak_neighbour(state, hp: int = 1):
+    from neverdeads_revenge.game.actors import ENEMIES, make_enemy
+
+    player = state.player
+    enemy = make_enemy(
+        ENEMIES["ghoul"], (player.position[0] + 1, player.position[1])
+    )
+    enemy.stats.hp = hp
+    state.enemies = [enemy]
+    state.turn_queue = type(state.turn_queue)([player, enemy])
+    state.refresh_vision()
+    return enemy
+
+
+def _kill_it(state, enemy) -> None:
+    from neverdeads_revenge.game.actions import Action, perform_action
+
+    for _ in range(40):
+        if not enemy.alive:
+            return
+        perform_action(state, Action.MOVE_EAST)
+    raise AssertionError("the player never landed the killing blow")
+
+
+def test_the_wager_is_a_coin_and_not_a_metaphor():
+    """Half the runs it is the best blade in the game, half the runs it is a
+    curse, and the player who buys it has decided they do not mind which."""
+    from neverdeads_revenge.world.items import ITEMS
+
+    blades = 0
+    curses = 0
+    for seed in range(80):
+        state = _wearing_wild("wager", seed)
+        worn = state.player.equipment.get("weapon")
+        if state.curses:
+            curses += 1
+        else:
+            blades += 1
+            assert worn is not None and ITEMS[worn.item_id].chest_only
+
+    assert blades and curses, f"{blades} blades, {curses} curses"
+    assert 20 < blades < 60, f"the coin is not a coin: {blades}/80"
+
+
+def test_the_hollow_tooth_takes_drinking_away_and_pays_in_kills():
+    from neverdeads_revenge.game.actions import Action, perform_action
+    from neverdeads_revenge.world.items import ITEMS, make_item
+
+    state = _wearing_wild("hollow_tooth")
+    enemy = _one_weak_neighbour(state)
+    state.player.stats.hp = 20
+    _kill_it(state, enemy)
+    assert state.player.hp == 23, "a kill should feed you three"
+
+    state.inventory.append(make_item(ITEMS["potion"]))
+    state.player.stats.hp = 10
+    perform_action(state, Action.QUAFF)
+
+    assert state.player.hp == 10, "the draught went down anyway"
+    assert state.inventory, "the draught was spent on a refusal"
+
+
+def test_without_it_a_kill_feeds_you_nothing():
+    state = start_run(NOXX, seed=3)
+    enemy = _one_weak_neighbour(state)
+    state.player.stats.hp = 20
+    _kill_it(state, enemy)
+    assert state.player.hp == 20
+
+
+def test_the_pilgrims_toll_charges_for_every_floor():
+    from neverdeads_revenge.game.actions import Action, perform_action
+
+    state = _wearing_wild("pilgrims_toll")
+    assert state.coin_multiplier == pytest.approx(1.5)
+    assert state.toll_per_floor == 5
+
+    state.gold = 100
+    state.player.position = state.exit_pos
+    perform_action(state, Action.DESCEND)
+
+    assert state.depth == 2
+    assert state.gold == 95
+
+
+def test_the_toll_cannot_take_coin_you_do_not_have():
+    """A debt the run cannot pay is not a toll, it is a wall."""
+    from neverdeads_revenge.game.actions import Action, perform_action
+
+    state = _wearing_wild("pilgrims_toll")
+    state.gold = 2
+    state.player.position = state.exit_pos
+    perform_action(state, Action.DESCEND)
+
+    assert state.depth == 2, "the toll stopped the descent"
+    assert state.gold == 0
+
+
+def test_the_counts_favour_heals_you_whole_on_the_thirteenth_kill():
+    from neverdeads_revenge.game.actions import COUNTS_FAVOUR_EVERY
+
+    state = _wearing_wild("counts_favour")
+    state.kills = COUNTS_FAVOUR_EVERY - 1
+    enemy = _one_weak_neighbour(state)
+    state.player.stats.hp = 4
+
+    _kill_it(state, enemy)
+
+    assert state.kills == COUNTS_FAVOUR_EVERY
+    assert state.player.hp == state.player.max_hp
+
+
+def test_the_counts_favour_does_not_pay_on_any_other_kill():
+    state = _wearing_wild("counts_favour")
+    enemy = _one_weak_neighbour(state)
+    state.player.stats.hp = 4
+
+    _kill_it(state, enemy)
+
+    assert state.player.hp == 4, "it healed on the wrong kill"
+
+
+def test_the_mirror_of_hunger_puts_something_beside_you_when_you_drink():
+    from neverdeads_revenge.game.actions import Action, perform_action
+    from neverdeads_revenge.world.items import ITEMS, make_item
+
+    state = _wearing_wild("mirror_of_hunger")
+    state.enemies = []
+    state.inventory.append(make_item(ITEMS["potion"]))
+    state.player.stats.hp = 10
+
+    perform_action(state, Action.QUAFF)
+
+    assert len(state.enemies) == 1, "nothing came"
+    enemy = state.enemies[0]
+    assert (
+        max(
+            abs(enemy.position[0] - state.player.position[0]),
+            abs(enemy.position[1] - state.player.position[1]),
+        )
+        == 1
+    ), "it did not arrive beside you"
+    assert take_turn(state, enemy) or not enemy.alive, "it cannot act"
+
+
+def test_the_nameless_run_trades_the_score_for_the_coin():
+    state = _wearing_wild("nameless_run")
+    state.floors_cleared = 4
+    state.total_turns = 0
+
+    assert state.coin_multiplier == pytest.approx(2.0)
+    assert state.score_multiplier == pytest.approx(0.5)
+    assert state.score == round((state.base_score + state.speed_bonus) * 0.5)
+
+
+def test_every_wild_offer_can_come_round():
+    """Twelve of them and two slots: a shelf that never shows one of them is a
+    shelf with eleven offers on it."""
+    from neverdeads_revenge.game.shop import WILD_OFFERS, roll_wild_stock
+
+    seen: set[str] = set()
+    for seed in range(200):
+        seen |= set(roll_wild_stock(Rng(seed)))
+    assert seen == set(WILD_OFFERS), f"never on the shelf: {set(WILD_OFFERS) - seen}"
+
+
+def test_a_run_with_no_wilds_has_none_in_force():
+    state = start_run(NOXX, seed=3)
+    assert state.wilds == set()
+    assert not state.draughts_forbidden
+    assert state.kill_heal == 0
+    assert state.toll_per_floor == 0
+    assert state.score_multiplier == 1.0

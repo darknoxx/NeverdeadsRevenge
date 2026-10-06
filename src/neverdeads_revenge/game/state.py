@@ -148,6 +148,12 @@ class GameState:
     #: Whether the grave ward is still unspent on this floor. Armed when the
     #: floor is built, spent by the first blow that reaches you.
     ward_ready: bool = False
+    #: Which wild offers are in force this run, by key.
+    #:
+    #: The two that multiply -- greed and the pact -- are numbers rather than
+    #: flags, because two of them have to stack. Everything else is a rule that
+    #: is either on or off, and a set says that once instead of six booleans.
+    wilds: set[str] = field(default_factory=set)
 
     # -- curses -------------------------------------------------------------
     def add_curse(self, curse: Curse) -> None:
@@ -253,6 +259,40 @@ class GameState:
         """Whether the worn amulet is this one."""
         return self.amulet == key
 
+    # -- what a wild offer did to the run -----------------------------------
+    def has_wild(self, key: str) -> bool:
+        """Whether this wild offer is in force."""
+        return key in self.wilds
+
+    @property
+    def draughts_forbidden(self) -> bool:
+        """Whether drinking has been taken away. The hollow tooth."""
+        return self.has_wild("hollow_tooth")
+
+    @property
+    def kill_heal(self) -> int:
+        """Health a kill puts back from the run's bargains.
+
+        The last ember is an amulet and is asked separately; this is the one a
+        wild offer pays, and the two are added rather than compared because a
+        player who bought both bought both.
+        """
+        return 3 if self.has_wild("hollow_tooth") else 0
+
+    @property
+    def toll_per_floor(self) -> int:
+        """What the dark charges for the next floor down. The pilgrim's toll."""
+        return 5 if self.has_wild("pilgrims_toll") else 0
+
+    @property
+    def score_multiplier(self) -> float:
+        """What the run is worth on the board.
+
+        The nameless run halves it and pays in coin instead, which is the two
+        currencies of this game set against each other on purpose.
+        """
+        return 0.5 if self.has_wild("nameless_run") else 1.0
+
     @property
     def coin_factor(self) -> float:
         """What a dropped coin is multiplied by, from every source.
@@ -348,7 +388,15 @@ class GameState:
     def build_floor(self, depth: int) -> GeneratedFloor:
         """Generate the next floor and move everyone onto it."""
         self.depth = depth
-        floor = generate_floor(self.rng, depth=depth, curse_keys=tuple(CURSES))
+        # What the player is already carrying goes into the floor's own dice.
+        # A chest that hands out a third coat is a chest nobody opens twice, and
+        # the floor is the only place that can decide not to.
+        floor = generate_floor(
+            self.rng,
+            depth=depth,
+            curse_keys=tuple(CURSES),
+            filled_slots=tuple(self.player.equipment) if self.player else (),
+        )
         self.dungeon_map = floor.map
 
         if self.player is None:
@@ -556,7 +604,9 @@ class GameState:
         escape below a run that died on floor ten one step from the rift.
         """
         escape = ESCAPE_BONUS if self.run_state is RunState.ESCAPED else 0
-        return self.base_score + self.speed_bonus + escape
+        return round(
+            (self.base_score + self.speed_bonus + escape) * self.score_multiplier
+        )
 
 
 def start_run(
@@ -651,6 +701,8 @@ def _apply_wilds(state: GameState, keys) -> None:
     the others do not.
     """
     for key in keys:
+        state.wilds.add(key)
+
         if key == "blind_box":
             template = state.rng.choice_weighted(
                 [(t, t.weight) for t in ITEMS.values()]
@@ -671,3 +723,41 @@ def _apply_wilds(state: GameState, keys) -> None:
         elif key == "second_wind":
             state.extra_lives += 1
             state.say("Something down here is keeping count of your deaths.", LogKind.SYSTEM)
+        elif key == "wager":
+            # A coin, and it is not a metaphor. Half the runs it is the best
+            # blade in the game and half the runs it is a curse, and the player
+            # who buys it has decided they do not mind which.
+            strong_blades = [
+                t.key
+                for t in ITEMS.values()
+                if t.chest_only and t.kind == "weapon"
+            ]
+            if state.rng.chance(0.5):
+                blade = ITEMS[state.rng.pick(strong_blades)]
+                _receive(state, blade)
+                state.say(
+                    f"The coin comes up clean. {blade.name} is in your hands.",
+                    LogKind.GOOD,
+                )
+            else:
+                state.add_curse(state.rng.pick(list(CURSES.values())))
+                state.say("The coin comes up dark.", LogKind.BAD)
+        elif key == "hollow_tooth":
+            state.say(
+                "Your teeth are gone and nothing will stay down. "
+                "Everything you kill feeds you instead.",
+                LogKind.SYSTEM,
+            )
+        elif key == "pilgrims_toll":
+            state.coin_multiplier *= 1.5
+            state.say("Every floor down will be paid for.", LogKind.BAD)
+        elif key == "counts_favour":
+            state.say("Something is counting your kills. It has a number in mind.", LogKind.SYSTEM)
+        elif key == "mirror_of_hunger":
+            state.say("Something will drink whenever you do.", LogKind.BAD)
+        elif key == "nameless_run":
+            state.coin_multiplier *= 2.0
+            state.say(
+                "Your name is not on this run, and the coin does not care.",
+                LogKind.SYSTEM,
+            )

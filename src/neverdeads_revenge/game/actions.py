@@ -22,7 +22,7 @@ from neverdeads_revenge.world.items import make_coin
 from neverdeads_revenge.world.map import GroundItem
 from neverdeads_revenge.world.tiles import Tile
 
-from .actors import Actor
+from .actors import Actor, make_enemy, pick_enemy_template
 from .combat import apply_revenge, attack
 from .curses import curse_by_key
 from .state import GameState, LogKind, RunState
@@ -45,6 +45,9 @@ EMBER_HEAL = 2
 #: What the mirror gives back to whatever struck you. Straight, not through
 #: armour -- see :meth:`~neverdeads_revenge.game.actors.Stats.reflect`.
 MIRROR_REFLECTION = 2
+
+#: Every how many kills the count's favour heals you whole.
+COUNTS_FAVOUR_EVERY = 13
 
 #: The most armour the second mouth will hold at once.
 #:
@@ -151,10 +154,18 @@ def _kill_message(state: GameState, enemy: Actor, outcome) -> None:
 
     player = state.player
 
-    if state.has_passive("ember"):
-        healed = player.stats.heal(EMBER_HEAL)
+    heal = (EMBER_HEAL if state.has_passive("ember") else 0) + state.kill_heal
+    if heal:
+        healed = player.stats.heal(heal)
         if healed:
-            state.say(f"The ember catches: {healed} back.", LogKind.GOOD)
+            state.say(f"The kill feeds you: {healed} back.", LogKind.GOOD)
+
+    if state.has_wild("counts_favour") and state.kills % COUNTS_FAVOUR_EVERY == 0:
+        player.stats.hp = player.stats.max_hp
+        state.say(
+            f"The count is satisfied at {state.kills}. You are whole again.",
+            LogKind.GOOD,
+        )
 
     if state.has_passive("borrowed_face"):
         # One turn of nobody being able to land on you. The world counts it down,
@@ -628,6 +639,13 @@ def _quaff(state: GameState) -> ActionResult:
     but it is also one a new player gets wrong once and then never again, so the
     game makes the obvious play and charges a turn for it.
     """
+    if state.draughts_forbidden:
+        state.say(
+            "Your mouth is closed to it. Nothing you drink stays down.",
+            LogKind.BAD,
+        )
+        return ActionResult(consumed_turn=False, acted=False)
+
     if not state.inventory:
         state.say("You have nothing to drink.", LogKind.PLAIN)
         return ActionResult(consumed_turn=False, acted=False)
@@ -675,6 +693,9 @@ def _quaff(state: GameState) -> ActionResult:
                 LogKind.PLAIN,
             )
 
+    if state.has_wild("mirror_of_hunger"):
+        _wake_something(state)
+
     # Drinking takes a turn, so it is not a free action in the middle of a fight
     # and monsters get their answer.
     state.turn += 1
@@ -682,6 +703,32 @@ def _quaff(state: GameState) -> ActionResult:
     advance_world(state)
     state.refresh_vision()
     return _outcome(state, consumed_turn=True, acted=True)
+
+
+def _wake_something(state: GameState) -> None:
+    """Put a monster beside the player, if there is anywhere to put one.
+
+    The mirror of hunger. It does not appear on the far side of the floor and
+    walk over -- it is already there, and it was waiting for you to be thirsty.
+    """
+    spots = [
+        direction.step(state.player.position)
+        for direction in DIRECTIONS
+    ]
+    free = [
+        pos
+        for pos in spots
+        if state.dungeon_map.is_walkable(pos) and state.actor_at(pos) is None
+    ]
+    if not free:
+        return
+
+    enemy = make_enemy(
+        pick_enemy_template(state.rng, state.depth), state.rng.pick(free)
+    )
+    state.enemies.append(enemy)
+    state.turn_queue.add(enemy)
+    state.say("Something drinks with you, and it was already here.", LogKind.BAD)
 
 
 def _try_descend(state: GameState) -> ActionResult:
@@ -700,6 +747,15 @@ def _try_descend(state: GameState) -> ActionResult:
 
     state.floors_cleared += 1
     state.build_floor(state.depth + 1)
+
+    if state.toll_per_floor:
+        # After the descent, so it reads as the price of the floor rather than
+        # as something that happened on the last one. It can empty the purse but
+        # not go below it: a debt the run cannot pay is not a toll.
+        paid = min(state.toll_per_floor, state.gold)
+        state.gold -= paid
+        state.say(f"The dark takes its toll: {paid} coins.", LogKind.BAD)
+
     return _outcome(state, consumed_turn=False, acted=False)
 
 
