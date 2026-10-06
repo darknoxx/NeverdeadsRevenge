@@ -21,7 +21,39 @@ from textual.widgets import Static
 
 from ...game.shop import Offer, ShopError, build_stock, buy
 
-__all__ = ["ShopScreen"]
+__all__ = [
+    "ShopScreen",
+    "PANEL_WIDTH",
+    "PANEL_CHROME",
+    "CONTENT_WIDTH",
+    "ROW_CHROME",
+    "LABEL_WIDTH",
+    "PITCH_WIDTH",
+    "CATCH_WIDTH",
+]
+
+#: Width of the shop panel, set in ``app.tcss``. Named here so the fitting test
+#: has something to check against instead of a magic number.
+PANEL_WIDTH = 74
+
+#: Columns the panel spends on its border (2) and its padding (4).
+PANEL_CHROME = 6
+
+#: What is left to draw in. This is the number the widget actually reports, so
+#: the test that checks the constants against the panel has something to compare.
+CONTENT_WIDTH = PANEL_WIDTH - PANEL_CHROME
+
+#: Columns a row spends before the detail starts: cursor (1), its space (1),
+#: the name (22), the price (5) and two spaces.
+LABEL_WIDTH = 22
+ROW_CHROME = 2 + LABEL_WIDTH + 5 + 2
+
+#: What a pitch may occupy on its line.
+PITCH_WIDTH = CONTENT_WIDTH - ROW_CHROME
+
+#: What a catch may occupy. One column more than a pitch: its line is indented
+#: to sit under the pitch and carries no cursor of its own.
+CATCH_WIDTH = CONTENT_WIDTH - (ROW_CHROME - 1)
 
 
 class ShopScreen(ModalScreen[None]):
@@ -138,7 +170,7 @@ class ShopScreen(ModalScreen[None]):
         cursor = ">" if selected else " "
         if offer.maxed:
             body.append(f"{cursor} ", style="bold green")
-            body.append(f"{offer.label:<22}", style="dim")
+            body.append(f"{offer.label:<{LABEL_WIDTH}}", style="dim")
             body.append("   --  ", style="dim")
             body.append("already yours\n", style="dim green")
             return
@@ -146,7 +178,7 @@ class ShopScreen(ModalScreen[None]):
         dim = not offer.affordable
         name_style = "#6b6b6b" if dim else ("bold" if selected else "")
         body.append(f"{cursor} ", style="bold yellow" if selected else "dim")
-        body.append(f"{offer.label:<22}", style=name_style)
+        body.append(f"{offer.label:<{LABEL_WIDTH}}", style=name_style)
         body.append(
             f"{offer.price:>5}",
             style="#6b6b6b" if dim else "bold yellow",
@@ -155,5 +187,5 @@ class ShopScreen(ModalScreen[None]):
         body.append("\n")
 
         if offer.catch:
-            body.append(f"   {'':<22}     ", style="dim")
+            body.append(f"   {'':<{LABEL_WIDTH}}     ", style="dim")
             body.append(f"{offer.catch}\n", style="#6b6b6b")

@@ -2299,3 +2299,43 @@ async def test_the_hero_name_is_centred_over_the_numbers():
         assert art.region.x + art.region.width / 2 == pytest.approx(
             name.region.x + name.region.width / 2, abs=1
         ), "the portrait and the name are not on the same axis"
+
+
+# -- the shop column ---------------------------------------------------------
+async def test_the_shop_column_constants_match_the_panel_it_draws():
+    """The fitting test below measures against arithmetic; this checks it.
+
+    The same split the legend uses: one test that the numbers match the real
+    widget, one that the catalogue fits the numbers. Without the first, the
+    second would happily pass against a panel that no longer exists.
+    """
+    from neverdeads_revenge.ui.screens.shop import CONTENT_WIDTH
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await pilot.press("s")
+        await pilot.pause()
+
+        assert app.screen.query_one("#shop").size.width == CONTENT_WIDTH
+        assert app.screen.query_one("#shop-list").size.width == CONTENT_WIDTH
+
+
+def test_every_wild_offer_fits_the_shop_column():
+    """A pitch and a catch each get exactly one line, and the panel is fixed.
+
+    A line that wraps drops its remainder at the left edge of the panel, under
+    the cursor and outside the column it belongs to, and reads as a broken row
+    rather than as a long sentence. Two of these were over the limit: the pact's
+    catch and greed's, both of which wrapped onto a line of their own.
+    """
+    from neverdeads_revenge.game.shop import WILD_OFFERS
+    from neverdeads_revenge.ui.screens.shop import CATCH_WIDTH, PITCH_WIDTH
+
+    for key, offer in WILD_OFFERS.items():
+        assert len(offer.pitch) <= PITCH_WIDTH, (
+            f"{key}: pitch is {len(offer.pitch)}, the column is {PITCH_WIDTH}"
+        )
+        assert len(offer.catch) <= CATCH_WIDTH, (
+            f"{key}: catch is {len(offer.catch)}, the column is {CATCH_WIDTH}"
+        )

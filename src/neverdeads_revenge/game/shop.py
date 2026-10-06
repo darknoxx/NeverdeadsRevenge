@@ -183,14 +183,14 @@ WILD_OFFERS: dict[str, WildOffer] = {
         name="the pact",
         price=45,
         pitch="coins are worth half again as much",
-        catch="you start cursed, and it does not come off",
+        catch="you start cursed, and the dark picks",
     ),
     "greed": WildOffer(
         key="greed",
         name="greed",
         price=40,
         pitch="coins are worth double",
-        catch="everything down there is a fifth tougher",
+        catch="everything below is a fifth tougher",
     ),
     "grave_goods": WildOffer(
         key="grave_goods",
