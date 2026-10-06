@@ -31,7 +31,7 @@ Screen {
     color: #8f8f8f;
 }
 
-#title-version, #title-hint {
+#title-hint {
     width: 1fr;
     content-align: center middle;
     color: #6b6b6b;

@@ -20,8 +20,6 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.screen import Screen
 
-from ... import __version__
-
 __all__ = ["TitleScreen", "TITLE_ART", "render_word"]
 
 #: A five-row block font. ``█`` and space only.
@@ -181,9 +179,8 @@ def _centered():
         yield Static(TITLE_ART, id="title-art")
         yield Static(TAGLINE, id="title-subtitle")
         yield Static(id="title-best")
-        yield Static(f"\nversion {__version__}", id="title-version")
         yield Static(
-            "press any key   ·   [bold]s[/] shop   ·   [bold]h[/] scores",
+            "\npress any key   ·   [bold]s[/] shop   ·   [bold]h[/] scores",
             id="title-hint",
         )
 
