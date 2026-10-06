@@ -17,6 +17,7 @@ from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
+from ...game.levels import KILLS_PER_LEVEL, MAX_LEVEL
 from ...game.shop import describe_item
 from ...world.items import ITEMS
 
@@ -70,6 +71,7 @@ class CharacterScreen(ModalScreen[None]):
             f"[bold {player.color}]{player.name}[/]  [dim]{state.hero.title}[/]",
             "",
             _row("health", f"{player.hp} / {player.max_hp}"),
+            _row("level", _level_line(state)),
             _row("speed", f"{player.speed:.2f}"),
             _row("damage", f"{low}-{high}"),
             _row("crit", f"{player.crit_chance:.0%}  x{player.crit_multiplier:.1f}"),
@@ -104,6 +106,14 @@ class CharacterScreen(ModalScreen[None]):
                 lines.append(f"  [bold red]{curse.name}[/]  [dim]{curse.price}[/]")
 
         return "\n".join(lines)
+
+
+def _level_line(state: GameState) -> str:
+    """The level, and how much of the next one the run has already earned."""
+    if state.level >= MAX_LEVEL:
+        return f"{state.level}  (nothing left to learn)"
+    earned = state.kills % KILLS_PER_LEVEL
+    return f"{state.level}  ({earned}/{KILLS_PER_LEVEL} kills to the next)"
 
 
 def _row(label: str, value: str) -> str:

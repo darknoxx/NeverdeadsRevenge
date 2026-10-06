@@ -115,6 +115,10 @@ class GameState:
     total_turns: int = 0
     run_state: RunState = RunState.PLAYING
     kills: int = 0
+    #: What the run has taught the hero so far. Derived from ``kills`` by
+    #: :func:`~neverdeads_revenge.game.levels.level_for`; kept as a field only so
+    #: the moment it changes can be noticed and written into the log.
+    level: int = 1
     revenge_stacks: int = 0
     floors_cleared: int = 0
     #: Draughts carried, not drunk. Survives a descent: it is the run's health

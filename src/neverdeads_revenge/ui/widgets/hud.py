@@ -175,6 +175,9 @@ class Hud(Static):
             out.append(" q", style="dim")
         out.append("\n")
 
-        out.append(f"Kills {state.kills}  Turns {state.total_turns}\n", style="dim")
+        # The level rides with the kills, because that is what buys it.
+        out.append(f"Kills {state.kills}  Turns {state.total_turns}", style="dim")
+        out.append("  Lv ", style="dim")
+        out.append(f"{state.level}\n", style="bold green")
 
         self.update(out)

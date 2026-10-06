@@ -411,18 +411,26 @@ def test_the_second_mouth_keeps_what_a_draught_could_not_heal():
 
 def test_the_second_mouth_will_not_bank_a_whole_elixir():
     """Uncapped, one elixir drunk while barely hurt is nineteen armour."""
-    from neverdeads_revenge.game.actions import SECOND_MOUTH_CAP
+    from neverdeads_revenge.game.actions import second_mouth_cap
 
     state = wearing("second_mouth")
-    for _ in range(3):
+    for _ in range(6):
         state.inventory.append(make_item(ITEMS["elixir"]))
-    state.player.stats.hp = state.player.max_hp - 1
 
-    for _ in range(3):
+    for _ in range(6):
         state.player.stats.hp = state.player.max_hp - 1
         perform_action(state, Action.QUAFF)
 
-    assert state.player.stored_armor == SECOND_MOUTH_CAP
+    assert state.player.stored_armor == second_mouth_cap(state.depth)
+
+
+def test_the_second_mouth_holds_more_the_deeper_you_are():
+    """A flat cap is a floor-three trinket: armour is a flat subtraction, so
+    what it is worth depends on what is hitting you."""
+    from neverdeads_revenge.game.actions import second_mouth_cap
+
+    assert second_mouth_cap(2) < second_mouth_cap(9)
+    assert second_mouth_cap(1) > 0
 
 
 def test_the_second_mouth_empties_when_the_floor_changes():

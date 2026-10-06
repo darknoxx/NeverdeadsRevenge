@@ -1933,16 +1933,19 @@ async def test_s_opens_the_shop_from_the_title():
 
 
 async def test_the_shop_takes_the_coin_and_keeps_the_parcel():
+    from neverdeads_revenge.game.shop import SUPPLIES
+
+    price = SUPPLIES[0].price
     app = NeverdeadsRevenge()
     async with app.run_test(size=SIZE) as pilot:
-        shop = await _open_shop(app, pilot, 100)
+        shop = await _open_shop(app, pilot, price * 4)
 
         # The first row is the cheapest draught.
         assert shop.offers[shop.index].key == "potion"
         await pilot.press("enter")
         await pilot.pause()
 
-        assert app.progress.gold == 85
+        assert app.progress.gold == price * 3
         assert app.progress.pending == ["potion"]
         assert "potion" in shop.message
 
@@ -1984,7 +1987,7 @@ async def test_a_bought_draught_is_in_the_pack_when_the_run_starts():
     """The whole point of the shop, end to end."""
     app = NeverdeadsRevenge()
     async with app.run_test(size=SIZE) as pilot:
-        await _open_shop(app, pilot, 100)
+        await _open_shop(app, pilot, 400)
         await pilot.press("enter")  # potion
         await pilot.pause()
         await pilot.press("escape")
@@ -1999,7 +2002,7 @@ async def test_a_bought_draught_is_in_the_pack_when_the_run_starts():
 async def test_bought_gear_is_worn_from_the_first_step():
     app = NeverdeadsRevenge()
     async with app.run_test(size=SIZE) as pilot:
-        shop = await _open_shop(app, pilot, 100)
+        shop = await _open_shop(app, pilot, 400)
         index = next(i for i, o in enumerate(shop.offers) if o.key == "hide")
         for _ in range(index):
             await pilot.press("down")
@@ -2018,7 +2021,7 @@ async def test_an_upgrade_bought_in_the_shop_reaches_the_next_run():
 
     app = NeverdeadsRevenge()
     async with app.run_test(size=SIZE) as pilot:
-        shop = await _open_shop(app, pilot, 500)
+        shop = await _open_shop(app, pilot, 900)
         index = next(i for i, o in enumerate(shop.offers) if o.key == "vigour")
         for _ in range(index):
             await pilot.press("down")
@@ -2058,7 +2061,7 @@ async def test_a_wild_offer_bought_in_the_shop_is_felt_in_the_run():
     app = NeverdeadsRevenge(seed=3)
     async with app.run_test(size=SIZE) as pilot:
         app.progress.wild_stock = ["second_wind", "greed"]
-        shop = await _open_shop(app, pilot, 200)
+        shop = await _open_shop(app, pilot, 900)
 
         index = next(i for i, o in enumerate(shop.offers) if o.key == "second_wind")
         for _ in range(index):

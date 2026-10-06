@@ -1909,14 +1909,39 @@ def test_the_dungeon_is_hard_enough_to_need_the_shop():
     assert enemy_count(ESCAPE_DEPTH) > enemy_count(1)
 
 
-def test_a_deep_monster_is_several_times_its_floor_one_self():
+def test_floor_one_is_a_fight_and_not_a_formality():
+    """The wall is the ground the run stands on, not the slope it climbs.
+
+    A fresh hero needs several blows for one ghoul, and the ghoul takes a
+    meaningful bite out of him in return. That is the whole reason the
+    difficulty went into the templates rather than into the potency curve: a
+    steep slope over a soft floor made the first three floors a formality and
+    the last three a cliff.
+    """
+    from neverdeads_revenge.game.actors import ENEMIES, NOXX
+
+    ghoul = ENEMIES["ghoul"]
+    blows = ghoul.stats.max_hp / ((NOXX.stats.damage[0] + NOXX.stats.damage[1]) / 2)
+    assert blows >= 2.5, f"a floor-one ghoul dies in {blows:.1f} blows"
+
+    bite = (ghoul.stats.damage[0] + ghoul.stats.damage[1]) / 2 - NOXX.stats.armor
+    assert bite / NOXX.stats.max_hp >= 0.10, "a floor-one ghoul barely scratches"
+
+
+def test_a_deep_monster_is_still_meaningfully_harder():
+    """The slope is gentler, but it is a slope: by the rift everything down
+    there is more than twice what floor one was."""
     from neverdeads_revenge.game.actors import ENEMIES, scale_template
+    from neverdeads_revenge.game.difficulty import MAX_POTENCY
     from neverdeads_revenge.world.generator import ESCAPE_DEPTH
 
+    assert MAX_POTENCY > 2.0
     for template in ENEMIES.values():
         deep = scale_template(template, ESCAPE_DEPTH)
-        assert deep.stats.max_hp >= template.stats.max_hp * 3, template.key
-        assert deep.stats.damage[1] >= template.stats.damage[1] * 3, template.key
+        assert deep.stats.max_hp == round(template.stats.max_hp * MAX_POTENCY), (
+            template.key
+        )
+        assert deep.stats.damage[1] > template.stats.damage[1], template.key
 
 
 def test_the_hero_must_still_be_faster_than_everything_in_the_dungeon():

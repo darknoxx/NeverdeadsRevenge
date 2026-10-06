@@ -525,7 +525,11 @@ ENEMIES: dict[str, EnemyTemplate] = {
         glyph="g",
         color="green",
         behaviour="aggressive",
-        stats=Stats(max_hp=9, hp=9, speed=0.7, damage=(2, 4), evasion=0, armor=0),
+        # Floor one is a fight now. It used to be a formality -- the whole
+        # dungeon was a formality -- and the fix is here rather than in the
+        # potency curve, because the challenge should be the ground the run
+        # stands on, not the slope it climbs.
+        stats=Stats(max_hp=15, hp=15, speed=0.7, damage=(4, 6), evasion=0, armor=0),
         gold=(3, 6),
         weight=4.0,
     ),
@@ -535,7 +539,7 @@ ENEMIES: dict[str, EnemyTemplate] = {
         glyph="s",
         color="grey70",
         behaviour="cautious",
-        stats=Stats(max_hp=14, hp=14, speed=1.0, damage=(3, 6), accuracy=1, armor=1),
+        stats=Stats(max_hp=22, hp=22, speed=1.0, damage=(5, 8), accuracy=1, armor=1),
         gold=(6, 11),
         weight=3.0,
     ),
@@ -545,7 +549,7 @@ ENEMIES: dict[str, EnemyTemplate] = {
         glyph="w",
         color="magenta",
         behaviour="hunter",
-        stats=Stats(max_hp=7, hp=7, speed=1.3, damage=(2, 5), evasion=3),
+        stats=Stats(max_hp=11, hp=11, speed=1.3, damage=(4, 7), evasion=3),
         gold=(5, 9),
         weight=1.5,
         # The only monster that gets more common as you descend. It is fast and

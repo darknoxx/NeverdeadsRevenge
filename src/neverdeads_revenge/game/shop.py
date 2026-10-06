@@ -94,7 +94,7 @@ META_UPGRADES: dict[str, MetaUpgrade] = {
         key="vigour",
         name="Vigour",
         description="the body remembers being killed and grows back thicker",
-        price=80,
+        price=140,
         max_hp=5,
         max_stacks=3,
     ),
@@ -102,7 +102,7 @@ META_UPGRADES: dict[str, MetaUpgrade] = {
         key="haste",
         name="Haste",
         description="the feet remember the way out",
-        price=120,
+        price=220,
         speed=0.12,
         max_stacks=2,
     ),
@@ -110,7 +110,7 @@ META_UPGRADES: dict[str, MetaUpgrade] = {
         key="lantern",
         name="Lantern",
         description="a light that does not go out when the run does",
-        price=100,
+        price=180,
         sight=1,
         max_stacks=1,
     ),
@@ -140,18 +140,22 @@ class ShopItem:
 
 
 #: Draughts. The cheapest thing the shop sells and the one it sells most of.
+#: Prices, and the shape of the grind. A run banks 50-115 coin, so the full
+#: permanent set at 1040 is twelve to eighteen runs -- which is the number the
+#: whole shop is tuned around. Cheap enough that every run buys something;
+#: expensive enough that the wall is what you are buying your way through.
 SUPPLIES: tuple[ShopItem, ...] = (
-    ShopItem("potion", 15),
-    ShopItem("elixir", 30),
+    ShopItem("potion", 30),
+    ShopItem("elixir", 60),
 )
 
 #: Weapons and coats, for the next run.
 GEAR: tuple[ShopItem, ...] = (
-    ShopItem("tooth", 25),
-    ShopItem("bite", 60),
-    ShopItem("hide", 40),
+    ShopItem("tooth", 45),
+    ShopItem("bite", 110),
+    ShopItem("hide", 70),
     # The best thing that lies on a floor, sold rather than waited for.
-    ShopItem("rune_plate", 90),
+    ShopItem("rune_plate", 170),
 )
 
 #: Amulets. All of them, priced by how much they change a run rather than by how
@@ -162,20 +166,20 @@ GEAR: tuple[ShopItem, ...] = (
 #: that takes something away, and a thing that takes something away has to be
 #: worth buying anyway.
 AMULETS_FOR_SALE: tuple[ShopItem, ...] = (
-    ShopItem("wayfarer", 50),
-    ShopItem("coin_hand", 55),
-    ShopItem("ember", 60),
-    ShopItem("marrow", 65),
-    ShopItem("patience", 85),
-    ShopItem("deathwatch", 90),
-    ShopItem("second_mouth", 90),
-    ShopItem("mirror", 95),
-    ShopItem("grave_ward", 100),
-    ShopItem("dead_weight", 100),
-    ShopItem("rune_heart", 110),
-    ShopItem("patient_knife", 115),
-    ShopItem("long_hunger", 120),
-    ShopItem("borrowed_face", 130),
+    ShopItem("wayfarer", 90),
+    ShopItem("coin_hand", 100),
+    ShopItem("ember", 110),
+    ShopItem("marrow", 120),
+    ShopItem("patience", 160),
+    ShopItem("deathwatch", 170),
+    ShopItem("second_mouth", 170),
+    ShopItem("mirror", 180),
+    ShopItem("grave_ward", 190),
+    ShopItem("dead_weight", 190),
+    ShopItem("rune_heart", 210),
+    ShopItem("patient_knife", 220),
+    ShopItem("long_hunger", 230),
+    ShopItem("borrowed_face", 250),
 )
 
 
@@ -202,84 +206,84 @@ WILD_OFFERS: dict[str, WildOffer] = {
     "blind_box": WildOffer(
         key="blind_box",
         name="the blind box",
-        price=25,
+        price=45,
         pitch="something from the deep, unseen",
         catch="you do not get to look first",
     ),
     "pact": WildOffer(
         key="pact",
         name="the pact",
-        price=45,
+        price=85,
         pitch="coins are worth half again as much",
         catch="you start cursed, and the dark picks",
     ),
     "greed": WildOffer(
         key="greed",
         name="greed",
-        price=40,
+        price=75,
         pitch="coins are worth double",
         catch="everything below is a fifth tougher",
     ),
     "grave_goods": WildOffer(
         key="grave_goods",
         name="grave goods",
-        price=55,
+        price=105,
         pitch="grave iron in hand from the start",
         catch="it is heavy, and it slows you down",
     ),
     "second_wind": WildOffer(
         key="second_wind",
         name="second wind",
-        price=70,
+        price=120,
         pitch="the first killing blow does not land",
         catch="once a run, and no more",
     ),
     "wager": WildOffer(
         key="wager",
         name="the wager",
-        price=35,
+        price=65,
         pitch="a coin, thrown into the dark",
         catch="one face a blade, the other a curse",
     ),
     "hollow_tooth": WildOffer(
         key="hollow_tooth",
         name="the hollow tooth",
-        price=60,
+        price=115,
         pitch="every kill feeds you three",
         catch="and no draught will ever stay down",
     ),
     "pilgrims_toll": WildOffer(
         key="pilgrims_toll",
         name="the pilgrim's toll",
-        price=50,
+        price=95,
         pitch="coins are worth half again as much",
         catch="the dark takes five for each floor",
     ),
     "counts_favour": WildOffer(
         key="counts_favour",
         name="the count's favour",
-        price=75,
+        price=125,
         pitch="every thirteenth kill heals you whole",
         catch="you do not want to know who counts",
     ),
     "mirror_of_hunger": WildOffer(
         key="mirror_of_hunger",
         name="the mirror of hunger",
-        price=65,
+        price=115,
         pitch="a draught heals half again as much",
         catch="and something drinks beside you",
     ),
     "nameless_run": WildOffer(
         key="nameless_run",
         name="the nameless run",
-        price=55,
+        price=105,
         pitch="coins are worth double",
         catch="and the score is worth half",
     ),
     "blood_deal": WildOffer(
         key="blood_deal",
         name="blood bargain",
-        price=90,
+        price=170,
         pitch="+0.15 speed, for good",
         catch="-4 max health, for good",
         permanent="blood_deal",

@@ -82,10 +82,14 @@ def test_prices_are_positive():
 
 
 def test_what_is_affordable_is_marked_before_the_screen_draws():
-    progress = shop(30)
+    # Read off the catalogue: prices are tuned against the bots, and a test that
+    # writes them down a second time fails every time they move.
+    cheapest = min(item.price for item in (*SUPPLIES, *GEAR))
+    dearest = max(item.price for item in (*SUPPLIES, *GEAR))
+    progress = shop(cheapest)
+
     assert offer_for(progress, "potion").affordable
-    assert offer_for(progress, "elixir").affordable
-    assert not offer_for(progress, "bite").affordable, "60 coins on 30"
+    assert not offer_for(progress, "bite").affordable, f"{dearest} coins on {cheapest}"
     assert offer_for(progress, "bite").buyable is False
 
 
@@ -125,32 +129,34 @@ def test_the_shelf_turns_over_two_at_a_time():
 
 # -- buying -----------------------------------------------------------------
 def test_buying_a_draught_sets_it_aside_for_the_next_run():
-    progress = shop(100)
+    price = SUPPLIES[0].price
+    progress = shop(price * 3)
     message = buy(progress, offer_for(progress, "potion"))
 
-    assert progress.gold == 85
+    assert progress.gold == price * 3 - price
     assert progress.pending == ["potion"]
     assert "potion" in message
 
 
 def test_buying_gear_sets_it_aside_too():
-    progress = shop(100)
+    progress = shop(1000)
     buy(progress, offer_for(progress, "bite"))
     assert progress.pending == ["bite"]
 
 
 def test_buying_an_upgrade_is_permanent_and_stacks():
-    progress = shop(500)
+    price = META_UPGRADES["vigour"].price
+    progress = shop(price * 4)
     for _ in range(2):
         buy(progress, offer_for(progress, "vigour"))
 
     assert progress.upgrades["vigour"] == 2
-    assert progress.gold == 500 - 160
+    assert progress.gold == price * 4 - price * 2
     assert progress.pending == [], "an upgrade is not consumed by a run"
 
 
 def test_an_upgrade_cannot_be_bought_past_its_cap():
-    progress = shop(1000)
+    progress = shop(4000)
     cap = META_UPGRADES["lantern"].max_stacks
     for _ in range(cap):
         buy(progress, offer_for(progress, "lantern"))
@@ -163,17 +169,17 @@ def test_an_upgrade_cannot_be_bought_past_its_cap():
 
 def test_buying_a_wild_waits_for_the_next_run():
     progress = _with_wilds("second_wind")
-    progress.gold = 100
+    progress.gold = WILD_OFFERS["second_wind"].price * 2
     buy(progress, offer_for(progress, "second_wind"))
 
     assert progress.wilds == ["second_wind"]
-    assert progress.gold == 30
+    assert progress.gold == WILD_OFFERS["second_wind"].price
 
 
 def test_a_permanent_wild_goes_straight_into_the_upgrades():
     """There is nothing to wait for: it changes every run from now on."""
     progress = _with_wilds("blood_deal")
-    progress.gold = 100
+    progress.gold = WILD_OFFERS["blood_deal"].price * 2
     buy(progress, offer_for(progress, "blood_deal"))
 
     assert progress.upgrades["blood_deal"] == 1
@@ -182,7 +188,7 @@ def test_a_permanent_wild_goes_straight_into_the_upgrades():
 
 def test_a_permanent_wild_cannot_be_bought_past_its_cap():
     progress = _with_wilds("blood_deal")
-    progress.gold = 1000
+    progress.gold = WILD_OFFERS["blood_deal"].price * 6
     for _ in range(META_UPGRADES["blood_deal"].max_stacks):
         buy(progress, offer_for(progress, "blood_deal"))
 
@@ -191,12 +197,12 @@ def test_a_permanent_wild_cannot_be_bought_past_its_cap():
 
 
 def test_the_shop_refuses_what_the_purse_cannot_cover():
-    progress = shop(10)
+    progress = shop(5)
     with pytest.raises(ShopError) as refusal:
         buy(progress, offer_for(progress, "bite"))
 
-    assert "10" in str(refusal.value), "the refusal should say what you have"
-    assert progress.gold == 10
+    assert "5" in str(refusal.value), "the refusal should say what you have"
+    assert progress.gold == 5
     assert progress.pending == []
 
 
@@ -550,3 +556,46 @@ def test_a_run_with_no_wilds_has_none_in_force():
     assert state.kill_heal == 0
     assert state.toll_per_floor == 0
     assert state.score_multiplier == 1.0
+
+
+def test_the_permanent_set_is_a_grind_and_not_a_wall():
+    """A run banks 50-115 coin, so the full permanent set is twelve to eighteen
+    runs. Cheap enough that every run buys something; expensive enough that the
+    wall is what you are buying your way through.
+
+    Both halves are asserted, because a price list fails in two directions and
+    only one of them is obvious.
+    """
+    from neverdeads_revenge.game.shop import AMULETS_FOR_SALE, GEAR, SUPPLIES
+
+    full = sum(
+        upgrade.price * upgrade.max_stacks
+        for upgrade in META_UPGRADES.values()
+        if not upgrade.wild
+    )
+    assert 800 <= full <= 1600, f"the permanent set costs {full}"
+
+    # And something has to be buyable after a bad run, or the first ten runs are
+    # a wall with nothing to spend on.
+    cheapest = min(item.price for item in (*SUPPLIES, *GEAR, *AMULETS_FOR_SALE))
+    assert cheapest <= 60, f"the cheapest thing costs {cheapest}"
+
+
+def test_the_wild_offers_are_priced_against_the_run_they_change():
+    """A wild is a single run's worth of change, so it has to cost less than a
+    permanent one -- and the bargains with a permanent catch cost the most,
+    because they are the only ones you keep."""
+    from neverdeads_revenge.game.shop import META_UPGRADES
+
+    cheapest_upgrade = min(
+        upgrade.price for upgrade in META_UPGRADES.values() if not upgrade.wild
+    )
+    permanent = [
+        offer for offer in WILD_OFFERS.values() if offer.permanent is not None
+    ]
+    single = [offer for offer in WILD_OFFERS.values() if offer.permanent is None]
+
+    assert single, "every wild is permanent?"
+    assert max(o.price for o in single) < cheapest_upgrade
+    assert permanent, "no permanent wild offers at all"
+    assert max(o.price for o in permanent) >= min(o.price for o in single)

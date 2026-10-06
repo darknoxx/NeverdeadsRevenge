@@ -40,27 +40,29 @@ No hero can heal on their own; potions and elixirs on the floor are the only way
 back up. A run's health is therefore a budget you spend across ten floors, and
 skipping loot to save time is a real trade.
 
-The dungeon is now built to be a wall. Measured with a bot over 40 seeds a hero
--- it kills what is beside it, drinks when hurt, picks up what it is worth
-walking to, washes a curse off when it can afford to, and beelines for the exit
+The dungeon is built to be a wall. Measured with a bot over 40 seeds a hero --
+it kills what is beside it, drinks when hurt, picks up what it is worth walking
+to, washes a curse off when it can afford to, and beelines for the exit
 otherwise:
 
 | | Noxx | Yeti | Walkyrion |
 | --- | --- | --- | --- |
-| nothing bought | 8% | 2% | 8% |
-| every permanent upgrade, a bought blade, a bought coat and a bought amulet | 38% | 40% | 50% |
+| nothing bought | 22% | 5% | 12% |
+| every permanent upgrade, a bought blade, a bought coat and a bought amulet | 62% | 48% | 42% |
 
-Of 120 runs with nothing bought, twelve reached floor 10 and the rest died on
-floors 4 to 8. That is the shape the wall is meant to have: the early floors are
-a place you get through and the deep ones are a place you die in, and the shop is
-the difference between the two rows of that table.
+Of 120 runs with nothing bought, twenty-three reached floor 10 and fourteen never
+got past floor 3. That is the shape the wall is meant to have: **floor one is a
+real fight**, the run climbs a gentle curve on top of it, and the shop is the
+difference between the two rows of that table.
 
-The three dials are `POTENCY_PER_FLOOR` (26% harder per floor, capped at 3.2x on
-floor 10), the enemy count (`7 + depth`) and how fast wraiths grow more common
-(1.25x per floor). Yeti's damage is a fourth: flat armour loses against damage
-that scales, and raising his damage from 9-13 to 12-17 is what took him off the
-floor. Raising his armour instead took him to 33% in one step, which is the same
-rule from the other side.
+The dials are the enemy templates (floor one is a fight, not a formality),
+`POTENCY_PER_FLOOR` (14% harder per floor, capped at 2.2x on floor 9), the enemy
+count (`7 + depth`) and how fast wraiths grow more common (1.25x per floor). The
+slope is *shallower* than it has ever been, and that is the point: a steep curve
+over a soft floor made the early game a formality and the late game a cliff. A
+shallow curve over a hard floor makes every floor of the run tense.
+
+The hero keeps up on their own, by levelling. See below.
 
 Two things were measured and left alone. The rare finds and the springs move the
 escape rate by less than the noise on a thirty-run sample. And the fastest hero
@@ -158,6 +160,32 @@ cost 63 and the quickest 34, so most runs score something and only a genuinely
 slow one scores nothing. Slower than the budget costs you the bonus rather than
 going negative, so a slow run is worth less, not worth less than nothing.
 
+## Levels
+
+A run is ten floors long and the monsters get 14% harder on each of them, so
+something has to keep up with that, and it should be the hero rather than the
+shop. So kills teach: **every four kills is a level**, and a level is a small
+package of stats.
+
+| | |
+| --- | --- |
+| every level | +2 max health |
+| every third | +1 damage |
+| every fourth | +1 armour |
+| every fifth | +0.05 speed |
+
+Health every level, because health is the resource a run spends and the one you
+watch. Then a rotation, with coprime lengths on purpose: if two of them shared a
+period the run would feel like a staircase instead of a curve. A run that dies on
+floor three has had none of the rotation; a run that reaches floor nine has had
+all of it a few times. The cap is level 20.
+
+It is automatic rather than a choice. A talent pick needs a screen and a key, and
+the point of this is that you notice yourself getting stronger without stopping
+to think about it. The decisions worth stopping for are in the shop, between
+runs, where they belong -- and levels are *run-only*: they go into the hero's own
+stats, so unlike REVENGE they do not lapse when you take the stairs.
+
 ## Test
 
 ```bash
@@ -252,7 +280,12 @@ are bought. Each is a bargain with a catch, and both halves are on the screen:
 | the count's favour | every thirteenth kill heals you whole | you do not want to know who counts |
 | blood bargain | +0.15 speed, for good | -4 max health, for good |
 
-Prices are placeholders and will be tuned.
+Prices are tuned around one number: **a run banks 50 to 115 coin, and the full
+permanent set costs 1040.** That is twelve to eighteen runs -- cheap enough that
+every run buys something, expensive enough that the wall is what you are buying
+your way through. A single-run wild offer always costs less than the cheapest
+permanent upgrade, because it is one run's worth of change and the upgrade is
+not.
 
 A bought parcel is taken off the books the moment the next run starts, so a
 draught bought for a run is drunk in that run. Upgrades and the permanent wild
@@ -310,7 +343,7 @@ out of chests or the shop, and the strange half is the point:
 | the deathwatch | three armour under a third health |
 | the deep hunger | kills feed REVENGE one more stack |
 | the revenant's patience | you hit harder the longer you linger, up to four |
-| the second mouth | overhealing a draught becomes armour, up to four |
+| the second mouth | overhealing a draught becomes armour, up to 3 + the floor |
 | the dead weight | slower; your blows throw them back a square |
 | the patient knife | your first blow on each thing crits |
 | the borrowed face | the turn after a kill, nothing lands |
@@ -355,10 +388,10 @@ has been done to you.
 
 ## Not implemented yet
 
-A talent tree, a fourth equipment slot, sound, saving mid-run, and hero unlocks.
-Two roster slots are shown locked and are not playable yet. A spring lifts a
-curse but the curses themselves are still only ever handed out by chests, and the
-shop's prices are placeholders.
+A talent tree (levels are automatic for now, not a choice), a fourth equipment
+slot, sound, saving mid-run, and hero unlocks. Two roster slots are shown locked
+and are not playable yet. A spring lifts a curse but the curses themselves are
+still only ever handed out by chests.
 
 The prologue is the only prose in the game, and it is shown once per session
 rather than once per run — told every run it stops being a premise and becomes a

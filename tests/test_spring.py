@@ -295,3 +295,44 @@ def test_every_curse_can_be_lifted(key: str):
         state.heal_scale,
         state.bleed_every,
     ) == baseline
+
+
+def test_a_spring_is_spent_by_the_wash():
+    """One wash per spring.
+
+    Otherwise a curse is not a decision at all: you walk back to the same water
+    and pay again, and the only thing standing between you and a clean sheet is
+    the size of the purse.
+    """
+    state = on_a_spring(gold=200, curses=("heavy", "frail"))
+    assert state.at_the_spring
+
+    perform_action(state, Action.CLEANSE)
+
+    assert not state.at_the_spring, "the spring is still there"
+    assert state.dungeon_map.tile_at(state.player.position) is Tile.FLOOR
+    assert state.gold == 200 - CLEANSE_COST
+
+
+def test_a_spent_spring_does_nothing_the_second_time():
+    state = on_a_spring(gold=200, curses=("heavy", "frail"))
+    perform_action(state, Action.CLEANSE)
+
+    before_gold = state.gold
+    left = len(state.curses)
+    result = perform_action(state, Action.INTERACT)
+    perform_action(state, Action.CLEANSE)
+
+    assert result.prompt is None, "a spent spring offered another wash"
+    assert state.gold == before_gold
+    assert len(state.curses) == left
+    assert "nothing here" in state.log[-1].text
+
+
+def test_a_spring_you_walked_away_from_is_still_there():
+    """Spent by a wash, not by being looked at."""
+    state = on_a_spring(gold=200, curses=("heavy",))
+    result = perform_action(state, Action.INTERACT)
+    assert result.prompt is not None
+
+    assert state.at_the_spring, "asking spent it"

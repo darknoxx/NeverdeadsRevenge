@@ -25,6 +25,7 @@ from neverdeads_revenge.world.tiles import Tile
 from .actors import Actor, make_enemy, pick_enemy_template
 from .combat import apply_revenge, attack
 from .curses import curse_by_key
+from .levels import apply_gain, gains_between, level_for
 from .state import GameState, LogKind, RunState
 
 __all__ = [
@@ -49,12 +50,20 @@ MIRROR_REFLECTION = 2
 #: Every how many kills the count's favour heals you whole.
 COUNTS_FAVOUR_EVERY = 13
 
-#: The most armour the second mouth will hold at once.
+#: What the second mouth can hold on the first floor, plus one for every floor
+#: below it.
 #:
-#: Uncapped, one elixir drunk while barely hurt is nineteen armour, which is
-#: most of a floor spent untouchable for thirty gold. Four is enough to matter
-#: and not enough to end the argument.
-SECOND_MOUTH_CAP = 4
+#: It was a flat four. A flat four is reached by the second draught on floor
+#: three and then does nothing at all for the rest of the run -- and armour is a
+#: flat subtraction, so what it is worth depends entirely on what is hitting
+#: you. The cap has to move with the depth, the same way the monsters do, or the
+#: amulet is a floor-three trinket wearing a strong-tier price.
+SECOND_MOUTH_BASE = 3
+
+
+def second_mouth_cap(depth: int) -> int:
+    """The most armour the second mouth will hold on ``depth``."""
+    return SECOND_MOUTH_BASE + max(0, depth)
 
 
 class Action(Enum):
@@ -151,6 +160,7 @@ def _kill_message(state: GameState, enemy: Actor, outcome) -> None:
     )
     state.kills += 1
     _drop_coins(state, enemy)
+    _learn(state)
 
     player = state.player
 
@@ -184,6 +194,23 @@ def _kill_message(state: GameState, enemy: Actor, outcome) -> None:
             f"{player.trait.describe(state.revenge_stacks)}.",
             LogKind.GOOD,
         )
+
+
+def _learn(state: GameState) -> None:
+    """Fold whatever the last kill taught into the hero.
+
+    Asked after every kill and almost always a no-op. The level is derived from
+    the kill count rather than counted up, so this is a comparison and not a
+    counter that could drift out of step with the thing it counts.
+    """
+    reached = level_for(state.kills)
+    if reached <= state.level:
+        return
+
+    gain = gains_between(state.level, reached)
+    state.level = reached
+    apply_gain(state.player, gain)
+    state.say(f"Level {reached}: {gain.describe()}.", LogKind.GOOD)
 
 
 def _drop_coins(state: GameState, enemy: Actor) -> None:
@@ -501,10 +528,18 @@ def _cleanse(state: GameState) -> ActionResult:
     curse = state.rng.pick(state.curses)
     state.gold -= state.cleanse_cost
     state.remove_curse(curse)
+
+    # Spent. One wash per spring, so a curse becomes a decision about which
+    # spring to spend rather than a standing offer you can walk back to -- and
+    # the tile goes back to plain floor, which is what the map should show and
+    # what makes ``enter`` on it say "there is nothing here" like anywhere else.
+    state.dungeon_map.set_tile(state.player.position, Tile.FLOOR)
+
     state.say(
         f"The water closes over {curse.name} and takes it with it.",
         LogKind.GOOD,
     )
+    state.say("The spring is spent, and the water goes still.", LogKind.PLAIN)
     return ActionResult(consumed_turn=False, acted=False)
 
 
@@ -680,7 +715,8 @@ def _quaff(state: GameState) -> ActionResult:
         if state.has_passive("second_mouth"):
             # Armour for this floor only. Carrying it down would make one drink
             # on floor two worth something on floor nine.
-            kept = min(SECOND_MOUTH_CAP, player.stored_armor + spare) - player.stored_armor
+            cap = second_mouth_cap(state.depth)
+            kept = min(cap, player.stored_armor + spare) - player.stored_armor
             player.stored_armor += kept
             if kept:
                 state.say(

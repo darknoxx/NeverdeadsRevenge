@@ -33,17 +33,21 @@ __all__ = [
 
 #: Fraction added to health and damage per floor descended.
 #:
-#: Raised from 0.15 once the shop, the amulets and the third slot existed. The
-#: floor-10 wall is the point: reaching the rift is meant to take several runs
-#: and a purse spent, and at 0.15 it took one run and no purse at all. Measured,
-#: not chosen -- see the escape rates in the README.
-POTENCY_PER_FLOOR = 0.26
+#: Lower than it has ever been, and that is the point. The wall is the *ground*
+#: now, not the slope: floor one is a real fight (see the templates in actors.py)
+#: and the run climbs a gentle curve on top of it. A steep curve over a soft
+#: floor made the early game a formality and the late game a cliff; a shallow
+#: curve over a hard floor makes every floor of the run tense, which is what a
+#: run should be.
+#:
+#: Measured, not chosen: see the escape rates in the README.
+POTENCY_PER_FLOOR = 0.14
 
 #: Ceiling on potency. Without it a floor-40 monster would be unplayable and any
-#: formula mistake would silently become exponential. Three times floor 1 is
-#: already a lot; past that, difficulty should come from the enemy mix and the
-#: count, not from bigger numbers.
-MAX_POTENCY = 3.2
+#: formula mistake would silently become exponential. Just over twice floor 1 is
+#: enough once floor 1 is already dangerous, and the hero's own levels are what
+#: the rest of the growth is for.
+MAX_POTENCY = 2.2
 
 #: No monster may act this fast.
 #:
