@@ -1237,7 +1237,7 @@ def test_curse_changes_are_kept_apart_from_equipment():
     from neverdeads_revenge.game.curses import CURSES
 
     state = start_run(NOXX, seed=1)
-    state.player.equipment["armour"] = make_item(ITEMS["leather"])
+    state.player.equipment["armour"] = make_item(ITEMS["hide"])
     state.add_curse(CURSES["frail"])
 
     assert state.player.curse_modifiers.armor == -2
@@ -1263,7 +1263,7 @@ def test_curses_survive_a_descent():
 
 
 # -- chests -----------------------------------------------------------------
-def _put_a_chest(state: GameState, curse: str = "wither", contents: str = "runed"):
+def _put_a_chest(state: GameState, curse: str = "wither", contents: str = "edge"):
     """Stand the player on a chest with known contents."""
     from neverdeads_revenge.world.items import make_chest
 
@@ -1295,12 +1295,12 @@ def test_the_question_names_the_price_and_not_the_reward():
     from neverdeads_revenge.game.curses import CURSES
 
     state = start_run(NOXX, seed=1)
-    _put_a_chest(state, curse="dim", contents="plate")
+    _put_a_chest(state, curse="dim", contents="warden")
 
     prompt = perform_action(state, Action.INTERACT).prompt
     assert prompt is not None
     assert CURSES["dim"].price in prompt
-    assert "plate" not in prompt
+    assert "warden" not in prompt
     assert "warden" not in prompt
 
 
@@ -1308,13 +1308,13 @@ def test_opening_pays_the_price_and_hands_over_the_reward():
     from neverdeads_revenge.game.curses import CURSES
 
     state = start_run(NOXX, seed=1)
-    _put_a_chest(state, curse="wither", contents="runed")
+    _put_a_chest(state, curse="wither", contents="edge")
     perform_action(state, Action.INTERACT)
 
     perform_action(state, Action.OPEN_CHEST)
 
     assert [c.key for c in state.curses] == ["wither"]
-    assert state.player.equipment["weapon"].name == "runed blade"
+    assert state.player.equipment["weapon"].name == "the runed edge"
     assert state.dungeon_map.item_at(state.player.position) is None, "the chest stayed"
 
 
@@ -1377,17 +1377,17 @@ def _place(state: GameState, item) -> None:
 # -- equipment --------------------------------------------------------------
 def test_equipping_fills_an_empty_slot():
     state = start_run(NOXX, seed=1)
-    _place(state, make_item(ITEMS["blade"]))
+    _place(state, make_item(ITEMS["bite"]))
     before = state.player.damage_range
 
     perform_action(state, Action.PICK_UP)
 
-    assert state.player.equipment["weapon"].name == "serrated blade"
+    assert state.player.equipment["weapon"].name == "the grey bite"
     assert state.inventory == [], "a weapon is worn, not carried"
     assert state.player.damage_range > before, "the weapon changed nothing"
     # Against the template rather than a number, so rebalancing the weapon does
     # not fail a test that was really about the wiring.
-    assert state.player.modifiers.damage == ITEMS["blade"].modifiers.damage
+    assert state.player.modifiers.damage == ITEMS["bite"].modifiers.damage
 
 
 def test_equipping_sets_the_old_one_down_beside_you():
@@ -1397,20 +1397,20 @@ def test_equipping_sets_the_old_one_down_beside_you():
     what you took off is on the floor next to you.
     """
     state = start_run(NOXX, seed=1)
-    blade = make_item(ITEMS["blade"])
+    blade = make_item(ITEMS["bite"])
     _place(state, blade)
     perform_action(state, Action.PICK_UP)
     assert state.player.equipment["weapon"] is blade
 
-    _place(state, make_item(ITEMS["knife"]))
+    _place(state, make_item(ITEMS["tooth"]))
     perform_action(state, Action.PICK_UP)
 
-    assert state.player.equipment["weapon"].name == "chipped knife"
+    assert state.player.equipment["weapon"].name == "the rusted tooth"
     assert state.dungeon_map.item_at(state.player.position) is None, (
         "the old weapon was left under the player, where enter would pick it up"
     )
     assert any(item is blade for item in state.dungeon_map.items.values()), (
-        "the serrated blade was not set down anywhere"
+        "the grey bite was not set down anywhere"
     )
 
 
@@ -1422,16 +1422,16 @@ def test_swapping_equipment_is_not_an_infinite_loop():
     never reach the stairs. Caught by a bot that stopped descending.
     """
     state = start_run(NOXX, seed=1)
-    _place(state, make_item(ITEMS["blade"]))
+    _place(state, make_item(ITEMS["bite"]))
     perform_action(state, Action.PICK_UP)
-    _place(state, make_item(ITEMS["knife"]))
+    _place(state, make_item(ITEMS["tooth"]))
 
     seen = []
     for _ in range(6):
         perform_action(state, Action.PICK_UP)
         seen.append(state.player.equipment["weapon"].name)
 
-    assert "serrated blade" not in seen, (
+    assert "the grey bite" not in seen, (
         f"enter put the old weapon back on, so the swap is still a loop: {seen}"
     )
     assert state.dungeon_map.item_at(state.player.position) is None
@@ -1440,16 +1440,16 @@ def test_swapping_equipment_is_not_an_infinite_loop():
 def test_stepping_onto_the_set_down_item_puts_it_back_on():
     """The whole of the undo: walk onto what you set down and take it back."""
     state = start_run(NOXX, seed=1)
-    blade = make_item(ITEMS["blade"])
+    blade = make_item(ITEMS["bite"])
     _place(state, blade)
     perform_action(state, Action.PICK_UP)
 
-    _place(state, make_item(ITEMS["knife"]))
+    _place(state, make_item(ITEMS["tooth"]))
     perform_action(state, Action.PICK_UP)
-    assert state.player.equipment["weapon"].name == "chipped knife"
+    assert state.player.equipment["weapon"].name == "the rusted tooth"
 
     # By identity, not by name: the floor generator can put a blade of its own
-    # down, and "the item called serrated blade" would find that one instead.
+    # down, and "the item called the grey bite" would find that one instead.
     blade_pos = next(
         pos for pos, item in state.dungeon_map.items.items() if item is blade
     )
@@ -1465,13 +1465,13 @@ def test_stepping_onto_the_set_down_item_puts_it_back_on():
 def test_weapon_and_armour_are_separate_slots():
     """A coat must not replace a blade."""
     state = start_run(NOXX, seed=1)
-    _place(state, make_item(ITEMS["blade"]))
+    _place(state, make_item(ITEMS["bite"]))
     perform_action(state, Action.PICK_UP)
-    _place(state, make_item(ITEMS["leather"]))
+    _place(state, make_item(ITEMS["hide"]))
     perform_action(state, Action.PICK_UP)
 
-    assert state.player.equipment["weapon"].name == "serrated blade"
-    assert state.player.equipment["armour"].name == "leather coat"
+    assert state.player.equipment["weapon"].name == "the grey bite"
+    assert state.player.equipment["armour"].name == "the thin hide"
     assert state.dungeon_map.item_at(state.player.position) is None
 
 
@@ -1493,8 +1493,8 @@ def test_equipment_reaches_every_effective_stat():
         player.crit_multiplier,
     )
 
-    player.equipment["weapon"] = make_item(ITEMS["estoc"])
-    player.equipment["armour"] = make_item(ITEMS["cloak"])
+    player.equipment["weapon"] = make_item(ITEMS["hunger"])
+    player.equipment["armour"] = make_item(ITEMS["shroud"])
 
     assert player.damage_range[0] > base[0][0], "damage did not move"
     assert player.evasion > base[2], "evasion did not move"
@@ -1509,9 +1509,9 @@ def test_equipment_armour_actually_stops_a_hit():
     ghoul = make_enemy(ENEMIES["ghoul"], (1, 0))
 
     bare = make_hero(NOXX, (0, 0))
-    player.equipment["armour"] = make_item(ITEMS["leather"])
+    player.equipment["armour"] = make_item(ITEMS["hide"])
 
-    assert player.armor == bare.armor + ITEMS["leather"].modifiers.armor
+    assert player.armor == bare.armor + ITEMS["hide"].modifiers.armor
     assert player.hurt(4) <= bare.hurt(4), "the coat did not absorb anything"
 
 

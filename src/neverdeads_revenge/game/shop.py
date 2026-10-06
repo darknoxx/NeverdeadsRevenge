@@ -147,9 +147,11 @@ SUPPLIES: tuple[ShopItem, ...] = (
 
 #: Weapons and coats, for the next run.
 GEAR: tuple[ShopItem, ...] = (
-    ShopItem("knife", 25),
-    ShopItem("blade", 60),
-    ShopItem("leather", 40),
+    ShopItem("tooth", 25),
+    ShopItem("bite", 60),
+    ShopItem("hide", 40),
+    # The best thing that lies on a floor, sold rather than waited for.
+    ShopItem("rune_plate", 90),
 )
 
 #: Amulets. All of them, priced by how much they change a run rather than by how

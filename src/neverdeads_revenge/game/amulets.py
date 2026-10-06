@@ -99,7 +99,7 @@ AMULETS: dict[str, Passive] = {
     ),
     "long_hunger": Passive(
         key="long_hunger",
-        name="the long hunger",
+        name="the deep hunger",
         blurb="kills feed REVENGE one more stack",
         tier=2,
     ),

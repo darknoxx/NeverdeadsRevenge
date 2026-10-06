@@ -431,3 +431,65 @@ def test_the_elixir_becomes_more_common_deeper():
     early = [roll_item(Rng(s), 1).key for s in range(400)]
     deep = [roll_item(Rng(s), 9).key for s in range(400)]
     assert deep.count("elixir") > early.count("elixir")
+
+
+# -- the equipment ladder ----------------------------------------------------
+def test_every_piece_of_equipment_has_its_own_name():
+    """Two things called the same thing is a character sheet nobody can read."""
+    from neverdeads_revenge.world.items import ITEMS
+
+    names = [t.name for t in ITEMS.values()]
+    assert len(set(names)) == len(names)
+
+
+def test_the_strong_tier_is_strictly_stronger_than_anything_on_the_floor():
+    """The chest is what the curse pays for. A floor find that matched it would
+    make the whole bargain a formality -- and it nearly did: the rune plate was
+    written with evasion on it as well, which put it level with a burial shroud.
+    """
+    from neverdeads_revenge.world.items import ITEMS
+
+    def power(template) -> int:
+        m = template.modifiers
+        return m.damage + m.armor + m.evasion
+
+    for kind in ("weapon", "armour"):
+        floor = [t for t in ITEMS.values() if t.kind == kind and not t.chest_only]
+        chest = [t for t in ITEMS.values() if t.kind == kind and t.chest_only]
+        assert floor and chest, kind
+        assert min(power(t) for t in chest) > max(power(t) for t in floor), kind
+
+
+def test_rarer_floor_loot_is_better_floor_loot():
+    """The weight table is the loot's difficulty curve.
+
+    If a common thing were as good as a rare one, the rare one would be noise --
+    and the ladder of names would be the only thing telling them apart.
+    """
+    from neverdeads_revenge.world.items import ITEMS
+
+    for kind in ("weapon", "armour"):
+        floor = sorted(
+            (t for t in ITEMS.values() if t.kind == kind and not t.chest_only),
+            key=lambda t: t.weight,
+            reverse=True,
+        )
+        power = [
+            t.modifiers.damage + t.modifiers.armor + t.modifiers.evasion
+            for t in floor
+        ]
+        assert power == sorted(power), f"{kind} ladder is out of order: {power}"
+
+
+def test_every_weapon_and_coat_can_actually_be_found():
+    """One in a tier that the other tier never rolls is one nobody ever sees."""
+    from neverdeads_revenge.world.items import ITEMS, equipment_count, roll_item
+
+    for kind in ("weapon", "armour"):
+        on_the_floor = [t for t in ITEMS.values() if t.kind == kind and not t.chest_only]
+        assert on_the_floor, kind
+        for template in on_the_floor:
+            assert template.weight > 0, template.key
+        assert equipment_count(1) >= 1
+        rolled = {roll_item(Rng(seed), 8, kinds=(kind,)).key for seed in range(60)}
+        assert rolled, f"nothing of kind {kind} ever rolled"

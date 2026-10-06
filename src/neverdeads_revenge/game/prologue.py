@@ -101,37 +101,31 @@ def terrain_legend() -> list[tuple[str, str]]:
     return [(tile.glyph, tile.description) for tile in LEGEND_TERRAIN]
 
 
-#: What a whole kind of equipment does, for the legend.
-#:
-#: One line per kind rather than per item: the panel is clipped rather than
-#: scrolled and the way out sits at the bottom of it, so four blades and three
-#: coats would push the goal off the screen to say four times over that a ``)``
-#: is a weapon. Which weapon it is belongs on the character sheet.
-_KIND_BLURB: dict[str, str] = {
-    "weapon": "weapon, +damage",
-    "armour": "armour, +defence",
-    "amulet": "amulet, a passive",
-}
-
-
 def item_legend() -> list[tuple[str, str]]:
-    """``(glyph, meaning)`` for what can be picked up, one row per glyph.
+    """``(glyph, meaning)`` for what can be picked up.
 
     Draughts keep a row each, because the difference between a potion and an
-    elixir is the decision the player is making; equipment collapses to a row per
-    kind, because the difference between two blades is not. The chest is a row
-    of its own: it is not loot, it is a question.
+    elixir is the decision the player is making. Everything wearable shares one
+    row of glyphs, because the difference between a blade and a coat is not a
+    decision the map asks you to make -- and because the panel is clipped and
+    three separate rows for them cost the sidebar a row it did not have.
+
+    A row may carry more than one glyph. The widget colours each of them, so
+    ``) [ "`` still reads as three things rather than one odd one.
+
+    The chest is a row of its own: it is not loot, it is a question.
     """
     rows: list[tuple[str, str]] = []
-    seen: set[str] = set()
     for template in ITEMS.values():
-        if template.chest_only or template.glyph in seen:
+        if template.chest_only or template.slot is not None:
             continue
-        seen.add(template.glyph)
-        if template.kind in _KIND_BLURB:
-            rows.append((template.glyph, _KIND_BLURB[template.kind]))
-        else:
-            rows.append((template.glyph, f"{template.name}, heals {template.heal}"))
+        rows.append((template.glyph, f"{template.name}, heals {template.heal}"))
+    # The order the glyphs are first declared in, so the row matches the order
+    # the map's own reference lists them in.
+    worn = " ".join(
+        dict.fromkeys(t.glyph for t in ITEMS.values() if t.slot is not None)
+    )
+    rows.append((worn, "weapon, armour, amulet"))
     rows.append((CHEST_GLYPH, "a chest, and a price"))
     rows.append((COIN_GLYPH, "coins, for the shop"))
     # The spring is terrain, but it is the one tile with a rule attached, so it

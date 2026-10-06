@@ -42,10 +42,12 @@ SLOT_GLYPH: dict[str, str] = {
     "amulet": AMULET_GLYPH,
 }
 
-#: Longest a slot's name may be here. The panel is clipped and all three share a
-#: line, so this is the number that keeps them on it; the whole name is on the
-#: character sheet behind ``c``.
-SHORT_NAME = 6
+#: Longest a slot's name may be here, as a backstop rather than a design.
+#:
+#: Nothing in the game reaches it -- ``tests/test_amulets.py`` measures every
+#: item against the line it goes on -- and it exists so that an item added later
+#: cannot wrap the sidebar even if nobody thought about it.
+SHORT_NAME = 12
 
 
 class Hud(Static):
@@ -126,21 +128,30 @@ class Hud(Static):
                 style="green",
             )
 
-        # What is being worn, all three on one line. Two lines became three with
-        # the amulet, and the sidebar is clipped: a third row here is a legend
-        # row gone, and the legend is where the way out is written. Emptied slots
-        # are shown as a dash rather than hidden, so nothing moves the first time
-        # something is picked up.
-        for slot in SLOT_ORDER:
-            if slot != SLOT_ORDER[0]:
-                out.append("  ", style="dim")
-            item = player.equipment.get(slot)
-            out.append(f"{SLOT_GLYPH[slot]} ", style="dim")
-            if item is None:
-                out.append("—", style="dim")
-            else:
-                out.append(item.name.split()[-1][:SHORT_NAME], style="bold white")
-        out.append("\n")
+        # What is being worn, on two lines rather than three. A third row here
+        # would be a legend row gone -- the sidebar is clipped and the legend is
+        # where the way out is written -- and all three names on one line do not
+        # fit: "the last argument" and "the deathwatch" are not short words.
+        #
+        # The blade and the coat share the first line because both are numbers.
+        # The amulet gets its own because its name is the only place its ability
+        # is written down anywhere on this screen.
+        #
+        # Emptied slots show a dash rather than nothing, so the panel does not
+        # change height the first time something is picked up.
+        for line, slots in enumerate((("weapon", "armour"), ("amulet",))):
+            for position, slot in enumerate(slots):
+                if position:
+                    out.append("  ", style="dim")
+                item = player.equipment.get(slot)
+                out.append(f"{SLOT_GLYPH[slot]} ", style="dim")
+                if item is None:
+                    out.append("—", style="dim")
+                else:
+                    out.append(
+                        item.name.split()[-1][:SHORT_NAME], style="bold white"
+                    )
+            out.append("\n")
 
         # Where the run stands, and what it has scored. One line rather than two:
         # the sidebar is clipped and the legend gained the spring row, so the

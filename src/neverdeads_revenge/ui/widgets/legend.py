@@ -108,11 +108,20 @@ class Legend(Static):
                 else:
                     out.append(f" {meaning}\n", style="dim")
                 continue
-            out.append(f"{glyph} ", style=_glyph_style(glyph))
+            # A row may carry several glyphs -- the wearable kinds share one --
+            # and each is coloured like the thing it stands for on the map.
+            # A single-glyph row goes through exactly the same path.
+            for char in glyph:
+                out.append(
+                    char, style=_glyph_style(char) if char.strip() else "dim"
+                )
+            out.append(" ")
             # Truncation is a backstop, not the design: tests/test_ui.py asserts
             # every line fits, so a monster whose stats grow too wide fails
             # there instead of silently wrapping here.
-            out.append(f"{meaning[:USABLE_WIDTH - 2]}\n", style="bold")
+            out.append(
+                f"{meaning[: USABLE_WIDTH - len(glyph) - 1]}\n", style="bold"
+            )
 
         self.update(out)
 

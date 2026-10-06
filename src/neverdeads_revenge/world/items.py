@@ -111,9 +111,13 @@ ITEMS: dict[str, ItemTemplate] = {
         weight_growth=1.25,
     ),
     # -- weapons -----------------------------------------------------------
-    "knife": ItemTemplate(
-        key="knife",
-        name="chipped knife",
+    #
+    # The name grows with the blade. "the rusted tooth" and "the last argument"
+    # are both a ``)``, and the difference between them is meant to be audible
+    # before any of the numbers are read.
+    "tooth": ItemTemplate(
+        key="tooth",
+        name="the rusted tooth",
         glyph=WEAPON_GLYPH,
         color=WEAPON_COLOR,
         kind="weapon",
@@ -121,9 +125,9 @@ ITEMS: dict[str, ItemTemplate] = {
         modifiers=Modifiers(damage=1),
         weight=5.0,
     ),
-    "blade": ItemTemplate(
-        key="blade",
-        name="serrated blade",
+    "bite": ItemTemplate(
+        key="bite",
+        name="the grey bite",
         glyph=WEAPON_GLYPH,
         color=WEAPON_COLOR,
         kind="weapon",
@@ -132,20 +136,20 @@ ITEMS: dict[str, ItemTemplate] = {
         weight=3.0,
         weight_growth=1.10,
     ),
-    "estoc": ItemTemplate(
-        key="estoc",
-        name="thin estoc",
+    "hunger": ItemTemplate(
+        key="hunger",
+        name="the long hunger",
         glyph=WEAPON_GLYPH,
         color=WEAPON_COLOR,
         kind="weapon",
         slot="weapon",
-        modifiers=Modifiers(damage=1, crit_chance=0.10, crit_multiplier=0.2),
+        modifiers=Modifiers(damage=2, crit_chance=0.10, crit_multiplier=0.2),
         weight=2.0,
         weight_growth=1.18,
     ),
-    "cleaver": ItemTemplate(
-        key="cleaver",
-        name="rusted cleaver",
+    "sorrow": ItemTemplate(
+        key="sorrow",
+        name="the heavy sorrow",
         glyph=WEAPON_GLYPH,
         color=WEAPON_COLOR,
         kind="weapon",
@@ -153,13 +157,14 @@ ITEMS: dict[str, ItemTemplate] = {
         # Heavy: the most damage of the four and the only one that costs speed,
         # so "better weapon" is a decision rather than a straight upgrade.
         modifiers=Modifiers(damage=3, speed=-0.15),
-        weight=2.0,
+        weight=1.6,
         weight_growth=1.15,
     ),
+
     # -- armour ------------------------------------------------------------
-    "leather": ItemTemplate(
-        key="leather",
-        name="leather coat",
+    "hide": ItemTemplate(
+        key="hide",
+        name="the thin hide",
         glyph=ARMOUR_GLYPH,
         color=ARMOUR_COLOR,
         kind="armour",
@@ -167,9 +172,9 @@ ITEMS: dict[str, ItemTemplate] = {
         modifiers=Modifiers(armor=1),
         weight=5.0,
     ),
-    "cloak": ItemTemplate(
-        key="cloak",
-        name="grey cloak",
+    "shroud": ItemTemplate(
+        key="shroud",
+        name="the grey shroud",
         glyph=ARMOUR_GLYPH,
         color=ARMOUR_COLOR,
         kind="armour",
@@ -181,9 +186,9 @@ ITEMS: dict[str, ItemTemplate] = {
         weight=3.0,
         weight_growth=1.10,
     ),
-    "boots": ItemTemplate(
-        key="boots",
-        name="swift boots",
+    "step": ItemTemplate(
+        key="step",
+        name="the swift step",
         glyph=ARMOUR_GLYPH,
         color=ARMOUR_COLOR,
         kind="armour",
@@ -192,6 +197,21 @@ ITEMS: dict[str, ItemTemplate] = {
         weight=2.0,
         weight_growth=1.15,
     ),
+    "rune_plate": ItemTemplate(
+        key="rune_plate",
+        name="the rune plate",
+        glyph=ARMOUR_GLYPH,
+        color=ARMOUR_COLOR,
+        kind="armour",
+        slot="armour",
+        # The best thing that ever lies on a floor, and rare enough that finding
+        # one is a story. Armour two and nothing else: it has to stay clearly
+        # under what a chest pays for, or the chest stops being worth the curse.
+        modifiers=Modifiers(armor=2),
+        weight=1.5,
+        weight_growth=1.25,
+    ),
+
     # -- amulets -----------------------------------------------------------
     #
     # A third slot, and the only one that grants an ability rather than a number.
@@ -281,7 +301,7 @@ ITEMS: dict[str, ItemTemplate] = {
     ),
     "long_hunger": ItemTemplate(
         key="long_hunger",
-        name="the long hunger",
+        name="the deep hunger",
         glyph=AMULET_GLYPH,
         color=AMULET_COLOR,
         kind="amulet",
@@ -346,14 +366,26 @@ ITEMS: dict[str, ItemTemplate] = {
     # A tier of their own, never rolled onto a floor. Clearly better than
     # anything lying around, because the player paid for them with something
     # they cannot get back.
-    "runed": ItemTemplate(
-        key="runed",
-        name="runed blade",
+    "edge": ItemTemplate(
+        key="edge",
+        name="the runed edge",
         glyph=WEAPON_GLYPH,
         color=WEAPON_COLOR,
         kind="weapon",
         slot="weapon",
         modifiers=Modifiers(damage=4, crit_chance=0.10),
+        chest_only=True,
+    ),
+    "argument": ItemTemplate(
+        key="argument",
+        name="the last argument",
+        glyph=WEAPON_GLYPH,
+        color=WEAPON_COLOR,
+        kind="weapon",
+        slot="weapon",
+        # The only blade that also defends. The strongest thing in the game that
+        # is not grave iron, and the one that asks nothing of you for it.
+        modifiers=Modifiers(damage=5, armor=1),
         chest_only=True,
     ),
     "grave": ItemTemplate(
@@ -366,8 +398,8 @@ ITEMS: dict[str, ItemTemplate] = {
         modifiers=Modifiers(damage=6, speed=-0.20),
         chest_only=True,
     ),
-    "plate": ItemTemplate(
-        key="plate",
+    "warden": ItemTemplate(
+        key="warden",
         name="warden plate",
         glyph=ARMOUR_GLYPH,
         color=ARMOUR_COLOR,
@@ -386,7 +418,20 @@ ITEMS: dict[str, ItemTemplate] = {
         modifiers=Modifiers(evasion=3),
         chest_only=True,
     ),
+    "burial": ItemTemplate(
+        key="burial",
+        name="the burial shroud",
+        glyph=ARMOUR_GLYPH,
+        color=ARMOUR_COLOR,
+        kind="armour",
+        slot="armour",
+        # Two of everything and a little speed gone. The coat for a hero who has
+        # decided the fight is going to be long.
+        modifiers=Modifiers(armor=2, evasion=2, speed=-0.10),
+        chest_only=True,
+    ),
 }
+
 
 
 #: What a chest looks like. Gold, because a chest is treasure before it is a

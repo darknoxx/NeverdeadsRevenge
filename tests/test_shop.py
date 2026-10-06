@@ -84,14 +84,14 @@ def test_what_is_affordable_is_marked_before_the_screen_draws():
     progress = shop(30)
     assert offer_for(progress, "potion").affordable
     assert offer_for(progress, "elixir").affordable
-    assert not offer_for(progress, "blade").affordable, "60 coins on 30"
-    assert offer_for(progress, "blade").buyable is False
+    assert not offer_for(progress, "bite").affordable, "60 coins on 30"
+    assert offer_for(progress, "bite").buyable is False
 
 
 def test_an_item_describes_itself():
     assert describe_item(ITEMS["potion"]) == "heals 8"
-    assert "damage" in describe_item(ITEMS["knife"])
-    assert "armour" in describe_item(ITEMS["leather"])
+    assert "damage" in describe_item(ITEMS["tooth"])
+    assert "armour" in describe_item(ITEMS["hide"])
 
 
 def test_every_wild_offer_is_a_deal_with_two_halves():
@@ -134,8 +134,8 @@ def test_buying_a_draught_sets_it_aside_for_the_next_run():
 
 def test_buying_gear_sets_it_aside_too():
     progress = shop(100)
-    buy(progress, offer_for(progress, "blade"))
-    assert progress.pending == ["blade"]
+    buy(progress, offer_for(progress, "bite"))
+    assert progress.pending == ["bite"]
 
 
 def test_buying_an_upgrade_is_permanent_and_stacks():
@@ -192,7 +192,7 @@ def test_a_permanent_wild_cannot_be_bought_past_its_cap():
 def test_the_shop_refuses_what_the_purse_cannot_cover():
     progress = shop(10)
     with pytest.raises(ShopError) as refusal:
-        buy(progress, offer_for(progress, "blade"))
+        buy(progress, offer_for(progress, "bite"))
 
     assert "10" in str(refusal.value), "the refusal should say what you have"
     assert progress.gold == 10
@@ -203,12 +203,12 @@ def test_the_shop_refuses_what_the_purse_cannot_cover():
 def test_the_loadout_is_taken_off_the_books():
     """A draught bought for this run is drunk in this run."""
     progress = shop(0)
-    progress.pending = ["potion", "blade"]
+    progress.pending = ["potion", "bite"]
     progress.wilds = ["greed"]
 
     loadout = loadout_from(progress)
 
-    assert loadout.pending == ("potion", "blade")
+    assert loadout.pending == ("potion", "bite")
     assert loadout.wilds == ("greed",)
     assert progress.pending == []
     assert progress.wilds == []
@@ -222,14 +222,14 @@ def test_bought_draughts_are_in_the_pack_at_the_first_step():
 
 
 def test_bought_gear_is_worn_at_the_first_step():
-    state = start_run(NOXX, seed=3, loadout=Loadout(pending=("blade", "leather")))
-    assert state.player.equipment["weapon"].item_id == "blade"
-    assert state.player.equipment["armour"].item_id == "leather"
+    state = start_run(NOXX, seed=3, loadout=Loadout(pending=("bite", "hide")))
+    assert state.player.equipment["weapon"].item_id == "bite"
+    assert state.player.equipment["armour"].item_id == "hide"
 
 
 def test_gear_changes_the_numbers_it_says_it_does():
     plain = start_run(NOXX, seed=3)
-    armed = start_run(NOXX, seed=3, loadout=Loadout(pending=("blade", "leather")))
+    armed = start_run(NOXX, seed=3, loadout=Loadout(pending=("bite", "hide")))
 
     assert armed.player.damage_range[0] == plain.player.damage_range[0] + 2
     assert armed.player.armor == plain.player.armor + 1

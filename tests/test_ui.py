@@ -520,14 +520,14 @@ async def test_the_character_screen_lists_what_is_worn_and_what_it_does():
     app = NeverdeadsRevenge()
     async with app.run_test(size=SIZE) as pilot:
         screen = await drive_to_game(app, pilot)
-        screen.state.player.equipment["weapon"] = make_item(ITEMS["blade"])
+        screen.state.player.equipment["weapon"] = make_item(ITEMS["bite"])
         await pilot.press("c")
         await pilot.pause()
 
         sheet = str(app.screen.query_one("#character-body").render())
-        assert "serrated blade" in sheet
+        assert "the grey bite" in sheet
         # Derived from the item, so rebalancing it does not fail this.
-        for change in ITEMS["blade"].modifiers.describe():
+        for change in ITEMS["bite"].modifiers.describe():
             assert change in sheet, f"{change!r} is not shown on the sheet"
 
 
@@ -577,7 +577,7 @@ async def test_the_chest_dialog_shows_the_price_and_hides_the_reward():
     async with app.run_test(size=SIZE) as pilot:
         screen = await drive_to_game(app, pilot)
         screen.state.dungeon_map.add_item(
-            screen.state.player.position, make_chest("dim", ITEMS["plate"])
+            screen.state.player.position, make_chest("dim", ITEMS["warden"])
         )
         await pilot.press("enter")
         await pilot.pause()
@@ -596,7 +596,7 @@ async def test_saying_yes_opens_the_chest():
     async with app.run_test(size=SIZE) as pilot:
         screen = await drive_to_game(app, pilot)
         state = screen.state
-        state.dungeon_map.add_item(state.player.position, make_chest("dim", ITEMS["plate"]))
+        state.dungeon_map.add_item(state.player.position, make_chest("dim", ITEMS["warden"]))
 
         await pilot.press("enter")
         await pilot.pause()
@@ -619,7 +619,7 @@ async def test_walking_away_costs_nothing():
     async with app.run_test(size=SIZE) as pilot:
         screen = await drive_to_game(app, pilot)
         state = screen.state
-        chest = make_chest("wither", ITEMS["runed"])
+        chest = make_chest("wither", ITEMS["edge"])
         state.dungeon_map.add_item(state.player.position, chest)
 
         await pilot.press("enter")
@@ -1292,9 +1292,10 @@ async def test_legend_fits_its_panel_without_wrapping():
     assert USABLE_WIDTH == PANEL_WIDTH - SIDEBAR_CHROME - 1, "border, padding, indent"
     for depth in range(1, 20):
         for glyph, meaning in legend_rows(depth):
-            # 2 columns for the glyph and its trailing space, 1 for the indent
-            # on a continuation line.
-            line = len(meaning) + (2 if glyph else 1)
+            # Every glyph of the row, its trailing space, and the indent on a
+            # continuation line. A row may carry more than one glyph: the
+            # wearable kinds share one.
+            line = len(meaning) + (len(glyph) + 1 if glyph else 1)
             assert line <= USABLE_WIDTH, (
                 f"legend line too long at floor {depth} ({line}): {glyph} {meaning}"
             )
@@ -1999,7 +2000,7 @@ async def test_bought_gear_is_worn_from_the_first_step():
     app = NeverdeadsRevenge()
     async with app.run_test(size=SIZE) as pilot:
         shop = await _open_shop(app, pilot, 100)
-        index = next(i for i, o in enumerate(shop.offers) if o.key == "leather")
+        index = next(i for i, o in enumerate(shop.offers) if o.key == "hide")
         for _ in range(index):
             await pilot.press("down")
         await pilot.press("enter")
@@ -2009,7 +2010,7 @@ async def test_bought_gear_is_worn_from_the_first_step():
 
         screen = await drive_to_game(app, pilot)
 
-        assert screen.state.player.equipment["armour"].item_id == "leather"
+        assert screen.state.player.equipment["armour"].item_id == "hide"
 
 
 async def test_an_upgrade_bought_in_the_shop_reaches_the_next_run():

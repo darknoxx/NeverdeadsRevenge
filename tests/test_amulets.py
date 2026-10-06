@@ -562,26 +562,40 @@ def test_without_it_the_answer_to_a_kill_lands():
 
 
 # -- the sidebar and the sheet ----------------------------------------------
-def test_the_slot_line_never_wraps_for_any_real_item():
-    """Three slots share one line in a clipped panel, and a wrapped line there
-    eats a legend row -- and the legend is where the way out is written.
+def test_no_item_name_is_too_long_for_the_slot_line():
+    """Two lines in a clipped panel, and a wrapped line there eats a legend row
+    -- and the legend is where the way out is written.
 
-    Measured against the real items rather than against the truncation limit: a
-    limit of six is only worth anything if nothing the game can hand you reaches
-    it, and the day something does is the day the sidebar loses a row.
+    The backstop in the widget is not the point; this is. Measured against every
+    real item, so the day one is named something too long the sidebar does not
+    quietly lose a row and print half a word.
     """
-    from neverdeads_revenge.ui.widgets.hud import SHORT_NAME, SLOT_ORDER
+    from neverdeads_revenge.ui.widgets.hud import SHORT_NAME
 
-    longest = dict.fromkeys(SLOT_ORDER, 0)
+    # The sidebar's content box, and what a slot row spends on glyphs and spaces.
+    BUDGET = 30
+
     for template in ITEMS.values():
         if template.slot is None:
             continue
-        longest[template.slot] = max(
-            longest[template.slot], len(template.name.split()[-1][:SHORT_NAME])
-        )
+        short = template.name.split()[-1]
+        assert len(short) <= SHORT_NAME, f"{template.key}: {short!r} is a backstop"
+        if template.slot == "amulet":
+            width = 2 + len(short)
+        else:
+            width = 2 + len(short)
+        assert width <= BUDGET, f"{template.key}: {width} wide"
 
-    line = sum(2 + longest[slot] for slot in SLOT_ORDER) + 2 * (len(SLOT_ORDER) - 1)
-    assert line <= 30, f"the slot line can be {line} wide: {longest}"
+    # And the blade and the coat share a line, so the two of them together have
+    # to fit it.
+    longest = {"weapon": 0, "armour": 0}
+    for template in ITEMS.values():
+        if template.slot in longest:
+            longest[template.slot] = max(
+                longest[template.slot], len(template.name.split()[-1])
+            )
+    together = 2 + longest["weapon"] + 2 + 2 + longest["armour"]
+    assert together <= BUDGET, f"the blade and coat line is {together} wide: {longest}"
 
 
 def test_the_character_sheet_shows_the_amulet_slot():
@@ -599,10 +613,13 @@ def test_a_bare_hero_has_no_passive_armour_or_damage():
 
 
 def test_the_legend_gives_amulets_a_row():
+    """The wearable kinds share one row of glyphs, so the amulet's is inside a
+    row rather than a row of its own -- which is what makes it fit at all."""
     from neverdeads_revenge.game.prologue import item_legend
 
-    rows = item_legend()
-    assert any(glyph == ITEMS["ember"].glyph for glyph, _ in rows)
+    glyphs = "".join(glyph for glyph, _ in item_legend())
+    assert ITEMS["ember"].glyph in glyphs
+    assert any("amulet" in meaning for _, meaning in item_legend())
 
 
 def test_a_fresh_hero_equipped_by_hand_starts_clean():
