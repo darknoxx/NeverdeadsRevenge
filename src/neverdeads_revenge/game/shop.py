@@ -95,7 +95,7 @@ META_UPGRADES: dict[str, MetaUpgrade] = {
         name="Vigour",
         description="the body remembers being killed and grows back thicker",
         price=80,
-        max_hp=2,
+        max_hp=5,
         max_stacks=3,
     ),
     "haste": MetaUpgrade(
@@ -103,7 +103,7 @@ META_UPGRADES: dict[str, MetaUpgrade] = {
         name="Haste",
         description="the feet remember the way out",
         price=120,
-        speed=0.05,
+        speed=0.12,
         max_stacks=2,
     ),
     "lantern": MetaUpgrade(

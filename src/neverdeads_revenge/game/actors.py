@@ -405,12 +405,13 @@ YETI = Hero(
         max_hp=52,
         hp=52,
         speed=0.75,
-        # Damage is what makes a slow hero work, and the sweep said so: raising
-        # his health changed nothing (54 hp measured the same as 46) while
-        # raising his damage moved the escape rate threefold. A slow hero does
-        # not lose by being fragile, he loses by taking four turns to kill
-        # something that hits him every one of them.
-        damage=(9, 13),
+        # Damage is what makes a slow hero work, and the sweep keeps saying so.
+        # Raising his health changed nothing (54 hp measured the same as 46).
+        # Raising his damage from 9-13 to 12-17 took his escape rate from 0% to
+        # 4% against the floor-10 wall, and his armour is the proof of the same
+        # rule from the other side: three more points of it took him to 33%,
+        # because armour is a flat subtraction and the monsters now scale.
+        damage=(12, 17),
         crit_chance=0.05,
         crit_multiplier=1.5,
         accuracy=1,
@@ -550,8 +551,10 @@ ENEMIES: dict[str, EnemyTemplate] = {
         # The only monster that gets more common as you descend. It is fast and
         # evasive, which is exactly the thing that makes a floor feel unfair if
         # the player cannot simply out-trade it -- so the deeper floors are
-        # floors where out-trading is no longer the whole answer.
-        weight_growth=1.14,
+        # floors where out-trading is no longer the whole answer. Raised from
+        # 1.14 with the rest of the wall: a slow hero's problem is the number of
+        # things hitting him, and this is the dial that changes it.
+        weight_growth=1.25,
     ),
 }
 

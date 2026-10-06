@@ -30,7 +30,17 @@ from .items import (
 from .map import DungeonMap, GroundItem
 from .tiles import Tile
 
-__all__ = ["GeneratedFloor", "generate_floor", "ESCAPE_DEPTH"]
+__all__ = ["GeneratedFloor", "generate_floor", "enemy_count", "ESCAPE_DEPTH"]
+
+
+def enemy_count(depth: int) -> int:
+    """How many monsters a floor holds, before the map's own limits.
+
+    A named function rather than a number in the middle of the generator: it is
+    the difficulty dial that is easiest to overshoot, and a dial you can call is
+    a dial you can measure.
+    """
+    return 7 + depth
 
 #: The floor that holds the way out instead of stairs down.
 #:
@@ -279,7 +289,7 @@ def generate_floor(
     ]
     # Never hand out fewer spawn points than we need; a cramped floor is fine.
     if enemy_budget is None:
-        enemy_budget = min(6 + depth, len(candidates))
+        enemy_budget = min(enemy_count(depth), len(candidates))
     spawn_points = rng.shuffled(candidates)[:enemy_budget]
 
     _scatter_decor(rng, dungeon_map, rooms, count=len(dungeon_map.walkable_positions()) // 18)

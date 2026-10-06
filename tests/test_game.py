@@ -1889,3 +1889,51 @@ def test_coins_are_not_carried_in_the_pack():
 
     assert state.inventory == []
     assert state.gold > 0
+
+
+# -- the wall ----------------------------------------------------------------
+def test_the_dungeon_is_hard_enough_to_need_the_shop():
+    """The floor-10 wall is the point, and it is measured rather than chosen.
+
+    With nothing bought, six runs in a hundred reach the rift; with every
+    permanent upgrade, a bought blade, a bought coat and a bought amulet,
+    forty-three do. A test cannot play forty runs -- the numbers are in the
+    README and the bots are in /tmp -- so it holds the dials instead, and this
+    comment is where the reason for them lives.
+    """
+    from neverdeads_revenge.game.difficulty import MAX_POTENCY, potency
+    from neverdeads_revenge.world.generator import ESCAPE_DEPTH, enemy_count
+
+    assert potency(ESCAPE_DEPTH) == MAX_POTENCY, "the cap is not reached in time"
+    assert potency(ESCAPE_DEPTH - 1) < MAX_POTENCY, "the cap is reached too early"
+    assert enemy_count(ESCAPE_DEPTH) > enemy_count(1)
+
+
+def test_a_deep_monster_is_several_times_its_floor_one_self():
+    from neverdeads_revenge.game.actors import ENEMIES, scale_template
+    from neverdeads_revenge.world.generator import ESCAPE_DEPTH
+
+    for template in ENEMIES.values():
+        deep = scale_template(template, ESCAPE_DEPTH)
+        assert deep.stats.max_hp >= template.stats.max_hp * 3, template.key
+        assert deep.stats.damage[1] >= template.stats.damage[1] * 3, template.key
+
+
+def test_the_hero_must_still_be_faster_than_everything_in_the_dungeon():
+    """The one hard constraint in the whole balance.
+
+    Potency scales speed as well as damage, and the clamp is the reason a
+    deep-floor wraith is faster than a floor-one wraith without ever being
+    faster than the hero. Raising potency without it would turn every other
+    stat into decoration.
+    """
+    from neverdeads_revenge.game.actors import ENEMIES, HEROES, scale_template
+    from neverdeads_revenge.game.difficulty import MAX_ENEMY_SPEED
+    from neverdeads_revenge.world.generator import ESCAPE_DEPTH
+
+    fastest = max(hero.stats.speed for hero in HEROES.values())
+    slowest = min(hero.stats.speed for hero in HEROES.values())
+    assert MAX_ENEMY_SPEED < fastest, "the fast hero no longer outruns the dungeon"
+    assert MAX_ENEMY_SPEED > slowest, "the slow hero is meant to be outrun"
+    for template in ENEMIES.values():
+        assert scale_template(template, ESCAPE_DEPTH).stats.speed <= MAX_ENEMY_SPEED

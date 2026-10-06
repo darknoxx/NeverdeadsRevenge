@@ -522,14 +522,27 @@ def test_the_patient_knife_is_ready_again_for_a_new_monster():
 
 
 # -- borrowed face -----------------------------------------------------------
+def _a_brute_beside(player, *, hp: int = 400):
+    """Something fast and certain, one square off, that will answer a kill.
+
+    Certain on purpose: the hit chance floor is 30%, so at a normal accuracy the
+    monster misses often enough that a test about whether a blow lands is really
+    a test about the dice.
+    """
+    brute = make_enemy(ENEMIES["bone"], (player.position[0], player.position[1] - 1))
+    brute.stats.hp = hp
+    brute.stats.speed = 3.0
+    brute.stats.accuracy = 99
+    player.stats.evasion = 0
+    return brute
+
+
 def test_the_borrowed_face_shrouds_you_for_the_turn_after_a_kill():
     state = wearing("borrowed_face")
     player = state.player
     weak = make_enemy(ENEMIES["ghoul"], (player.position[0] + 1, player.position[1]))
     weak.stats.hp = 1
-    brute = make_enemy(ENEMIES["bone"], (player.position[0], player.position[1] - 1))
-    brute.stats.hp = 400
-    brute.stats.speed = 3.0
+    brute = _a_brute_beside(player)
     brute.stats.damage = (6, 6)
     state.enemies = [weak, brute]
     state.turn_queue = type(state.turn_queue)([player, weak, brute])
@@ -547,9 +560,7 @@ def test_without_it_the_answer_to_a_kill_lands():
     player = state.player
     weak = make_enemy(ENEMIES["ghoul"], (player.position[0] + 1, player.position[1]))
     weak.stats.hp = 1
-    brute = make_enemy(ENEMIES["bone"], (player.position[0], player.position[1] - 1))
-    brute.stats.hp = 400
-    brute.stats.speed = 3.0
+    brute = _a_brute_beside(player)
     brute.stats.damage = (6, 6)
     state.enemies = [weak, brute]
     state.turn_queue = type(state.turn_queue)([weak, brute, player])

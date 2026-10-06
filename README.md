@@ -40,50 +40,33 @@ No hero can heal on their own; potions and elixirs on the floor are the only way
 back up. A run's health is therefore a budget you spend across ten floors, and
 skipping loot to save time is a real trade.
 
-Measured with two bots over 24 seeds each, because the choice of bot turned out
-to matter more than the hero:
+The dungeon is now built to be a wall. Measured with a bot over 40 seeds a hero
+-- it kills what is beside it, drinks when hurt, picks up what it is worth
+walking to, washes a curse off when it can afford to, and beelines for the exit
+otherwise:
 
-* **trade** — attack whatever is adjacent, always.
-* **kite** — break contact and drink when badly hurt.
+| | Noxx | Yeti | Walkyrion |
+| --- | --- | --- | --- |
+| nothing bought | 8% | 2% | 8% |
+| every permanent upgrade, a bought blade, a bought coat and a bought amulet | 38% | 40% | 50% |
 
-| hero | trade | kite |
-| --- | --- | --- |
-| Noxx | 4/24 | **11/24** |
-| Yeti | **8/24** | 4/24 |
-| Walkyrion | **8/24** | 3/24 |
+Of 120 runs with nothing bought, twelve reached floor 10 and the rest died on
+floors 4 to 8. That is the shape the wall is meant to have: the early floors are
+a place you get through and the deep ones are a place you die in, and the shop is
+the difference between the two rows of that table.
 
-Each hero played to its own strength — Noxx kites, the armoured two trade — Noxx
-is the strongest, which is what a speed-and-crit hero should be. The single
-trade-only bot used to report the opposite, and it was the instrument: it cannot
-express disengaging, so it flattered the heroes who survive by standing still.
-The numbers above are a rough read, not a verdict; 24 runs is a small sample.
+The three dials are `POTENCY_PER_FLOOR` (26% harder per floor, capped at 3.2x on
+floor 10), the enemy count (`7 + depth`) and how fast wraiths grow more common
+(1.25x per floor). Yeti's damage is a fourth: flat armour loses against damage
+that scales, and raising his damage from 9-13 to 12-17 is what took him off the
+floor. Raising his armour instead took him to 33% in one step, which is the same
+rule from the other side.
 
-Measured stage by stage, on the same seeds:
-
-| | escapes |
-| --- | --- |
-| no equipment at all | 17–33% |
-| equipment, no chests | 38–46% |
-| equipment and chests | 17–33% |
-
-Loot doubles your chances and then the curses take it back. That is the bargain
-working: a chest is worth opening and worth thinking about.
-
-The shop is measured with the same instrument, over 40 seeds a hero:
-
-| | escapes |
-| --- | --- |
-| nothing bought | 38% Noxx · 48% Yeti · 62% Walkyrion |
-| every permanent upgrade, a bought weapon and a bought coat | 75% Noxx · 88% Yeti · 75% Walkyrion |
-
-A run banks 50–90 coin, and the full set of permanent upgrades costs 580 — so
-seven to ten runs before a hero is kitted out. That is meta-progression doing
-what it is for: the early runs are the hard ones, and the score is what you play
-for once they are not.
-
-The rare finds and the springs were measured the same way, by turning each off
-and playing the same seeds again. Both move the escape rate by less than the
-noise on a thirty-run sample, so neither of them is quietly carrying the game.
+Two things were measured and left alone. The rare finds and the springs move the
+escape rate by less than the noise on a thirty-run sample. And the fastest hero
+still strictly outruns everything in the dungeon, which is the one hard
+constraint in the whole balance: a single monster that outran Noxx would turn
+every other stat he has into decoration.
 
 ## Install
 
@@ -164,6 +147,11 @@ apart on purpose: the score is a record of the run, the purse is what the run wa
 worth to you afterwards. Running them together made every fight worth points
 whether or not it was worth fighting.
 
+The two currencies are also set against each other on purpose. The nameless run
+halves the score and doubles the coin, and the pilgrim's toll charges for every
+floor down while paying better for what you find there. A run is allowed to be
+about one or the other.
+
 The speed bonus is `(80 x floors cleared) - turns`, times ten, and never below
 zero. Eighty turns a floor is the budget; across 144 bot runs the median floor
 cost 63 and the quickest 34, so most runs score something and only a genuinely
@@ -206,6 +194,7 @@ mistake rather than a style.
 | `w` `a` `s` `d` / `h` `j` `k` `l` / arrows | Move (walk into an enemy to attack) |
 | `.` or `space` | Wait a turn |
 | `enter` | Interact: pick up what you are standing on, take the stairs, or use the spring |
+| `c` | Character sheet: every stat, all three slots, and what has been done to you |
 | `>` | Descend, when you already know that is what you want |
 | `q` | Drink a potion |
 | `c` | Character sheet: every stat, and what each piece is contributing |
@@ -241,15 +230,29 @@ death does not take away. It is spent in the shop, which `s` opens from the titl
 | --- | --- |
 | **Supplies** | draughts, used up next run |
 | **Gear** | a weapon or a coat, worn from the first step of the next run |
+| **Amulets** | all fourteen, and the only shelf where the thing you buy changes how a fight is fought |
 | **Upgrades** | permanent, bought in stacks, and the only thing here a bad run cannot take back |
 | **Wild offers** | two at a time, re-rolled after every run |
 
 The wild offers are the reason to look at the shop even when the sensible things
 are bought. Each is a bargain with a catch, and both halves are on the screen:
-the blind box is something from the deep that you do not get to look at first,
-greed doubles every coin and makes everything down there a fifth tougher, second
-wind turns the first killing blow of a run into a near miss. Prices are
-placeholders and will be tuned.
+
+| offer | what it gives | what it takes |
+| --- | --- | --- |
+| the blind box | something from the deep, unseen | you do not get to look first |
+| the wager | a coin, thrown into the dark | one face a blade, the other a curse |
+| greed | coins are worth double | everything below is a fifth tougher |
+| the pact | coins are worth half again as much | you start cursed, and the dark picks |
+| the pilgrim's toll | coins are worth half again as much | the dark takes five for each floor |
+| the nameless run | coins are worth double | and the score is worth half |
+| grave goods | grave iron in hand from the start | it is heavy, and it slows you down |
+| the hollow tooth | every kill feeds you three | and no draught will ever stay down |
+| the mirror of hunger | a draught heals half again as much | and something drinks beside you |
+| second wind | the first killing blow does not land | once a run, and no more |
+| the count's favour | every thirteenth kill heals you whole | you do not want to know who counts |
+| blood bargain | +0.15 speed, for good | -4 max health, for good |
+
+Prices are placeholders and will be tuned.
 
 A bought parcel is taken off the books the moment the next run starts, so a
 draught bought for a run is drunk in that run. Upgrades and the permanent wild
@@ -278,6 +281,44 @@ how far you get.
 or a coat (`[`). Whatever it replaces is set down on the floor *beside* you, so
 nothing is ever lost and walking back onto it puts it on again. Weapons raise
 damage and crit; armour raises armour, evasion and speed.
+
+The name grows with the thing, and the ladder is ordered by how rare it is:
+
+| | weapon | coat |
+| --- | --- | --- |
+| common | the rusted tooth, +1 damage | the thin hide, +1 armour |
+| | the grey bite, +2 damage, +5% crit | the grey shroud, +1 evasion |
+| | the long hunger, +2 damage, +10% crit | the swift step, +0.15 speed, +1 evasion |
+| rare | the heavy sorrow, +3 damage, -0.15 speed | the rune plate, +2 armour |
+| chest | the runed edge, +4 damage, +10% crit | warden plate, +3 armour |
+| chest | the last argument, +5 damage, +1 armour | shade cloak, +3 evasion |
+| chest | grave iron, +6 damage, -0.20 speed | the burial shroud, +2 armour, +2 evasion, -0.10 speed |
+
+**Amulets** (`"`) are the third slot and the only one that grants an ability
+rather than a number. There are fourteen, four of them lying about and the rest
+out of chests or the shop, and the strange half is the point:
+
+| amulet | what it does |
+| --- | --- |
+| the last ember | every kill puts two health back |
+| the coin hand | every coin is worth a quarter more |
+| the marrow | draughts heal half again as much |
+| the wayfarer | you know the way out when you arrive |
+| the rune heart | +1 max health for every floor down |
+| the mirror | whatever strikes you takes two back, straight through armour |
+| the grave ward | the first blow of each floor is halved |
+| the deathwatch | three armour under a third health |
+| the deep hunger | kills feed REVENGE one more stack |
+| the revenant's patience | you hit harder the longer you linger, up to four |
+| the second mouth | overhealing a draught becomes armour, up to four |
+| the dead weight | slower; your blows throw them back a square |
+| the patient knife | your first blow on each thing crits |
+| the borrowed face | the turn after a kill, nothing lands |
+
+A chest looks at what you are already wearing and prefers a slot you have not
+filled, so the second chest is not a second coat. It also gets better with depth:
+a chest on floor nine hands out the top of its tier, which is the only thing that
+keeps it worth the curse once every slot is full.
 
 **Chests** (`&`) are not loot, they are a question. Standing on one and pressing
 `enter` stops the game and shows you the price — and only the price. Whatever is
@@ -314,10 +355,10 @@ has been done to you.
 
 ## Not implemented yet
 
-A talent tree, equipment slots beyond the two, sound, saving mid-run, and hero
-unlocks. Two roster slots are shown locked and are not playable yet. A spring
-lifts a curse but the curses themselves are still only ever handed out by chests,
-and the wild offers are the same six every time they come round.
+A talent tree, a fourth equipment slot, sound, saving mid-run, and hero unlocks.
+Two roster slots are shown locked and are not playable yet. A spring lifts a
+curse but the curses themselves are still only ever handed out by chests, and the
+shop's prices are placeholders.
 
 The prologue is the only prose in the game, and it is shown once per session
 rather than once per run — told every run it stops being a premise and becomes a
@@ -328,8 +369,8 @@ toll.
 ```
 src/neverdeads_revenge/
 ├── core/     seeded rng, directions, energy-based turn queue
-├── world/    tiles, dungeon map, generator, field of view
-├── game/     actors, combat, game state, actions, curses, the shop
+├── world/    tiles, dungeon map, generator, items, field of view
+├── game/     actors, combat, game state, actions, curses, amulets, the shop
 └── ui/       Textual app, screens, widgets
 ```
 

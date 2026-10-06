@@ -2014,6 +2014,8 @@ async def test_bought_gear_is_worn_from_the_first_step():
 
 
 async def test_an_upgrade_bought_in_the_shop_reaches_the_next_run():
+    from neverdeads_revenge.game.shop import META_UPGRADES
+
     app = NeverdeadsRevenge()
     async with app.run_test(size=SIZE) as pilot:
         shop = await _open_shop(app, pilot, 500)
@@ -2027,7 +2029,10 @@ async def test_an_upgrade_bought_in_the_shop_reaches_the_next_run():
 
         screen = await drive_to_game(app, pilot)
 
-        assert screen.state.player.max_hp == screen.hero.stats.max_hp + 2
+        assert (
+            screen.state.player.max_hp
+            == screen.hero.stats.max_hp + META_UPGRADES["vigour"].max_hp
+        )
 
 
 async def test_the_shelf_turns_over_after_a_run():

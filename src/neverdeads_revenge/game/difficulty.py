@@ -32,13 +32,18 @@ __all__ = [
 ]
 
 #: Fraction added to health and damage per floor descended.
-POTENCY_PER_FLOOR = 0.15
+#:
+#: Raised from 0.15 once the shop, the amulets and the third slot existed. The
+#: floor-10 wall is the point: reaching the rift is meant to take several runs
+#: and a purse spent, and at 0.15 it took one run and no purse at all. Measured,
+#: not chosen -- see the escape rates in the README.
+POTENCY_PER_FLOOR = 0.26
 
 #: Ceiling on potency. Without it a floor-40 monster would be unplayable and any
-#: formula mistake would silently become exponential. Twice as hard as floor 1
-#: is already a lot; past that, difficulty should come from the enemy mix and the
+#: formula mistake would silently become exponential. Three times floor 1 is
+#: already a lot; past that, difficulty should come from the enemy mix and the
 #: count, not from bigger numbers.
-MAX_POTENCY = 2.0
+MAX_POTENCY = 3.2
 
 #: No monster may act this fast.
 #:

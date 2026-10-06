@@ -237,20 +237,27 @@ def test_gear_changes_the_numbers_it_says_it_does():
 
 
 def test_vigour_is_health_you_actually_start_with():
+    # Read off the table rather than written down twice: these numbers are
+    # tuned against the bots, and a test that hardcodes them fails every time
+    # the wall is measured again without saying anything about the game.
+    per_stack = META_UPGRADES["vigour"].max_hp
     plain = start_run(NOXX, seed=3)
     tough = start_run(NOXX, seed=3, loadout=Loadout(upgrades={"vigour": 3}))
 
-    assert tough.player.max_hp == plain.player.max_hp + 6
+    assert tough.player.max_hp == plain.player.max_hp + per_stack * 3
     assert tough.player.hp == tough.player.max_hp, "bought health you do not have"
 
 
 def test_haste_and_lantern_do_what_they_say():
+    per_stack = META_UPGRADES["haste"].speed
     plain = start_run(NOXX, seed=3)
     upgraded = start_run(
         NOXX, seed=3, loadout=Loadout(upgrades={"haste": 2, "lantern": 1})
     )
 
-    assert upgraded.player.speed == pytest.approx(plain.player.speed + 0.10)
+    assert upgraded.player.speed == pytest.approx(
+        plain.player.speed + per_stack * 2
+    )
     assert upgraded.sight_radius == plain.sight_radius + 1
 
 
@@ -272,9 +279,10 @@ def test_the_blood_bargain_can_never_leave_a_hero_at_nothing():
 
 
 def test_upgrades_are_applied_to_every_hero_the_same_way():
+    per_stack = META_UPGRADES["vigour"].max_hp
     for hero in (NOXX, YETI):
         state = start_run(hero, seed=3, loadout=Loadout(upgrades={"vigour": 1}))
-        assert state.player.max_hp == hero.stats.max_hp + 2, hero.key
+        assert state.player.max_hp == hero.stats.max_hp + per_stack, hero.key
 
 
 def test_the_blind_box_always_hands_something_over():
