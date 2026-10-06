@@ -17,12 +17,15 @@ from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
+from ...game.shop import describe_item
+from ...world.items import ITEMS
+
 from ...game.state import GameState
 
 __all__ = ["CharacterScreen"]
 
 #: Slots, in the order they are shown.
-SLOTS: tuple[str, ...] = ("weapon", "armour")
+SLOTS: tuple[str, ...] = ("weapon", "armour", "amulet")
 
 
 class CharacterScreen(ModalScreen[None]):
@@ -81,8 +84,13 @@ class CharacterScreen(ModalScreen[None]):
             if item is None:
                 lines.append(f"[dim]{slot:<9}[/][dim]nothing[/]")
                 continue
-            changes = ", ".join(item.modifiers.describe()) or "no effect"
-            lines.append(f"[dim]{slot:<9}[/][bold]{item.name}[/]  [dim]{changes}[/]")
+            # The same describer the shop uses, so a blade reads the same in
+            # both places -- and an amulet, whose effect is a sentence rather
+            # than a list of numbers, reads as one.
+            lines.append(
+                f"[dim]{slot:<9}[/][bold]{item.name}[/]  "
+                f"[dim]{describe_item(ITEMS[item.item_id])}[/]"
+            )
 
         lines.append("")
         lines.append(_row("carried", _carried(state)))

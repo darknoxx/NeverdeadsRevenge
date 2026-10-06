@@ -142,6 +142,12 @@ class GameState:
     enemy_hp_multiplier: float = 1.0
     #: Killing blows left before one of them lands. Second wind.
     extra_lives: int = 0
+    #: Player turns during which nothing can land a blow on you. The borrowed
+    #: face, set to one by a kill and counted down by the world.
+    shrouded: int = 0
+    #: Whether the grave ward is still unspent on this floor. Armed when the
+    #: floor is built, spent by the first blow that reaches you.
+    ward_ready: bool = False
 
     # -- curses -------------------------------------------------------------
     def add_curse(self, curse: Curse) -> None:
@@ -219,11 +225,67 @@ class GameState:
 
     @property
     def heal_scale(self) -> float:
-        """What a draught is worth, as a fraction of what it says on the tin."""
+        """What a draught is worth, as a fraction of what it says on the tin.
+
+        Curses take their share and the marrow adds to it, and the two are meant
+        to be able to meet: FAMINE halves a draught and the marrow makes it half
+        again as much, which is the whole reason the marrow is worded that way.
+        """
         scale = 1.0
         for curse in self.curses:
             scale *= curse.heal_scale
+        if self.has_passive("marrow"):
+            scale *= 1.5
         return scale
+
+    # -- amulets ------------------------------------------------------------
+    @property
+    def amulet(self) -> str | None:
+        """The ability the worn amulet grants, or ``None``.
+
+        One slot, so one ability. A second amulet would be a second rule to hold
+        in your head at the same time, and the three slots already ask for two.
+        """
+        worn = self.player.equipment.get("amulet")
+        return worn.amulet if worn is not None else None
+
+    def has_passive(self, key: str) -> bool:
+        """Whether the worn amulet is this one."""
+        return self.amulet == key
+
+    @property
+    def coin_factor(self) -> float:
+        """What a dropped coin is multiplied by, from every source.
+
+        The wilds set ``coin_multiplier``; the coin hand multiplies it on top.
+        Kept apart so a wild can be re-applied or replaced without having to know
+        what the amulet is doing.
+        """
+        factor = self.coin_multiplier
+        if self.has_passive("coin_hand"):
+            factor *= 1.25
+        return factor
+
+    def refresh_passives(self) -> None:
+        """Recompute the two amulets whose effect depends on the moment.
+
+        Written on every call rather than only when something changed, for the
+        same reason REVENGE is: a bonus that is written rather than nudged cannot
+        leave a residue behind when its condition stops being true.
+        """
+        player = self.player
+        player.passive_armor = 0
+        player.passive_damage = 0
+
+        amulet = self.amulet
+        if amulet == "deathwatch" and player.hp * 3 <= player.max_hp:
+            player.passive_armor += 3
+        if amulet == "patience":
+            # Four at turn forty, which is about the point a careful floor stops
+            # being careful and starts being a fight. The score wants you gone
+            # quickly and this amulet wants you to stay; that argument is the
+            # whole reason it exists.
+            player.passive_damage += min(4, self.turn // 10)
 
     # -- logging ------------------------------------------------------------
     def say(self, text: str, kind: LogKind = LogKind.PLAIN) -> None:
@@ -316,12 +378,45 @@ class GameState:
         self.revenge_stacks = 0
         apply_revenge(self.player, 0)
 
+        self.arm_amulets()
+
         self.say(f"You descend to floor {depth}.", LogKind.SYSTEM)
         if floor.is_final:
             self.say("A rift tears the dark open, and beyond it: air.", LogKind.GOOD)
         if self.enemies:
             self.say(f"{len(self.enemies)} shapes move in the dark.", LogKind.PLAIN)
         return floor
+
+    def arm_amulets(self) -> None:
+        """Whatever the worn amulet does at the start of a floor.
+
+        Called from ``build_floor`` and again from :func:`start_run`, because the
+        first floor is built before the shop's parcel is opened. Without the
+        second call an amulet bought or found for this run would sit out the floor
+        it was bought for -- the same trap the wild offers fell into.
+
+        Every step has to survive being run twice on the same floor, which is why
+        the rune heart is guarded by depth and the rest are plain assignments.
+        """
+        self.player.stored_armor = 0
+        self.shrouded = 0
+        for enemy in self.enemies:
+            enemy.struck = False
+
+        if self.depth > 1 and self.has_passive("rune_heart"):
+            # Only on the way down. Paying out on floor one as well would make
+            # "every floor you descend" one floor more than it says.
+            self.player.stats.max_hp += 1
+            self.player.stats.hp += 1
+
+        if self.has_passive("wayfarer") and self.exit_pos is not None:
+            # Dimly, the way anywhere else you have walked past is drawn. The map
+            # already knows how to show a place you have been and cannot see; this
+            # only tells it that you have been there.
+            self.dungeon_map.explored.add(self.exit_pos)
+
+        self.ward_ready = self.has_passive("grave_ward")
+        self.refresh_passives()
 
     @property
     def exit_pos(self) -> Pos | None:
@@ -491,9 +586,10 @@ def start_run(
     _apply_upgrades(state, permanent)
     _apply_pending(state, loadout.pending)
     _apply_wilds(state, loadout.wilds)
-    # The floor is already built, so anything the wilds changed about the
-    # monsters has to be applied to them now.
+    # The floor is already built, so anything the loadout changed about the
+    # monsters or the amulet has to be applied to it now.
     state.toughen_enemies()
+    state.arm_amulets()
     return state
 
 
@@ -520,6 +616,11 @@ def _apply_upgrades(state: GameState, upgrades: dict[str, int]) -> None:
     player.stats.hp = player.stats.max_hp
 
 
+def _the(name: str) -> str:
+    """``the`` before a name that needs one, and not before one that has it."""
+    return name if name.startswith("the ") else f"the {name}"
+
+
 def _receive(state: GameState, template) -> None:
     """Put an item where it belongs: draughts in the pack, the rest worn."""
     item = make_item(template)
@@ -536,7 +637,10 @@ def _apply_pending(state: GameState, keys) -> None:
         if template is None:
             continue
         _receive(state, template)
-        state.say(f"You start with the {template.name}.", LogKind.SYSTEM)
+        state.say(
+            f"You start with {_the(template.name)}.",
+            LogKind.SYSTEM,
+        )
 
 
 def _apply_wilds(state: GameState, keys) -> None:

@@ -110,6 +110,7 @@ def terrain_legend() -> list[tuple[str, str]]:
 _KIND_BLURB: dict[str, str] = {
     "weapon": "weapon, +damage",
     "armour": "armour, +defence",
+    "amulet": "amulet, a passive",
 }
 
 

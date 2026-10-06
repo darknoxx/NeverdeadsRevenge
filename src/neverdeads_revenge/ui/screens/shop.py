@@ -15,7 +15,7 @@ from __future__ import annotations
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
@@ -76,7 +76,11 @@ class ShopScreen(ModalScreen[None]):
         with Vertical(id="shop"):
             yield Static("THE SHOP", id="shop-title")
             yield Static(id="shop-gold")
-            yield Static(id="shop-list")
+            # The shelf scrolls. Fourteen amulets alone do not fit a terminal,
+            # and a shop that hides half its stock behind a clipped panel is a
+            # shop where the good thing is the thing you never saw.
+            with VerticalScroll(id="shop-list"):
+                yield Static(id="shop-rows")
             yield Static(id="shop-message")
             yield Static(
                 "up/down choose   [bold]enter[/] buy   [bold]s[/] leave",
@@ -138,8 +142,15 @@ class ShopScreen(ModalScreen[None]):
     # -- drawing ------------------------------------------------------------
     def _draw(self) -> None:
         self.query_one("#shop-gold", Static).update(self._gold_line())
-        self.query_one("#shop-list", Static).update(self._list())
+        rows, selected = self._list()
+        self.query_one("#shop-rows", Static).update(rows)
         self.query_one("#shop-message", Static).update(self.message)
+        # Kept two rows off the top edge so the line above the selection is
+        # visible: a cursor at the very top of a scrolled list looks like the
+        # list has ended.
+        self.query_one("#shop-list", VerticalScroll).scroll_to(
+            y=max(0, selected - 2), animate=False
+        )
 
     def _gold_line(self) -> Text:
         line = Text(no_wrap=True)
@@ -148,17 +159,29 @@ class ShopScreen(ModalScreen[None]):
         line.append("  coins")
         return line
 
-    def _list(self) -> Text:
+    def _list(self) -> tuple[Text, int]:
+        """The whole shelf, and which line the cursor is on.
+
+        The line number is what the scroll box needs, and counting it here is the
+        only place that knows how many lines a row took -- a wild offer is two.
+        """
         body = Text(no_wrap=True)
         section = None
+        line = 0
+        selected = 0
         for position, offer in enumerate(self.offers):
             if offer.section != section:
                 if section is not None:
                     body.append("\n")
+                    line += 1
                 body.append(f"{offer.section}\n", style="bold cyan")
+                line += 1
                 section = offer.section
+            if position == self.index:
+                selected = line
             self._row(body, offer, position == self.index)
-        return body
+            line += 1 + (1 if offer.catch else 0)
+        return body, selected
 
     def _row(self, body: Text, offer: Offer, selected: bool) -> None:
         """One line: cursor, name, price, what it does.

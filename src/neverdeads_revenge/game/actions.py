@@ -39,6 +39,21 @@ __all__ = [
 ]
 
 
+#: What the last ember puts back on a kill.
+EMBER_HEAL = 2
+
+#: What the mirror gives back to whatever struck you. Straight, not through
+#: armour -- see :meth:`~neverdeads_revenge.game.actors.Stats.reflect`.
+MIRROR_REFLECTION = 2
+
+#: The most armour the second mouth will hold at once.
+#:
+#: Uncapped, one elixir drunk while barely hurt is nineteen armour, which is
+#: most of a floor spent untouchable for thirty gold. Four is enough to matter
+#: and not enough to end the argument.
+SECOND_MOUTH_CAP = 4
+
+
 class Action(Enum):
     """Everything the player can do."""
 
@@ -109,6 +124,16 @@ class ActionResult:
 # -- helpers ---------------------------------------------------------------
 
 
+def _the(name: str) -> str:
+    """``the`` before a name that needs one, and not before one that has it.
+
+    Half the equipment is called "the something" -- every amulet is, and the
+    strongest blades are -- and "You start with the the patient knife" is the
+    sort of thing that makes a whole screen look unfinished.
+    """
+    return name if name.startswith("the ") else f"the {name}"
+
+
 def _remove_corpse(state: GameState, enemy: Actor) -> None:
     enemy.alive = False
     state.enemies.remove(enemy)
@@ -125,8 +150,20 @@ def _kill_message(state: GameState, enemy: Actor, outcome) -> None:
     _drop_coins(state, enemy)
 
     player = state.player
+
+    if state.has_passive("ember"):
+        healed = player.stats.heal(EMBER_HEAL)
+        if healed:
+            state.say(f"The ember catches: {healed} back.", LogKind.GOOD)
+
+    if state.has_passive("borrowed_face"):
+        # One turn of nobody being able to land on you. The world counts it down,
+        # and the monsters that answer this very kill are the ones it covers.
+        state.shrouded = 1
+
     before = state.revenge_stacks
-    state.revenge_stacks = apply_revenge(player, before + 1)
+    gain = 1 + (1 if state.has_passive("long_hunger") else 0)
+    state.revenge_stacks = apply_revenge(player, before + gain)
     if state.revenge_stacks > before:
         # Say what it actually granted, not what it granted back when the game
         # had one hero. "REVENGE 3: +3 armour" is the whole point of the trait
@@ -150,7 +187,7 @@ def _drop_coins(state: GameState, enemy: Actor) -> None:
     if high <= 0:
         return
 
-    value = max(1, round(state.rng.between(low, high) * state.coin_multiplier))
+    value = max(1, round(state.rng.between(low, high) * state.coin_factor))
     existing = state.dungeon_map.item_at(enemy.position)
     if existing is not None and existing.kind == "coin":
         # Two kills in the same corner should be one bigger pile, not one pile
@@ -173,6 +210,10 @@ def _player_takes_damage(state: GameState, enemy: Actor, outcome) -> None:
         state.say(f"The {enemy.name} attacks and misses you.", LogKind.PLAIN)
     if outcome.killed:
         state.die(f"You are slain by the {enemy.name}.")
+
+    # The deathwatch turns on the moment the wound lands, so it is recomputed
+    # before the next thing in the queue swings.
+    state.refresh_passives()
 
 
 def _enemy_takes_damage(state: GameState, enemy: Actor, outcome) -> None:
@@ -211,6 +252,8 @@ def perform_action(state: GameState, action: Action) -> ActionResult:
     """
     if state.over:
         return _outcome(state, consumed_turn=False, acted=False)
+
+    state.refresh_passives()
 
     match action:
         case Action.INTERACT:
@@ -294,13 +337,49 @@ def _bleed(state: GameState) -> None:
 
 
 def _resolve_player_attack(state: GameState, target: Actor) -> None:
-    outcome = attack(state.player, target, state.rng)
+    # The patient knife only makes the *first* blow count double, so something
+    # has to remember whether there has been one. The flag is cleared on every
+    # descent, with the monsters it belonged to.
+    first = not target.struck
+    outcome = attack(
+        state.player,
+        target,
+        state.rng,
+        force_crit=first and state.has_passive("patient_knife"),
+    )
+    target.struck = True
+
     if not outcome.hit:
         state.say(f"You swing at the {target.name} and miss.", LogKind.PLAIN)
         return
+
+    if outcome.crit and state.has_passive("patient_knife") and first:
+        state.say("It has been waiting for this one.", LogKind.GOOD)
+
     _enemy_takes_damage(state, target, outcome)
     if outcome.killed:
         _remove_corpse(state, target)
+        return
+
+    if state.has_passive("dead_weight"):
+        _knock_back(state, target)
+
+
+def _knock_back(state: GameState, target: Actor) -> None:
+    """Throw ``target`` one square further away, if there is anywhere to go.
+
+    The one amulet that trades a stat for a rule, and the rule has to be worth the
+    trade. It is not free damage -- it is a turn the monster spends walking back,
+    which is the thing a slow hero needs more than anything.
+    """
+    away = direction_towards(state.player.position, target.position)
+    landing = away.step(target.position)
+    if not state.dungeon_map.is_walkable(landing):
+        return
+    if state.actor_at(landing) is not None:
+        return
+    target.position = landing
+    state.say(f"The weight of it throws the {target.name} back.", LogKind.GOOD)
 
 
 def _interact(state: GameState) -> ActionResult:
@@ -464,7 +543,7 @@ def _pick_up(state: GameState) -> ActionResult:
         _equip(state, item)
     else:
         state.inventory.append(item)
-        state.say(f"You pick up the {item.name}.", LogKind.GOOD)
+        state.say(f"You pick up {_the(item.name)}.", LogKind.GOOD)
     return ActionResult(consumed_turn=False, acted=False)
 
 
@@ -506,12 +585,13 @@ def _equip(state: GameState, item: GroundItem) -> None:
     detail = f" ({changes})" if changes else ""
 
     if previous is None:
-        state.say(f"You take up the {item.name}{detail}.", LogKind.GOOD)
+        state.say(f"You take up {_the(item.name)}{detail}.", LogKind.GOOD)
         return
 
     if _set_down(state, previous):
         state.say(
-            f"You take up the {item.name}{detail} and set down the {previous.name}.",
+            f"You take up {_the(item.name)}{detail} and set down "
+            f"{_the(previous.name)}.",
             LogKind.GOOD,
         )
         return
@@ -519,7 +599,8 @@ def _equip(state: GameState, item: GroundItem) -> None:
     # Boxed in on every side. Rare, and the item is not thrown away for it.
     state.dungeon_map.add_item(player.position, previous)
     state.say(
-        f"You take up the {item.name}{detail}; the {previous.name} falls at your feet.",
+        f"You take up {_the(item.name)}{detail}; {_the(previous.name)} falls at "
+        f"your feet.",
         LogKind.GOOD,
     )
 
@@ -577,10 +658,22 @@ def _quaff(state: GameState) -> ActionResult:
             LogKind.BAD,
         )
     elif healed < amount:
-        state.say(
-            f"Its power spills past the wound; {amount - healed} is lost.",
-            LogKind.PLAIN,
-        )
+        spare = amount - healed
+        if state.has_passive("second_mouth"):
+            # Armour for this floor only. Carrying it down would make one drink
+            # on floor two worth something on floor nine.
+            kept = min(SECOND_MOUTH_CAP, player.stored_armor + spare) - player.stored_armor
+            player.stored_armor += kept
+            if kept:
+                state.say(
+                    f"The second mouth keeps what spills: {kept} armour.",
+                    LogKind.GOOD,
+                )
+        else:
+            state.say(
+                f"Its power spills past the wound; {spare} is lost.",
+                LogKind.PLAIN,
+            )
 
     # Drinking takes a turn, so it is not a free action in the middle of a fight
     # and monsters get their answer.
@@ -639,8 +732,34 @@ def take_turn(state: GameState, actor: Actor) -> bool:
 
 
 def _resolve_enemy_attack(state: GameState, attacker: Actor, player: Actor) -> None:
-    outcome = attack(attacker, player, state.rng)
+    if state.shrouded and state.has_passive("borrowed_face"):
+        state.say(
+            f"The {attacker.name} strikes at where you were, and finds nothing.",
+            LogKind.PLAIN,
+        )
+        return
+
+    warded = state.ward_ready and state.has_passive("grave_ward")
+    outcome = attack(attacker, player, state.rng, damage_scale=0.5 if warded else 1.0)
+
     _player_takes_damage(state, attacker, outcome)
+
+    if warded and outcome.hit:
+        # Spent by a blow that landed, not by a swing. "The first blow of each
+        # floor" is what the amulet says, and a swing that missed was not one.
+        state.ward_ready = False
+        state.say("The ward takes half of it, and is spent.", LogKind.GOOD)
+
+    if outcome.hit and state.has_passive("mirror"):
+        # Whatever struck you wears it. Two points is small against a deep-floor
+        # monster and is not meant to be the answer -- it is meant to make a
+        # crowd of small things into a decision.
+        back = attacker.stats.reflect(MIRROR_REFLECTION)
+        if back:
+            state.say(f"The mirror gives {back} of it back.", LogKind.GOOD)
+        if not attacker.stats.alive:
+            state.say(f"The {attacker.name} comes apart on its own blow.", LogKind.GOOD)
+            _remove_corpse(state, attacker)
 
 
 def _move_towards_player(
@@ -686,13 +805,19 @@ def advance_world(state: GameState) -> None:
     monsters get an action in before the queue hands control back. A speed-0.7
     ghoul only gets to move about every second player turn.
     """
+    state.refresh_passives()
     for _ in range(MAX_ENEMY_ACTIONS_PER_PLAYER_TURN):
         if state.over:
-            return
+            break
         actor = state.turn_queue.pop()
         if actor is None:
-            return
+            break
         if actor.is_player:
-            return  # back to the player
+            break  # back to the player
         if actor.alive:
             take_turn(state, actor)
+
+    # Counted down here rather than once per turn, so the borrowed face covers
+    # exactly the monsters that answer the kill and not the ones after them.
+    if state.shrouded:
+        state.shrouded -= 1

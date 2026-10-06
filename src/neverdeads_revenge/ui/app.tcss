@@ -341,7 +341,17 @@ ShopScreen {
     margin: 0 0 1 0;
 }
 
+/* Capped and scrollable: the shelves grew past a terminal's height. The
+   scrollbar is hidden for the same reason the message log's is -- it would take
+   a column out of the detail text, and the hint already says how to move. */
 #shop-list {
+    width: 1fr;
+    height: auto;
+    max-height: 20;
+    scrollbar-size-vertical: 0;
+}
+
+#shop-rows {
     width: 1fr;
     height: auto;
 }

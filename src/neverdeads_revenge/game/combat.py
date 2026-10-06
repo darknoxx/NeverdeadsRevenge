@@ -94,18 +94,35 @@ def hit_chance(attacker: Actor, defender: Actor) -> float:
     return max(MIN_HIT_CHANCE, min(MAX_HIT_CHANCE, chance))
 
 
-def attack(attacker: Actor, defender: Actor, rng: Rng) -> AttackOutcome:
+def attack(
+    attacker: Actor,
+    defender: Actor,
+    rng: Rng,
+    *,
+    force_crit: bool = False,
+    damage_scale: float = 1.0,
+) -> AttackOutcome:
     """Resolve one attack from ``attacker`` against adjacent ``defender``.
 
     Mutates ``defender``'s health and the ``alive`` flag when it lands a killing
     blow. The caller is responsible for cleaning up the body.
+
+    ``force_crit`` and ``damage_scale`` exist for the two amulets that reach into
+    the dice: the patient knife makes a first blow a crit, and the grave ward
+    takes half of one. Both are passed in rather than read from the actors,
+    because the rules behind them live in ``game/`` and this function deliberately
+    knows nothing about amulets.
     """
     if not rng.chance(hit_chance(attacker, defender)):
         return AttackOutcome(hit=False, crit=False, damage=0, killed=False, dodged=True)
 
     base = attacker.damage_roll(rng)
-    crit = rng.chance(attacker.crit_chance)
+    crit = force_crit or rng.chance(attacker.crit_chance)
     damage = int(round(base * attacker.crit_multiplier)) if crit else base
+    if damage_scale != 1.0:
+        # Never nothing. A ward that turned a blow into a no-op would be a
+        # different amulet, and the message would be a lie.
+        damage = max(1, int(round(damage * damage_scale)))
 
     dealt = defender.hurt(damage)
     killed = not defender.stats.alive

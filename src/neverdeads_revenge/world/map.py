@@ -40,6 +40,9 @@ class GroundItem:
     contents: GroundItem | None = None
     #: Coins in a pile. Zero for everything that is not a coin.
     gold: int = 0
+    #: Which amulet ability this grants, by key. Like ``curse``, a string: the
+    #: rule belongs to ``game/``, and ``world/`` only carries the name of it.
+    amulet: str | None = None
 
 
 @dataclass(slots=True)

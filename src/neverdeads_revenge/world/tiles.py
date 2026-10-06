@@ -21,7 +21,7 @@ class Tile(Enum):
     DOOR = "+"
     STAIRS_DOWN = ">"
     RUBBLE = ","
-    GRASS = '"'
+    GRASS = "'"
     WATER = "~"
     #: The way out. Only the deepest floor has one, and standing on it ends the
     #: run in a victory rather than a death. A different tile from the stairs on

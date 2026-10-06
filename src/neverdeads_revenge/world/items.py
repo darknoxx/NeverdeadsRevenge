@@ -70,6 +70,10 @@ class ItemTemplate:
     weight_growth: float = 1.0
     #: Never rolled onto a floor. Chests hand these out, and only chests.
     chest_only: bool = False
+    #: Which amulet ability this grants, by key. ``None`` for everything that is
+    #: not an amulet. The rule lives in :mod:`game.amulets`; this is only the
+    #: name of it, the same way a chest carries a curse key.
+    amulet: str | None = None
 
 
 #: Glyph and colour per kind of thing. Weapons and armour follow the old
@@ -79,6 +83,11 @@ WEAPON_GLYPH = ")"
 WEAPON_COLOR = "bright_white"
 ARMOUR_GLYPH = "["
 ARMOUR_COLOR = "#b87333"
+
+#: An amulet. The old roguelike convention, and the reason grass had to move off
+#: this glyph: it is the one mark a player already reads as "wear this".
+AMULET_GLYPH = '"'
+AMULET_COLOR = "#f472b6"
 
 ITEMS: dict[str, ItemTemplate] = {
     # -- draughts ----------------------------------------------------------
@@ -183,6 +192,155 @@ ITEMS: dict[str, ItemTemplate] = {
         weight=2.0,
         weight_growth=1.15,
     ),
+    # -- amulets -----------------------------------------------------------
+    #
+    # A third slot, and the only one that grants an ability rather than a number.
+    # The weak ones lie about and can be bought; the strong ones come out of
+    # chests and from the shop. See :mod:`game.amulets` for what each one does --
+    # the name here has to match the name there, which a test checks.
+    "ember": ItemTemplate(
+        key="ember",
+        name="the last ember",
+        glyph=AMULET_GLYPH,
+        color=AMULET_COLOR,
+        kind="amulet",
+        slot="amulet",
+        amulet="ember",
+        # Low, so an amulet is a find rather than the usual thing on the floor.
+        weight=1.0,
+    ),
+    "coin_hand": ItemTemplate(
+        key="coin_hand",
+        name="the coin hand",
+        glyph=AMULET_GLYPH,
+        color=AMULET_COLOR,
+        kind="amulet",
+        slot="amulet",
+        amulet="coin_hand",
+        weight=1.0,
+    ),
+    "marrow": ItemTemplate(
+        key="marrow",
+        name="the marrow",
+        glyph=AMULET_GLYPH,
+        color=AMULET_COLOR,
+        kind="amulet",
+        slot="amulet",
+        amulet="marrow",
+        weight=1.0,
+    ),
+    "wayfarer": ItemTemplate(
+        key="wayfarer",
+        name="the wayfarer",
+        glyph=AMULET_GLYPH,
+        color=AMULET_COLOR,
+        kind="amulet",
+        slot="amulet",
+        amulet="wayfarer",
+        weight=1.0,
+    ),
+    "rune_heart": ItemTemplate(
+        key="rune_heart",
+        name="the rune heart",
+        glyph=AMULET_GLYPH,
+        color=AMULET_COLOR,
+        kind="amulet",
+        slot="amulet",
+        amulet="rune_heart",
+        chest_only=True,
+    ),
+    "mirror": ItemTemplate(
+        key="mirror",
+        name="the mirror",
+        glyph=AMULET_GLYPH,
+        color=AMULET_COLOR,
+        kind="amulet",
+        slot="amulet",
+        amulet="mirror",
+        chest_only=True,
+    ),
+    "grave_ward": ItemTemplate(
+        key="grave_ward",
+        name="the grave ward",
+        glyph=AMULET_GLYPH,
+        color=AMULET_COLOR,
+        kind="amulet",
+        slot="amulet",
+        amulet="grave_ward",
+        chest_only=True,
+    ),
+    "deathwatch": ItemTemplate(
+        key="deathwatch",
+        name="the deathwatch",
+        glyph=AMULET_GLYPH,
+        color=AMULET_COLOR,
+        kind="amulet",
+        slot="amulet",
+        amulet="deathwatch",
+        chest_only=True,
+    ),
+    "long_hunger": ItemTemplate(
+        key="long_hunger",
+        name="the long hunger",
+        glyph=AMULET_GLYPH,
+        color=AMULET_COLOR,
+        kind="amulet",
+        slot="amulet",
+        amulet="long_hunger",
+        chest_only=True,
+    ),
+    "patience": ItemTemplate(
+        key="patience",
+        name="the revenant's patience",
+        glyph=AMULET_GLYPH,
+        color=AMULET_COLOR,
+        kind="amulet",
+        slot="amulet",
+        amulet="patience",
+        chest_only=True,
+    ),
+    "second_mouth": ItemTemplate(
+        key="second_mouth",
+        name="the second mouth",
+        glyph=AMULET_GLYPH,
+        color=AMULET_COLOR,
+        kind="amulet",
+        slot="amulet",
+        amulet="second_mouth",
+        chest_only=True,
+    ),
+    "dead_weight": ItemTemplate(
+        key="dead_weight",
+        name="the dead weight",
+        glyph=AMULET_GLYPH,
+        color=AMULET_COLOR,
+        kind="amulet",
+        slot="amulet",
+        amulet="dead_weight",
+        # The one amulet that costs a stat, and the reason it can afford to.
+        modifiers=Modifiers(speed=-0.20),
+        chest_only=True,
+    ),
+    "patient_knife": ItemTemplate(
+        key="patient_knife",
+        name="the patient knife",
+        glyph=AMULET_GLYPH,
+        color=AMULET_COLOR,
+        kind="amulet",
+        slot="amulet",
+        amulet="patient_knife",
+        chest_only=True,
+    ),
+    "borrowed_face": ItemTemplate(
+        key="borrowed_face",
+        name="the borrowed face",
+        glyph=AMULET_GLYPH,
+        color=AMULET_COLOR,
+        kind="amulet",
+        slot="amulet",
+        amulet="borrowed_face",
+        chest_only=True,
+    ),
     # -- out of the chests -------------------------------------------------
     #
     # A tier of their own, never rolled onto a floor. Clearly better than
@@ -282,6 +440,7 @@ def make_item(template: ItemTemplate) -> GroundItem:
         kind=template.kind,
         slot=template.slot,
         modifiers=template.modifiers,
+        amulet=template.amulet,
     )
 
 
@@ -312,15 +471,26 @@ def roll_item(
     return rng.choice_weighted([(t, _weight_at(t, depth)) for t in pool])
 
 
-def roll_chest_contents(rng: Rng) -> ItemTemplate:
-    """What is inside a chest: one of the strong things, evenly.
+#: How much likelier a chest is to hold a blade or a coat than an amulet.
+#:
+#: Evenly was right when the strong tier was four blades and coats. Now that it
+#: holds fourteen things, an even split makes the blade the rare find and hands
+#: out amulets three chests running -- which is the thing the third slot was
+#: meant to fix. The chest is still not a second lottery: the player cannot
+#: influence it either way, and that is what "not a lottery" has always meant
+#: here. The mix is a design choice, not a dice roll.
+CHEST_GEAR_BIAS = 4.0
 
-    Evenly rather than weighted, because a chest is already a gamble on the
-    curse. Making the reward a second lottery on top of the first is two
-    surprises where the player was promised one.
-    """
+
+def roll_chest_contents(rng: Rng) -> ItemTemplate:
+    """What is inside a chest: one of the strong things."""
     strong = [t for t in ITEMS.values() if t.chest_only]
-    return rng.pick(strong)
+    return rng.choice_weighted(
+        [
+            (t, CHEST_GEAR_BIAS if t.kind in ("weapon", "armour") else 1.0)
+            for t in strong
+        ]
+    )
 
 
 def loot_count(depth: int) -> int:

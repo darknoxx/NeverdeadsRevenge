@@ -72,6 +72,17 @@ class Stats:
         self.hp = min(self.max_hp, self.hp + amount)
         return self.hp - before
 
+    def reflect(self, amount: int) -> int:
+        """Take ``amount`` straight, ignoring armour.
+
+        For the mirror. A reflection is not a blow, so the armour that turns a
+        blow aside has nothing to do with it -- and an amulet that says two and
+        delivers one against anything armoured is an amulet that lied.
+        """
+        amount = max(0, amount)
+        self.hp = max(0, self.hp - amount)
+        return amount
+
     def hurt(self, amount: int, bonus_armor: int = 0) -> int:
         """Apply ``amount`` after armour. Returns damage actually taken.
 
@@ -194,6 +205,21 @@ class Actor:
     #: How this actor wants to fight. Copied from the template so the AI does not
     #: have to carry the template around.
     behaviour: str = "aggressive"
+    #: Armour an amulet grants only under a condition -- the deathwatch, which
+    #: only counts while the wearer is nearly gone. Recomputed by the game, not
+    #: derived here: the condition is a rule, and rules live in ``game/``.
+    passive_armor: int = 0
+    #: Armour an amulet banked earlier -- what the second mouth does with a
+    #: draught that had nothing left to heal. Cleared when the floor changes,
+    #: because armour stored against one floor's monsters should not follow you
+    #: down to the next.
+    stored_armor: int = 0
+    #: Damage an amulet grants only under a condition. Recomputed like
+    #: ``passive_armor``.
+    passive_damage: int = 0
+    #: Whether the player has already landed a blow on this actor. The patient
+    #: knife only makes the *first* one a crit, so something has to remember.
+    struck: bool = False
 
     # -- combat -------------------------------------------------------------
     #
@@ -229,7 +255,13 @@ class Actor:
     @property
     def armor(self) -> int:
         """Armour from every source, for display and for combat."""
-        return self.stats.armor + self.armor_bonus + self.modifiers.armor
+        return (
+            self.stats.armor
+            + self.armor_bonus
+            + self.modifiers.armor
+            + self.passive_armor
+            + self.stored_armor
+        )
 
     @property
     def evasion(self) -> int:
@@ -251,7 +283,7 @@ class Actor:
     def damage_range(self) -> tuple[int, int]:
         """The damage roll before the dice, bonuses included."""
         low, high = self.stats.damage
-        bonus = self.damage_bonus + self.modifiers.damage
+        bonus = self.damage_bonus + self.modifiers.damage + self.passive_damage
         return (low + bonus, high + bonus)
 
     def distance_from(self, other: Actor) -> int:
@@ -271,9 +303,12 @@ class Actor:
         """Take a hit, after everything this actor has on.
 
         The armour is passed down to ``Stats`` rather than subtracted here so
-        there is exactly one place that knows what armour does.
+        there is exactly one place that knows what armour does. What is passed is
+        ``armor`` minus the base, so a new source of armour cannot be added to the
+        property and forgotten here -- which is the bug this line exists to not
+        have.
         """
-        return self.stats.hurt(amount, self.armor_bonus + self.modifiers.armor)
+        return self.stats.hurt(amount, self.armor - self.stats.armor)
 
     def __repr__(self) -> str:
         return f"Actor({self.name!r}, hp={self.hp}/{self.max_hp}, at={self.position})"

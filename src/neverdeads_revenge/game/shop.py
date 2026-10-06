@@ -24,6 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from neverdeads_revenge.core.rng import Rng
+from neverdeads_revenge.game.amulets import AMULETS, blurb_for
 from neverdeads_revenge.world.items import ITEMS, ItemTemplate, make_item
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "ShopItem",
     "SUPPLIES",
     "GEAR",
+    "AMULETS",
     "WildOffer",
     "WILD_OFFERS",
     "WILD_SLOTS",
@@ -150,6 +152,30 @@ GEAR: tuple[ShopItem, ...] = (
     ShopItem("leather", 40),
 )
 
+#: Amulets. All of them, priced by how much they change a run rather than by how
+#: rare they are -- the weak ones can be found lying about, so the shop selling
+#: them cheap is a convenience, and the strong ones are what the coin is for.
+#:
+#: The dead weight costs the most of the middle group because it is the only one
+#: that takes something away, and a thing that takes something away has to be
+#: worth buying anyway.
+AMULETS_FOR_SALE: tuple[ShopItem, ...] = (
+    ShopItem("wayfarer", 50),
+    ShopItem("coin_hand", 55),
+    ShopItem("ember", 60),
+    ShopItem("marrow", 65),
+    ShopItem("patience", 85),
+    ShopItem("deathwatch", 90),
+    ShopItem("second_mouth", 90),
+    ShopItem("mirror", 95),
+    ShopItem("grave_ward", 100),
+    ShopItem("dead_weight", 100),
+    ShopItem("rune_heart", 110),
+    ShopItem("patient_knife", 115),
+    ShopItem("long_hunger", 120),
+    ShopItem("borrowed_face", 130),
+)
+
 
 @dataclass(frozen=True, slots=True)
 class WildOffer:
@@ -221,7 +247,7 @@ WILD_SLOTS = 2
 
 
 #: The shelves, in the order the shop draws them.
-SECTIONS: tuple[str, ...] = ("SUPPLIES", "GEAR", "UPGRADES", "WILD OFFERS")
+SECTIONS: tuple[str, ...] = ("SUPPLIES", "GEAR", "AMULETS", "UPGRADES", "WILD OFFERS")
 
 
 class ShopError(Exception):
@@ -259,7 +285,14 @@ class Offer:
 
 
 def describe_item(template: ItemTemplate) -> str:
-    """A short line for what an item does, as the shop says it."""
+    """A short line for what an item does, as the shop says it.
+
+    An amulet's ability is a sentence rather than a list of numbers, so it comes
+    from the amulet table; everything else is its modifiers. The dead weight has
+    both, and the sentence is the part worth reading.
+    """
+    if template.amulet is not None:
+        return blurb_for(template.amulet)
     if template.heal:
         return f"heals {template.heal}"
     described = template.modifiers.describe()
@@ -296,6 +329,19 @@ def build_stock(progress) -> list[Offer]:
             Offer(
                 key=item.key,
                 section="GEAR",
+                label=template.name,
+                detail=describe_item(template),
+                price=item.price,
+                affordable=gold >= item.price,
+            )
+        )
+
+    for item in AMULETS_FOR_SALE:
+        template = item.template
+        offers.append(
+            Offer(
+                key=item.key,
+                section="AMULETS",
                 label=template.name,
                 detail=describe_item(template),
                 price=item.price,

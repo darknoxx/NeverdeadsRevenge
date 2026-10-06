@@ -19,11 +19,33 @@ from textual.widgets import Static
 
 from neverdeads_revenge.game.state import GameState
 from neverdeads_revenge.world.generator import ESCAPE_DEPTH
+from neverdeads_revenge.world.items import (
+    AMULET_GLYPH,
+    ARMOUR_GLYPH,
+    WEAPON_GLYPH,
+)
 
-__all__ = ["Hud"]
+__all__ = ["Hud", "SLOT_ORDER", "SHORT_NAME"]
 
 #: Width of the health bar, in cells. Fits the sidebar without wrapping.
 BAR_CELLS = 12
+
+#: The three slots, in the order the sidebar lists them.
+SLOT_ORDER: tuple[str, ...] = ("weapon", "armour", "amulet")
+
+#: The glyph the map draws each slot with. Weapons are ``)`` and coats are ``[``
+#: there; the sidebar has no business inventing a second alphabet for the same
+#: three things.
+SLOT_GLYPH: dict[str, str] = {
+    "weapon": WEAPON_GLYPH,
+    "armour": ARMOUR_GLYPH,
+    "amulet": AMULET_GLYPH,
+}
+
+#: Longest a slot's name may be here. The panel is clipped and all three share a
+#: line, so this is the number that keeps them on it; the whole name is on the
+#: character sheet behind ``c``.
+SHORT_NAME = 6
 
 
 class Hud(Static):
@@ -104,16 +126,21 @@ class Hud(Static):
                 style="green",
             )
 
-        # What is being worn, by slot. Emptied slots are shown as a dash rather
-        # than hidden, so the sidebar does not change height the first time
+        # What is being worn, all three on one line. Two lines became three with
+        # the amulet, and the sidebar is clipped: a third row here is a legend
+        # row gone, and the legend is where the way out is written. Emptied slots
+        # are shown as a dash rather than hidden, so nothing moves the first time
         # something is picked up.
-        for slot, label in (("weapon", "W"), ("armour", "A")):
+        for slot in SLOT_ORDER:
+            if slot != SLOT_ORDER[0]:
+                out.append("  ", style="dim")
             item = player.equipment.get(slot)
-            out.append(f"{label} ", style="dim")
+            out.append(f"{SLOT_GLYPH[slot]} ", style="dim")
             if item is None:
-                out.append("—\n", style="dim")
+                out.append("—", style="dim")
             else:
-                out.append(f"{item.name}\n", style="bold white")
+                out.append(item.name.split()[-1][:SHORT_NAME], style="bold white")
+        out.append("\n")
 
         # Where the run stands, and what it has scored. One line rather than two:
         # the sidebar is clipped and the legend gained the spring row, so the

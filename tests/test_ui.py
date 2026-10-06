@@ -2339,3 +2339,57 @@ def test_every_wild_offer_fits_the_shop_column():
         assert len(offer.catch) <= CATCH_WIDTH, (
             f"{key}: catch is {len(offer.catch)}, the column is {CATCH_WIDTH}"
         )
+
+
+def test_every_amulet_blurb_fits_the_shop_column():
+    """An amulet's ability is a sentence, and a sentence is easier to write too
+    long than a list of numbers is. One already was."""
+    from neverdeads_revenge.game.amulets import AMULETS
+    from neverdeads_revenge.ui.screens.shop import PITCH_WIDTH
+
+    for key, passive in AMULETS.items():
+        assert len(passive.blurb) <= PITCH_WIDTH, (
+            f"{key}: the blurb is {len(passive.blurb)}, the column is {PITCH_WIDTH}"
+        )
+
+
+async def test_the_shop_has_a_shelf_for_amulets():
+    from neverdeads_revenge.game.amulets import AMULETS
+    from neverdeads_revenge.game.shop import AMULETS_FOR_SALE
+    from neverdeads_revenge.ui.screens.shop import ShopScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        app.progress.gold = 999
+        await pilot.press("s")
+        await pilot.pause()
+
+        assert isinstance(app.screen, ShopScreen)
+        assert app.screen.query_one("#shop-rows").render()
+        shown = {offer.key for offer in app.screen.offers}
+        for item in AMULETS_FOR_SALE:
+            assert item.key in shown, item.key
+        assert set(AMULETS_FOR_SALE[i].key for i in range(len(AMULETS_FOR_SALE))) <= set(
+            AMULETS
+        )
+
+
+async def test_the_shop_scrolls_to_whatever_is_selected():
+    """Fourteen amulets do not fit a terminal, and a cursor the player cannot
+    see is a cursor that is not there."""
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        app.progress.gold = 999
+        await pilot.press("s")
+        await pilot.pause()
+
+        for _ in range(len(app.screen.offers) - 1):
+            await pilot.press("down")
+        await pilot.pause()
+
+        assert app.screen.index == len(app.screen.offers) - 1
+        # The last offer is a wild one, at the very bottom of the shelf.
+        rows = app.screen.query_one("#shop-rows")
+        assert rows.region.y < app.screen.query_one("#shop").size.height

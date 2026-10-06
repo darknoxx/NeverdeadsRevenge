@@ -1516,12 +1516,17 @@ def test_equipment_armour_actually_stops_a_hit():
 
 
 def test_an_item_that_is_not_equipment_never_fills_a_slot():
-    """Draughts stay draughts. A potion in the weapon slot would be absurd."""
+    """Draughts stay draughts. A potion in the weapon slot would be absurd.
+
+    Asserted in both directions: everything worn is a weapon, a coat or an
+    amulet, and everything with a slot is worn.
+    """
     from neverdeads_revenge.world.items import ITEMS as ALL_ITEMS
 
+    wearable = ("weapon", "armour", "amulet")
     for template in ALL_ITEMS.values():
         if template.slot is not None:
-            assert template.kind in ("weapon", "armour"), template.key
+            assert template.kind in wearable, template.key
             assert not template.heal, f"{template.key} both heals and is worn"
         else:
             assert template.kind == "draught", template.key
