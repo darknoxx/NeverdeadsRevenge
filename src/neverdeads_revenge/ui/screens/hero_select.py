@@ -1,25 +1,36 @@
 """Hero select.
 
-Milestone 1 ships one hero, but the screen already iterates over the roster so
-the next one costs a dictionary entry in :mod:`game.actors` and nothing else.
-Locked slots are shown rather than hidden, so the shape of what is coming is
-visible from the start.
+The roster is data, so the next hero costs a dictionary entry in
+:mod:`game.actors` and nothing else. Locked slots are shown rather than hidden,
+so the shape of what is coming is visible from the start.
+
+The chosen hero is drawn as their letter in the block font from
+:mod:`neverdeads_revenge.ui.blocks`, at the size the title spells its own name
+in, because that letter is what the player is about to spend the whole run
+looking for on the map. Choosing a character you have not seen is not much of a
+choice.
 """
 
 from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
+from textual.containers import Vertical
 from textual.screen import Screen
 from textual.widgets import Static
 
 from ...game.actors import HEROES, Hero
+from ..blocks import ROWS, render_word
 
-__all__ = ["HeroSelectScreen"]
+__all__ = ["HeroSelectScreen", "FUTURE_HEROES", "STAT_ROWS"]
 
 #: Slugs for heroes that exist as a design idea but not in code yet.
 FUTURE_HEROES = ("revenant", "warden")
+
+#: Rows in the stat table. ``app.tcss`` pins the widget to this number, so a row
+#: added here without a row added there is a row that gets clipped -- and a
+#: locked slot has no table at all, so the widget has to hold its height anyway.
+STAT_ROWS = 7
 
 
 class HeroSelectScreen(Screen[str]):
@@ -56,13 +67,25 @@ class HeroSelectScreen(Screen[str]):
         return self.slots[self._index]
 
     def compose(self) -> ComposeResult:
-        with Horizontal(id="hero-select"):
-            yield Static(id="hero-glyph")
-            yield Static(id="hero-name")
-            yield Static(id="hero-title")
-        yield Static(id="hero-blurb")
-        yield Static(id="hero-stats")
-        yield Static(id="hero-roster")
+        # One column, centred on the screen, so the letter, the name, the prose
+        # and the numbers all sit on the same axis. They used to be three
+        # separate blocks with three different left edges, and the prose sat
+        # against the left wall of the terminal.
+        #
+        # The centring is a container rather than ``align-h`` on the screen:
+        # Textual ignores horizontal alignment on a ``Screen`` itself, which is
+        # why the title screen wraps its own content the same way.
+        # The roster goes inside the card rather than beside it. A full-width
+        # child fills the container, and a container with nothing left over has
+        # nothing to centre -- which is why the card sat against the left wall
+        # while everything inside it looked correctly centred.
+        with Vertical(id="hero-select"):
+            with Vertical(id="hero-card"):
+                yield Static(id="hero-art")
+                yield Static(id="hero-name")
+                yield Static(id="hero-blurb")
+                yield Static(id="hero-stats")
+                yield Static(id="hero-roster")
 
     def on_mount(self) -> None:
         self.redraw()
@@ -71,26 +94,51 @@ class HeroSelectScreen(Screen[str]):
     def redraw(self) -> None:
         hero = self.current
         self.query_one("#hero-roster", Static).update(self._roster())
+        # One short line for the placeholder, a wrapped paragraph for a real
+        # hero. Centred for the one and left-aligned for the other: a single
+        # line sitting at the left edge of a forty-wide column reads as a
+        # mistake rather than as alignment.
+        self.query_one("#hero-blurb", Static).styles.text_align = (
+            "center" if hero is None else "start"
+        )
         if hero is None:
-            self.query_one("#hero-glyph", Static).update("[dim]?[/dim]")
-            self.query_one("#hero-name", Static).update("???")
-            self.query_one("#hero-title", Static).update("")
+            self.query_one("#hero-art", Static).update(self._locked_art())
+            self.query_one("#hero-name", Static).update("[dim]???[/]")
             self.query_one("#hero-blurb", Static).update(
                 "\n[dim]Not yet resurrected.[/dim]\n"
             )
             self.query_one("#hero-stats", Static).update("")
             return
 
-        # The glyph the player is about to spend the whole run looking at, in the
-        # colour they will be looking for. Choosing a character you have not seen
-        # is not much of a choice.
-        self.query_one("#hero-glyph", Static).update(
-            f"[bold {hero.color}]{hero.glyph}[/]"
+        self.query_one("#hero-art", Static).update(self._art(hero))
+        # Name and title on one line, in the hero's own colour. The small glyph
+        # that used to sit beside the name is gone: the letter above *is* the
+        # glyph now, and printing it twice at two sizes is one of them too many.
+        self.query_one("#hero-name", Static).update(
+            f"[bold {hero.color}]{hero.name}[/]  [dim]{hero.title}[/]"
         )
-        self.query_one("#hero-name", Static).update(hero.name)
-        self.query_one("#hero-title", Static).update(hero.title)
         self.query_one("#hero-blurb", Static).update(hero.blurb)
         self.query_one("#hero-stats", Static).update(self._stat_block(hero))
+
+    @staticmethod
+    def _art(hero: Hero) -> str:
+        """The hero's letter in blocks, in the colour they will be on the map."""
+        art = render_word(hero.glyph)
+        if not art:
+            # A hero whose letter the font does not carry still gets a card.
+            return f"[bold {hero.color}]{hero.glyph}[/]"
+        return f"[bold {hero.color}]" + "\n".join(art) + "[/]"
+
+    @staticmethod
+    def _locked_art() -> str:
+        """A question mark, centred in the same rows the real letters use.
+
+        The same height on purpose. A locked slot that collapsed to a single row
+        would make the whole screen jump as the player cycles through the roster,
+        and the jump would land exactly on the slot that has nothing to show.
+        """
+        margin = "\n" * (ROWS // 2)
+        return f"{margin}[dim]?[/]{margin}"
 
     def _roster(self) -> str:
         """One glyph per slot, the current one boxed, locked ones dim.
@@ -109,10 +157,18 @@ class HeroSelectScreen(Screen[str]):
             parts.append(f"[reverse] {cell} [/reverse]" if here else f" {cell} ")
         return "  ".join(parts)
 
-    def _stat_block(self, hero: Hero) -> str:
+    @staticmethod
+    def _stat_block(hero: Hero) -> str:
+        """The numbers, one row each.
+
+        The row count is fixed and ``app.tcss`` pins the widget to it, because a
+        table that changed height would move everything below it -- and a locked
+        slot has no table at all, so the card would shrink exactly where the
+        player is cycling past. ``tests/test_ui.py`` asserts the count.
+        """
         s = hero.stats
         rows = [
-            ("health", f"{s.max_hp}", self._health_note(s.max_hp)),
+            ("health", f"{s.max_hp}", HeroSelectScreen._health_note(s.max_hp)),
             ("speed", f"{s.speed:.2f}", "actions per turn"),
             ("crit", f"{s.crit_chance:.0%}", f"x{s.crit_multiplier:.1f} damage"),
             ("damage", f"{s.damage[0]}-{s.damage[1]}", "per hit"),

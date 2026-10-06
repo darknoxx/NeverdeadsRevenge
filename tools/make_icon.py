@@ -25,7 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from neverdeads_revenge.ui.screens.title import BLOCK  # noqa: E402
+from neverdeads_revenge.ui.blocks import BLOCK  # noqa: E402
 
 #: The icon is authored in a 256-unit square and scaled by the consumer.
 SIZE = 256

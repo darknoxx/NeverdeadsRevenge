@@ -393,7 +393,7 @@ def test_the_title_font_can_spell_the_whole_name():
     A title that quietly drops a letter is the failure mode this file was
     rewritten to fix, so the alphabet it needs is asserted rather than assumed.
     """
-    from neverdeads_revenge.ui.screens.title import BLOCK
+    from neverdeads_revenge.ui.blocks import BLOCK
 
     for char in "NEVERDEAD'S REVENGE":
         if char == " ":
@@ -403,7 +403,7 @@ def test_the_title_font_can_spell_the_whole_name():
 
 def test_every_title_glyph_is_the_same_height():
     """Ragged glyphs would make the block art shear on its baseline."""
-    from neverdeads_revenge.ui.screens.title import BLOCK, ROWS
+    from neverdeads_revenge.ui.blocks import BLOCK, ROWS
 
     for char, glyph in BLOCK.items():
         assert len(glyph) == ROWS, f"{char!r} is {len(glyph)} rows, not {ROWS}"
@@ -412,7 +412,7 @@ def test_every_title_glyph_is_the_same_height():
 
 def test_rendering_a_word_lines_the_glyphs_up():
     """One string per row, all the same width -- that is what makes it a block."""
-    from neverdeads_revenge.ui.screens.title import ROWS, render_word
+    from neverdeads_revenge.ui.blocks import ROWS, render_word
 
     rows = render_word("NEVERDEAD")
     assert len(rows) == ROWS
@@ -432,7 +432,7 @@ def test_the_title_art_is_solid_blocks_and_nothing_else():
 
 def test_unknown_characters_are_skipped_rather_than_crashing():
     """A font that raises on an unknown letter takes the title screen with it."""
-    from neverdeads_revenge.ui.screens.title import render_word
+    from neverdeads_revenge.ui.blocks import render_word
 
     assert render_word("N?E") == render_word("NE")
     assert render_word("123") == []
@@ -2176,3 +2176,126 @@ async def test_a_clean_hero_gets_no_dialog_either():
 
         assert isinstance(app.screen, GameScreen)
         assert "nothing on you" in state.log[-1].text
+
+
+# -- the hero portrait -------------------------------------------------------
+def test_the_font_carries_every_heros_letter():
+    """A hero whose letter the font lacks would draw a card with no portrait,
+    which is the one thing this screen exists to show."""
+    from neverdeads_revenge.game.actors import HEROES
+    from neverdeads_revenge.ui.blocks import BLOCK
+
+    for hero in HEROES.values():
+        assert hero.glyph in BLOCK, hero.key
+
+
+def test_the_font_carries_the_letters_the_locked_slots_will_need():
+    """Revenant and warden are two dictionary entries away from being real."""
+    from neverdeads_revenge.ui.blocks import BLOCK
+
+    for letter in "REVENANTWARDEN":
+        assert letter in BLOCK, letter
+
+
+def test_render_letter_colours_one_character():
+    from neverdeads_revenge.ui.blocks import render_letter
+
+    art = render_letter("N", "bold #a855f7")
+    assert art.startswith("[bold #a855f7]")
+    assert art.endswith("[/]")
+    assert "█" in art
+    assert render_letter("?") == "", "a letter the font lacks draws nothing"
+
+
+async def test_the_hero_select_draws_the_hero_letter_in_blocks():
+    """The glyph, at the size the title spells its own name in."""
+    from neverdeads_revenge.game.actors import HEROES
+    from neverdeads_revenge.ui.blocks import render_word
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await pilot.press("x")
+        await pilot.pause()
+
+        for _ in range(len(HEROES)):
+            hero = app.screen.current
+            assert hero is not None
+            art = str(app.screen.query_one("#hero-art").render())
+            assert [line.rstrip() for line in art.splitlines()] == [
+                line.rstrip() for line in render_word(hero.glyph)
+            ], hero.key
+            await pilot.press("right")
+            await pilot.pause()
+
+
+async def test_the_card_is_the_same_size_on_every_slot():
+    """Including the locked ones, which have no stat table to show at all.
+
+    A card that grew and shrank as the player cycled would move the roster --
+    the thing they are reading to work out where they are -- under their hands,
+    and it would move furthest on the slots with the least to say.
+    """
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await pilot.press("x")
+        await pilot.pause()
+
+        seen = set()
+        for _ in range(len(actors_module.HEROES) + len(FUTURE_HEROES)):
+            card = app.screen.query_one("#hero-card")
+            seen.add((card.region.y, card.size.height))
+            await pilot.press("right")
+            await pilot.pause()
+
+        assert len(seen) == 1, f"the card moves between slots: {seen}"
+
+
+def test_the_stat_table_is_the_row_count_the_css_pins_it_to():
+    """``app.tcss`` gives the widget a fixed height, so a row added to the table
+    without one added to the CSS is a row that silently gets clipped."""
+    from neverdeads_revenge.game.actors import HEROES
+    from neverdeads_revenge.ui.screens.hero_select import STAT_ROWS
+
+    for hero in HEROES.values():
+        assert len(HeroSelectScreen._stat_block(hero).splitlines()) == STAT_ROWS, hero.key
+
+
+async def test_the_hero_prose_and_numbers_start_on_the_same_column():
+    """The complaint this rewrite answers: the prose sat against the left wall.
+
+    Both are in one centred card now, so both start on its left edge, and the
+    card sits in the middle of the screen rather than at column zero.
+    """
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await pilot.press("x")
+        await pilot.pause()
+
+        blurb = app.screen.query_one("#hero-blurb")
+        stats = app.screen.query_one("#hero-stats")
+        card = app.screen.query_one("#hero-card")
+
+        assert blurb.region.x == stats.region.x, "the prose and the table disagree"
+        assert card.region.x > 0, "the card is still against the left wall"
+        centre = card.region.x + card.region.width / 2
+        assert abs(centre - app.size.width / 2) <= 1, "the card is not centred"
+
+
+async def test_the_hero_name_is_centred_over_the_numbers():
+    from neverdeads_revenge.ui.blocks import ROWS
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await pilot.press("x")
+        await pilot.pause()
+
+        art = app.screen.query_one("#hero-art")
+        name = app.screen.query_one("#hero-name")
+        assert art.size.height == ROWS
+        assert art.region.x + art.region.width / 2 == pytest.approx(
+            name.region.x + name.region.width / 2, abs=1
+        ), "the portrait and the name are not on the same axis"

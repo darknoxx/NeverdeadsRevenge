@@ -305,7 +305,7 @@ def test_the_block_motive_draws_the_hero_glyph_from_the_title_font(tmp_path):
     Derived rather than redrawn: a block letter duplicated by hand is a block
     letter that eventually disagrees with itself.
     """
-    from neverdeads_revenge.ui.screens.title import BLOCK
+    from neverdeads_revenge.ui.blocks import BLOCK
 
     generated = _generate(tmp_path, "--motive", "a")
     root = ET.fromstring(generated.read_text())

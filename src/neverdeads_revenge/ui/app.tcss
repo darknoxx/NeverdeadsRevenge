@@ -48,62 +48,69 @@ Screen {
 
 /* -- hero select ------------------------------------------------------- */
 
+/* Everything on one axis, centred both ways: the letter, the name, the prose
+   and the numbers. Three separate blocks with three different left edges was
+   what this screen was, and the prose sat against the left wall.
+
+   A container rather than align-h on the screen: Textual ignores horizontal
+   alignment on a Screen itself. */
 #hero-select {
     align: center middle;
     width: 1fr;
     height: 1fr;
 }
 
-/* The glyph the player is about to become. Wide enough for one character plus
-   its padding so the name beside it does not shift when the hero changes. */
-#hero-glyph {
-    width: 4;
+/* Exactly as wide as the stat block, which is the widest thing in it: the prose
+   wraps to this, the numbers fill it, and both start on the same column. A wider
+   card centred the numbers in the middle of a column of prose with a different
+   left edge, and the eye reads that as two blocks that failed to line up. */
+#hero-card {
+    width: 42;
+    height: auto;
+}
+
+/* The hero's letter at the size the title spells its own name in. Five wide,
+   so the column below it is what decides the layout, not this. */
+#hero-art {
+    width: 1fr;
     height: auto;
     content-align: center middle;
 }
 
 #hero-name {
-    width: auto;
-    content-align: left middle;
-    color: $accent;
-    text-style: bold;
-}
-
-#hero-title {
-    width: auto;
-    padding: 0 0 0 1;
-    content-align: left middle;
-    color: #8f8f8f;
-}
-
-#hero-blurb {
-    width: 56;
-    height: auto;
-    margin: 1 0 0 0;
-    content-align: center middle;
-}
-
-#hero-stats {
     width: 1fr;
     height: auto;
     margin: 1 0 0 0;
     content-align: center middle;
+    text-align: center;
+}
+
+/* A fixed five rows, which is what the longest blurb in the roster needs. The
+   card would otherwise grow and shrink as the player cycles, and everything
+   below the prose -- the numbers, the roster -- would move with it.
+   tests/test_ui.py asserts that every hero still fits. */
+#hero-blurb {
+    width: 1fr;
+    height: 5;
+    margin: 1 0 0 0;
+}
+
+/* Seven, matching STAT_ROWS in hero_select.py. Fixed, because a locked slot has
+   no table to show at all and the card has to be the same height on every slot. */
+#hero-stats {
+    width: 1fr;
+    height: 7;
+    margin: 1 0 0 0;
 }
 
 #hero-roster {
     width: 1fr;
     height: auto;
-    margin: 1 0 0 0;
+    margin: 2 0 0 0;
     content-align: center middle;
     color: #6b6b6b;
 }
 
-#hero-roster-hint {
-    width: 1fr;
-    height: auto;
-    content-align: center middle;
-    color: #6b6b6b;
-}
 
 /* -- game screen ------------------------------------------------------- */
 
