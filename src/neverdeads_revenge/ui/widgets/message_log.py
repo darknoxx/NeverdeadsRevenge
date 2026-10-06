@@ -22,6 +22,8 @@ KIND_STYLES: dict[LogKind, str] = {
     LogKind.GOOD: "bold green",
     LogKind.BAD: "bold red",
     LogKind.SYSTEM: "bold cyan",
+    # The same gold the coins are on the map, so the line and the pile match.
+    LogKind.COIN: "bold yellow",
 }
 
 

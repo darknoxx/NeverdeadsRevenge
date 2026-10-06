@@ -62,8 +62,14 @@ CURSES: dict[str, Curse] = {
     "bleed": Curse(
         key="bleed",
         name="BLEED",
-        price="a drop of blood every third step",
-        bleed_every=3,
+        price="a drop of blood every tenth step",
+        # Ten, not three. Three was a death sentence rather than a price: a
+        # floor is sixty turns and half of them are steps, so the old cadence
+        # cost thirteen health a floor and finished runs by itself. Ten still
+        # costs a real thing -- four or five health a floor, every floor, with
+        # no way to get it back but a draught -- and it leaves the player alive
+        # to regret it.
+        bleed_every=10,
     ),
     "frail": Curse(
         key="frail",

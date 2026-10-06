@@ -1147,13 +1147,14 @@ def _walk_one_step(state: GameState) -> bool:
 
 
 def test_bleed_costs_blood_on_a_cadence():
-    """Every third step, not every step: a drip, not a waterfall."""
+    """Every so many steps, not every step: a drip, not a waterfall."""
     from neverdeads_revenge.game.curses import CURSES
 
     state = start_run(NOXX, seed=1)
     state.add_curse(CURSES["bleed"])
     every = state.bleed_every
-    assert every == 3
+    assert every == CURSES["bleed"].bleed_every
+    assert every > 1, "a cadence of one is a waterfall"
 
     # One step short of the next payment.
     state.player.steps = every - 1
@@ -1962,3 +1963,21 @@ def test_the_hero_must_still_be_faster_than_everything_in_the_dungeon():
     assert MAX_ENEMY_SPEED > slowest, "the slow hero is meant to be outrun"
     for template in ENEMIES.values():
         assert scale_template(template, ESCAPE_DEPTH).stats.speed <= MAX_ENEMY_SPEED
+
+
+def test_bleed_is_a_price_and_not_a_sentence():
+    """It was one health every third step, and a floor is sixty turns of which
+    half are steps -- thirteen health a floor, which finished runs on its own.
+
+    Checked against a floor rather than against a number: what a curse costs has
+    to be read in the currency the run is spent in.
+    """
+    from neverdeads_revenge.game.curses import CURSES
+    from neverdeads_revenge.game.state import TURN_BUDGET_PER_FLOOR
+
+    every = CURSES["bleed"].bleed_every
+    steps_a_floor = TURN_BUDGET_PER_FLOOR // 2
+    assert steps_a_floor // every <= 6, f"bleed costs {steps_a_floor // every} a floor"
+
+    # And it still has to cost something, or it is not a curse.
+    assert steps_a_floor // every >= 2

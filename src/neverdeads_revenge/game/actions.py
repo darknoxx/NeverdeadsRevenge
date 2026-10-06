@@ -582,7 +582,7 @@ def _pick_up(state: GameState) -> ActionResult:
 
     if item.kind == "coin":
         state.gold += item.gold
-        state.say(f"You pocket {item.gold} coins.", LogKind.GOOD)
+        state.say(f"You pocket {item.gold} coins.", LogKind.COIN)
         return ActionResult(consumed_turn=False, acted=False)
 
     if item.slot:

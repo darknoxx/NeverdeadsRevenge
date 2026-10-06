@@ -79,6 +79,11 @@ class LogKind(Enum):
     GOOD = "good"
     BAD = "bad"
     SYSTEM = "system"
+    #: Coins. Their own kind because they are their own thing in this game --
+    #: the one resource that outlives the run -- so the log can colour the
+    #: meta-currency apart from loot, and the sound can be a coin rather than a
+    #: potion.
+    COIN = "coin"
 
 
 @dataclass(frozen=True, slots=True)

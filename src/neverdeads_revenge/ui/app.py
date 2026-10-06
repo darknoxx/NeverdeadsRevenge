@@ -23,6 +23,7 @@ from ..core.rng import Rng
 from ..game.shop import Loadout, loadout_from
 from ..game.state import GameState, RunState
 from ..persistence import load_meta, save_meta
+from .audio import Sfx
 from .hold import REPEAT_GAP
 from .screens.game import GameScreen
 from .screens.game_over import GameOverScreen
@@ -67,6 +68,9 @@ class NeverdeadsRevenge(App[None]):
         self.run_seed = seed
         #: What outlives a run. Loaded once, written on every ending. The file
         #: has been sitting there unread since the persistence layer was built.
+        #: Sound. Constructed once for the whole session and silent on a machine
+        #: with no player, which is most of them.
+        self.sfx = Sfx()
         self.progress = load_meta()
         # A save from a build without the rotating shelf has none on it, and an
         # empty shelf is not a shop.
@@ -161,6 +165,11 @@ class NeverdeadsRevenge(App[None]):
 
     def on_mount(self) -> None:
         self.push_screen("title")
+
+    def on_unmount(self) -> None:
+        # The worker is a daemon and would die with the process anyway; this is
+        # so it stops before the process does rather than during it.
+        self.sfx.close()
 
     # -- navigation ---------------------------------------------------------
     def open_hero_select(self) -> None:

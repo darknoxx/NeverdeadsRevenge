@@ -25,6 +25,7 @@ from ...game.actors import HEROES
 from ...game.shop import Loadout
 from ...game.prologue import GOAL_HINT, terrain_help
 from ...game.state import GameState, start_run
+from ..audio import loudest_kind, sound_for_kind
 from ..widgets.hud import Hud
 from ..widgets.legend import Legend
 from ..widgets.map_view import MapView
@@ -33,6 +34,7 @@ from .character import CharacterScreen
 from .chest import ChestScreen
 from .game_over import GameOverScreen
 from .name_entry import NameEntryScreen
+from .pause import PauseScreen
 from .spring import SpringScreen
 
 __all__ = ["GameScreen"]
@@ -193,8 +195,13 @@ class GameScreen(Screen[None]):
 
     def _do(self, action: Action) -> None:
         assert self.state is not None
+        before_log = len(self.state.log)
+        before_depth = self.state.depth
+        before_level = self.state.level
+
         result = perform_action(self.state, action)
         self._refresh_all()
+        self._sound_after(before_log, before_depth, before_level)
 
         if result.prompt is not None:
             # The domain says a decision is needed; the UI asks for it. The deed
@@ -218,10 +225,40 @@ class GameScreen(Screen[None]):
         if result.died or result.escaped:
             self._game_over(won=result.escaped)
 
+    def _sound_after(
+        self, before_log: int, before_depth: int, before_level: int
+    ) -> None:
+        """Make the noise the last thing that happened deserves.
+
+        A descent and a level are events rather than messages, so they are
+        checked first and take the turn's sound for themselves. Everything else
+        is read off the log, which already knows whether a line was a hit, a
+        crit or a wound -- so the rules are not written down a second time.
+
+        Nothing at all while the run is ending: ``_game_over`` has a sound of its
+        own and two at once is one too many.
+        """
+        assert self.state is not None
+        if self.state.over:
+            return
+        if self.state.depth != before_depth:
+            self._play("stairs")
+            return
+        if self.state.level != before_level:
+            self._play("level")
+            return
+        kind = loudest_kind(entry.kind for entry in self.state.log[before_log:])
+        self._play(sound_for_kind(kind) if kind is not None else None)
+
+    def _play(self, name: str | None) -> None:
+        if name:
+            self.app.sfx.play(name)
+
     def _chest_answer(self, open_it: bool | None) -> None:
         """Act on the answer. Walking away costs nothing at all."""
         if not open_it or self.state is None:
             return
+        self._play("chest")
         result = perform_action(self.state, Action.OPEN_CHEST)
         self._refresh_all()
         if result.died or result.escaped:
@@ -230,6 +267,7 @@ class GameScreen(Screen[None]):
     def _game_over(self, won: bool = False) -> None:
         assert self.state is not None
         state = self.state
+        self._play("victory" if won else "death")
         summary = Text(no_wrap=True)
         if won:
             summary.append(f"Out of the dark on floor {state.depth}\n", style="bold bright_cyan")
@@ -290,7 +328,9 @@ class GameScreen(Screen[None]):
         self.app.push_screen(CharacterScreen(self.state))
 
     def action_menu(self) -> None:
-        self.app.push_screen("pause", self._pause_result)
+        # An instance rather than a name, so the menu can be told whether the
+        # sound is on before it draws itself.
+        self.app.push_screen(PauseScreen(self.app.sfx), self._pause_result)
 
     def _pause_result(self, result: str | None) -> None:
         """Quit from the pause menu ends the run without a death."""

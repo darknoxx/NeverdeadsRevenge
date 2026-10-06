@@ -228,7 +228,7 @@ mistake rather than a style.
 | `c` | Character sheet: every stat, and what each piece is contributing |
 | `i` | Show what you are carrying |
 | `?` | Controls and the terrain reference |
-| `Esc` | Menu, `q` there to quit to title |
+| `Esc` | Menu: `r` resume, `m` sound on/off, `q` quit to title |
 
 On the **title screen**: any key starts a run, `s` opens the shop and `h` opens
 the scoreboard. In the **shop**: up/down choose, `enter` buys, `s` or `Esc`
@@ -243,6 +243,36 @@ are covered too: three presses do the same thing.
 The repeats a held key keeps sending are ignored by whatever screen comes next,
 so holding enter to start does not walk you around the first room printing
 "There is nothing here" — the next screen only acts on a new press.
+
+## Sound
+
+Chiptune, generated rather than recorded, and shipped with the package:
+
+```bash
+python3 tools/make_sounds.py            # regenerate them all
+python3 tools/make_sounds.py --list     # what there is, and how long
+```
+
+A Gameboy's two pulse channels are square waves with a duty cycle and its noise
+channel is noise, which between them is `math` and `struct` from the standard
+library -- so the sounds are synthesised exactly, with no samples, no
+dependencies and nothing to license. Twelve of them, sixty kilobytes, none
+longer than two thirds of a second. A test regenerates every file and fails if
+the committed one disagrees, the same way the icon is checked.
+
+The sounds are read off the message log, which already sorts itself into combat,
+crit, damage and the rest, so the rules are not written down a second time. A
+turn that produces three lines sounds like the worst thing that happened in it
+rather than like all three at once. Levels, descents, chests and the two endings
+are named events and get their own.
+
+**It is silent when it has to be.** A terminal game has no business assuming it
+can make a noise, so the player looks for `paplay`, `aplay`, `ffplay` or
+`afplay` (or the standard library on Windows), plays through one worker thread so
+sounds queue rather than overlap, and does nothing at all if it finds none -- no
+error, no delay, no missing feature. If the audio server goes away mid-run the
+game goes quiet and carries on. `m` in the pause menu turns it off, and
+`NEVERDEADS_REVENGE_MUTE=1` starts it off.
 
 ## Gold and the shop
 
@@ -372,7 +402,7 @@ the detour.
 | curse | what it takes |
 | --- | --- |
 | WITHER | a quarter of your health, taken now |
-| BLEED | a drop of blood every third step |
+| BLEED | a drop of blood every tenth step |
 | FRAIL | two points of armour, gone |
 | HEAVY | a quarter of your speed |
 | DIM | your sight, cut to five paces |
@@ -389,9 +419,9 @@ has been done to you.
 ## Not implemented yet
 
 A talent tree (levels are automatic for now, not a choice), a fourth equipment
-slot, sound, saving mid-run, and hero unlocks. Two roster slots are shown locked
-and are not playable yet. A spring lifts a curse but the curses themselves are
-still only ever handed out by chests.
+slot, music as opposed to sound effects, saving mid-run, and hero unlocks. Two
+roster slots are shown locked and are not playable yet. A spring lifts a curse
+but the curses themselves are still only ever handed out by chests.
 
 The prologue is the only prose in the game, and it is shown once per session
 rather than once per run — told every run it stops being a premise and becomes a

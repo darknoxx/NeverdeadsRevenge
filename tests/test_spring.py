@@ -138,7 +138,7 @@ def test_lifting_one_curse_leaves_the_others_working():
 def test_lifting_bleed_stops_the_bleeding():
     state = start_run(NOXX, seed=3)
     state.add_curse(CURSES["bleed"])
-    assert state.bleed_every == 3
+    assert state.bleed_every == CURSES["bleed"].bleed_every
 
     state.remove_curse(state.curses[0])
     assert state.bleed_every == 0

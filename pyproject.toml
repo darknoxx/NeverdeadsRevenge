@@ -30,6 +30,10 @@ ndr = "neverdeads_revenge.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/neverdeads_revenge"]
+# The sound effects are read at runtime, so they have to travel with the code
+# rather than sitting in assets/ with the desktop file. Named explicitly so a
+# future packaging change cannot quietly drop them and leave the game silent.
+include = ["src/neverdeads_revenge/sounds/*.wav"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
