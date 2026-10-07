@@ -9,6 +9,9 @@ crash and most machines running a terminal game have no business making noise.
 
 from __future__ import annotations
 
+import cmath
+import math
+import struct
 import subprocess
 import sys
 import time
@@ -573,3 +576,68 @@ def test_the_log_exists_from_the_moment_the_game_starts(tmp_path, monkeypatch):
     assert "aplay" in header
     assert "streams=True" in header
     sfx.close()
+
+
+# -- audible on the machine it is played on -----------------------------------
+#: A laptop speaker rolls off hard below about three hundred hertz, and that is
+#: where this game is played. A sound whose energy lives down there is a sound
+#: the game asks for, the device plays, and nobody hears.
+SPEAKER_FLOOR_HZ = 300.0
+
+#: The share of a sound's energy that may sit below it.
+MAX_LOW_SHARE = 0.35
+
+_DFT_N = 256
+_TWIDDLE = [
+    [cmath.exp(-2j * math.pi * k * i / _DFT_N) for i in range(_DFT_N)]
+    for k in range(_DFT_N // 2)
+]
+
+
+def _low_share(path) -> float:
+    """How much of a sound's energy is under the speaker's floor.
+
+    A small DFT rather than a band filter, because the question is about energy
+    and not about pitch: a low square wave has most of its *pitch* at the
+    fundamental and most of its *energy* in the harmonics, and it is the energy
+    that has to reach the ear.
+    """
+    with wave.open(str(path), "rb") as handle:
+        frames = handle.readframes(handle.getnframes())
+        rate = handle.getframerate()
+    samples = [sample[0] / 32768 for sample in struct.iter_unpack("<h", frames)]
+    chunk = (samples * (_DFT_N // len(samples) + 1))[:_DFT_N]
+
+    low = total = 0.0
+    for k in range(1, _DFT_N // 2):
+        freq = k * rate / _DFT_N
+        if freq > 4000:
+            break
+        row = _TWIDDLE[k]
+        power = abs(sum(chunk[i] * row[i] for i in range(_DFT_N))) ** 2
+        total += power
+        if freq < SPEAKER_FLOOR_HZ:
+            low += power
+    return low / total if total else 0.0
+
+
+def test_every_sound_can_be_heard_on_a_laptop():
+    """The failure this test was written for: the chest, the curse and taking a
+    blow were three quarters, a half and two fifths bass, and the sound was
+    reported as erratic because some of it simply never came out of the speaker.
+    """
+    for path in sorted(SOUNDS_DIR.glob("*.wav")):
+        share = _low_share(path)
+        assert share < MAX_LOW_SHARE, (
+            f"{path.stem} has {share:.0%} of its energy below "
+            f"{SPEAKER_FLOOR_HZ:.0f}Hz, where a laptop speaker rolls off"
+        )
+
+
+def test_the_most_common_sound_is_not_a_click():
+    """The hit was fifty milliseconds, which is a click rather than a note: the
+    ear needs about a tenth of a second to hear a pitch as a pitch."""
+    with wave.open(str(SOUNDS_DIR / "hit.wav"), "rb") as handle:
+        seconds = handle.getnframes() / handle.getframerate()
+
+    assert seconds >= 0.075, f"the hit is {seconds * 1000:.0f}ms"

@@ -66,15 +66,23 @@ SOUNDS: dict[str, tuple[Note, ...]] = {
     # little grit in it; a crit is the same shape an octave up and in two parts,
     # so it is unmistakably *more* than a hit; taking one is low, fat and harsh,
     # because the player has to hear it without looking.
+    # Eighty milliseconds and a higher sweep than it used to have. It was fifty
+    # milliseconds sweeping 340 to 190, which on a laptop is a click and a thump:
+    # the ear needs about a tenth of a second to hear a note as a note, and the
+    # small speakers in a laptop roll off hard below three hundred hertz. The
+    # most common sound in the game has to survive both.
     "hit": (
-        Note(340, 0.05, duty=0.5, to=190, noise=0.25),
+        Note(520, 0.08, duty=0.5, to=320, noise=0.25, volume=0.65),
     ),
     "crit": (
         Note(560, 0.035, duty=0.25, to=720),
         Note(820, 0.07, duty=0.25, to=500, noise=0.15),
     ),
+    # It was 190 to 85, which is a rumble a laptop cannot make at all: two
+    # fifths of its energy was under three hundred hertz. Still the lowest sound
+    # in the game, because taking a blow should sound like one.
     "hurt": (
-        Note(190, 0.11, duty=0.75, to=85, noise=0.45, volume=0.6),
+        Note(400, 0.12, duty=0.75, to=210, noise=0.45, volume=0.7),
     ),
     "kill": (
         Note(523, 0.05, duty=0.5),
@@ -100,11 +108,11 @@ SOUNDS: dict[str, tuple[Note, ...]] = {
         Note(784, 0.15, duty=0.25),
     ),
     "curse": (
-        Note(150, 0.22, duty=0.75, to=65, noise=0.5, volume=0.6),
+        Note(300, 0.20, duty=0.75, to=170, noise=0.5, volume=0.7),
     ),
     "chest": (
-        Note(110, 0.11, duty=0.75, noise=0.3),
-        Note(165, 0.20, duty=0.5, to=140, noise=0.2),
+        Note(330, 0.11, duty=0.75, noise=0.3, volume=0.6),
+        Note(495, 0.20, duty=0.5, to=390, noise=0.2, volume=0.6),
     ),
     # -- the two endings ---------------------------------------------------
     "death": (
