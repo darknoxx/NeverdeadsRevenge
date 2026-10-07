@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 from neverdeads_revenge.world.modifiers import Modifiers
 
-__all__ = ["Curse", "CURSES", "curse_by_key"]
+__all__ = ["Curse", "CURSES", "TOUCH_CURSES", "curse_by_key"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +96,17 @@ CURSES: dict[str, Curse] = {
         heal_scale=0.5,
     ),
 }
+
+
+#: What a monster's touch can leave behind, by key.
+#:
+#: Deliberately not the whole table. WITHER takes a quarter of your health for
+#: good, and a quarter of your health taken by a random blow in a corridor is
+#: not a price, it is a mugging -- that one belongs on a chest, where the player
+#: read it and said yes. These four are the ones that feel like something
+#: reaching through you: the dark closing in, the guard going slack, the weight,
+#: and the slow leak.
+TOUCH_CURSES: tuple[str, ...] = ("dim", "frail", "heavy", "bleed")
 
 
 def curse_by_key(key: str | None) -> Curse | None:

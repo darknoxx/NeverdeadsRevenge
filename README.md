@@ -235,6 +235,7 @@ mistake rather than a style.
 | `>` | Descend, when you already know that is what you want |
 | `q` | Drink a potion |
 | `c` | Character sheet: every stat, and what each piece is contributing |
+| `i` | What you are carrying and wearing, and what each of them does |
 | `i` | Show what you are carrying |
 | `?` | Controls and the terrain reference |
 | `Esc` | Menu: `r` resume, `m` sound on/off, `q` quit to title |
@@ -345,6 +346,34 @@ A bought parcel is taken off the books the moment the next run starts, so a
 draught bought for a run is drunk in that run. Upgrades and the permanent wild
 offer are not.
 
+## The people
+
+`8` is somebody. Not a monster and not a hero -- something that was returned, or
+something that never left, standing in a room and willing to say one true thing
+about the place. About one floor in four from the second one down, and never on
+the first, because floor one is where you learn what a monster looks like.
+
+They are solid: walking into one says so rather than silently refusing to move,
+and `enter` beside one is a conversation. They never take a turn, they cannot be
+attacked, and they never stand on the way out -- a conversation on the exit is a
+conversation you have to walk past twice.
+
+| | |
+| --- | --- |
+| **the Tally** | counts things in and does not count them out |
+| **Vesper** | was promised a morning |
+| **the Ninth** | got as far as the stairs and turned around |
+| **Cinder** | keeps a fire that does not warm anything |
+| **the Lamplighter** | has never lit one on the way back up |
+| **the Sexton** | digs, because there is nobody to bury |
+
+Each of them has several lines and says one per meeting, at random: hearing the
+same sentence twice from the same person is the moment a person becomes
+furniture. **They carry no mechanics at all** -- no quest, no trade, no reward --
+and that is deliberate. A line of lore is the cheapest thing in the game to add
+and the most expensive to get wrong, so the first version is one sentence and no
+promise. A quest is a promise, and a promise needs a system behind it.
+
 ## High score
 
 Every run ends by asking for a name — five slots, on a death and on an escape
@@ -423,6 +452,17 @@ occasionally does not: one of those blades or coats turns up lying on the floor
 with nothing owed for it. Rare enough to be a surprise, common enough to be worth
 the detour.
 
+**Wraiths leave something behind.** One blow in twenty, the wraith's touch sticks:
+the dark closes in, or your guard goes slack, or the weight, or the slow leak.
+Rare enough that a run can pass without it, often enough that a wraith is
+something you would rather not be touched by -- which is the point of the only
+monster here that is already fast, evasive and hard to out-trade.
+
+It is never WITHER. A quarter of your health taken by a random blow in a corridor
+is not a price, it is a mugging; that one belongs on a chest, where you read it
+and said yes. Every other curse in the game is something you agreed to, and this
+is the one that simply happens to you.
+
 | curse | what it takes |
 | --- | --- |
 | WITHER | a quarter of your health, taken now |
@@ -444,8 +484,8 @@ has been done to you.
 
 A talent tree (levels are automatic for now, not a choice), a fourth equipment
 slot, music as opposed to sound effects, saving mid-run, and hero unlocks. Two
-roster slots are shown locked and are not playable yet. A spring lifts a curse
-but the curses themselves are still only ever handed out by chests.
+roster slots are shown locked and are not playable yet. The people have nothing
+to trade and nothing to ask of you yet: quests are the next thing they need.
 
 The prologue is the only prose in the game, and it is shown once per session
 rather than once per run — told every run it stops being a premise and becomes a

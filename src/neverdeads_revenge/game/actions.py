@@ -22,10 +22,11 @@ from neverdeads_revenge.world.items import make_coin
 from neverdeads_revenge.world.map import GroundItem
 from neverdeads_revenge.world.tiles import Tile
 
-from .actors import Actor, make_enemy, pick_enemy_template
+from .actors import Actor, ActorKind, make_enemy, pick_enemy_template
 from .combat import apply_revenge, attack
-from .curses import curse_by_key
+from .curses import TOUCH_CURSES, CURSES, curse_by_key
 from .levels import apply_gain, gains_between, level_for
+from .npcs import npc_by_key
 from .state import GameState, LogKind, RunState
 
 __all__ = [
@@ -126,10 +127,12 @@ class ActionResult:
     #: The domain never draws a dialog. It says one is needed, and the UI asks --
     #: which is what keeps the whole decision tree testable without a terminal.
     prompt: str | None = None
-    #: Set when the thing underfoot is the spring rather than a chest. The two
-    #: need different dialogs and different answers, and a string cannot say
-    #: which one it is.
-    spring: bool = False
+    #: Which dialog the prompt belongs to. The domain never draws one; it says
+    #: one is needed and which question it is asking. Three kinds now -- a chest,
+    #: a spring, somebody talking -- and a fourth would want an enum.
+    prompt_kind: str = "chest"
+    #: Set when the prompt is somebody talking, so the dialog can title itself.
+    speaker: str = ""
 
 
 # -- helpers ---------------------------------------------------------------
@@ -259,10 +262,29 @@ def _player_takes_damage(state: GameState, enemy: Actor, outcome) -> None:
         state.say(f"The {enemy.name} attacks and misses you.", LogKind.PLAIN)
     if outcome.killed:
         state.die(f"You are slain by the {enemy.name}.")
+    elif outcome.hit and enemy.curse_chance:
+        _maybe_cursed(state, enemy)
 
     # The deathwatch turns on the moment the wound lands, so it is recomputed
     # before the next thing in the queue swings.
     state.refresh_passives()
+
+
+def _maybe_cursed(state: GameState, enemy: Actor) -> None:
+    """A monster's touch can leave something behind.
+
+    Every curse in the game so far has been a price the player read and agreed
+    to -- the line on a chest, the catch on a pact. One that can simply happen
+    to you is a different feeling, and it is the one the wraith is for: not a
+    bargain but the dungeon reaching out.
+    """
+    if not state.rng.chance(enemy.curse_chance):
+        return
+    state.say(
+        f"The {enemy.name}'s touch goes through you, and something stays.",
+        LogKind.BAD,
+    )
+    state.add_curse(CURSES[state.rng.pick(TOUCH_CURSES)])
 
 
 def _enemy_takes_damage(state: GameState, enemy: Actor, outcome) -> None:
@@ -350,6 +372,12 @@ def _try_move(state: GameState, direction: Direction) -> bool:
     blocker = state.actor_at(target)
     if blocker is not None:
         if blocker.is_player:  # cannot happen, but be explicit
+            return False
+        if blocker.kind is ActorKind.NPC:
+            # Solid, and not a fight. Saying so beats refusing to move in
+            # silence: the player pressed a direction and something has to
+            # happen, even if the something is "no, and here is why".
+            state.say(f"{blocker.name} is in the way. Press enter to speak.", LogKind.PLAIN)
             return False
         _resolve_player_attack(state, blocker)
         return True
@@ -458,6 +486,13 @@ def _interact(state: GameState) -> ActionResult:
     if state.on_exit:
         return _try_descend(state)
 
+    # After the exit, deliberately: standing on the stairs and next to somebody
+    # should take you downstairs. The stairs are a decision the player has
+    # already made by walking onto them.
+    beside = state.npc_beside_player()
+    if beside is not None:
+        return _talk(state, beside)
+
     state.say("There is nothing here.", LogKind.PLAIN)
     return ActionResult(consumed_turn=False, acted=False)
 
@@ -473,6 +508,24 @@ def chest_prompt(chest: GroundItem) -> str:
     if curse is None:
         return "Whatever is inside is not free."
     return f"The price: {curse.price}."
+
+
+def _talk(state: GameState, npc: Actor) -> ActionResult:
+    """Somebody has something to say.
+
+    One line per meeting, picked at random, because hearing the same sentence
+    twice from the same person is the moment a person becomes furniture.
+    """
+    template = npc_by_key(npc.npc)
+    if template is None:
+        return ActionResult(consumed_turn=False, acted=False)
+    return ActionResult(
+        consumed_turn=False,
+        acted=False,
+        prompt=state.rng.pick(template.lines),
+        prompt_kind="npc",
+        speaker=template.name,
+    )
 
 
 def spring_prompt(state: GameState) -> str:
@@ -520,7 +573,7 @@ def _spring(state: GameState) -> ActionResult:
         consumed_turn=False,
         acted=False,
         prompt=spring_prompt(state),
-        spring=True,
+        prompt_kind="spring",
     )
 
 

@@ -33,7 +33,9 @@ from ..widgets.message_log import MessageLog
 from .character import CharacterScreen
 from .chest import ChestScreen
 from .game_over import GameOverScreen
+from .inventory import InventoryScreen
 from .name_entry import NameEntryScreen
+from .npc import NpcScreen
 from .pause import PauseScreen
 from .spring import SpringScreen
 
@@ -195,6 +197,14 @@ class GameScreen(Screen[None]):
 
     def _do(self, action: Action) -> None:
         assert self.state is not None
+
+        if action is Action.INVENTORY:
+            # A look, not a turn. The domain verb still exists and is still
+            # headless -- it reports the pack as a line of text -- and the screen
+            # is what the UI does with the same question.
+            self.app.push_screen(InventoryScreen(self.state))
+            return
+
         before_log = len(self.state.log)
         before_depth = self.state.depth
         before_level = self.state.level
@@ -207,8 +217,10 @@ class GameScreen(Screen[None]):
             # The domain says a decision is needed; the UI asks for it. The deed
             # happens only if the answer comes back yes, which is why neither
             # opening a chest nor washing a curse is bound to a key.
-            if result.spring:
+            if result.prompt_kind == "spring":
                 self.app.push_screen(SpringScreen(result.prompt), self._spring_answer)
+            elif result.prompt_kind == "npc":
+                self.app.push_screen(NpcScreen(result.speaker, result.prompt))
             else:
                 self.app.push_screen(ChestScreen(result.prompt), self._chest_answer)
             return

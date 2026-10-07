@@ -18,6 +18,7 @@ for each of them; one that says "you" belongs to whoever the player picked.
 from __future__ import annotations
 
 from ..game.actors import ENEMIES, HEROES, Hero, scale_template
+from ..game.npcs import NPC_GLYPH
 from ..world.generator import ESCAPE_DEPTH
 from ..world.items import CHEST_GLYPH, COIN_GLYPH, ITEMS
 from ..world.tiles import Tile
@@ -193,7 +194,14 @@ def legend_rows(depth: int = 1, hero: Hero | None = None) -> list[tuple[str, str
     the chest row made it one line too long. The glyphs separate the sections
     well enough without spending a row on it.
     """
-    return [*enemy_legend(depth, hero), *item_legend()]
+    return [
+        *enemy_legend(depth, hero),
+        # Not a monster and not loot, but it is on the map and it is the only
+        # mark there that will not hurt you. One row, and the row is worth it:
+        # everything else in this panel is a thing to avoid or a thing to take.
+        (NPC_GLYPH, "somebody to talk to"),
+        *item_legend(),
+    ]
 
 
 def terrain_help() -> str:

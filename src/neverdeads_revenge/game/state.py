@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from enum import Enum
 
-from neverdeads_revenge.core.direction import Pos
+from neverdeads_revenge.core.direction import Pos, chebyshev
 from neverdeads_revenge.core.rng import Rng
 from neverdeads_revenge.core.turn_queue import TurnQueue
 from neverdeads_revenge.world.fov import compute_fov_full
@@ -23,9 +23,18 @@ from neverdeads_revenge.world.map import DungeonMap, GroundItem
 from neverdeads_revenge.world.modifiers import Modifiers
 from neverdeads_revenge.world.tiles import Tile
 
-from .actors import Actor, Hero, make_enemy, make_hero, pick_enemy_template
+from .actors import (
+    Actor,
+    ActorKind,
+    Hero,
+    make_enemy,
+    make_hero,
+    make_npc,
+    pick_enemy_template,
+)
 from .combat import apply_revenge
 from .curses import CURSES, Curse
+from .npcs import NPCS, Npc, npc_by_key
 from .shop import META_UPGRADES, Loadout
 
 __all__ = [
@@ -114,6 +123,10 @@ class GameState:
     dungeon_map: DungeonMap = field(default_factory=lambda: DungeonMap(width=1, height=1))
     player: Actor = None  # type: ignore[assignment]
     enemies: list[Actor] = field(default_factory=list)
+    #: Whoever is standing about on this floor. Kept apart from ``enemies``
+    #: rather than flagged inside it, because almost everything that walks the
+    #: floor asks about enemies and none of it should have to ask twice.
+    npcs: list[Actor] = field(default_factory=list)
     turn_queue: TurnQueue = field(default_factory=TurnQueue)
     log: list[LogEntry] = field(default_factory=list)
     turn: int = 0
@@ -351,23 +364,43 @@ class GameState:
         return [enemy for enemy in self.enemies if enemy.alive]
 
     def actor_at(self, pos: Pos) -> Actor | None:
-        """The actor standing on ``pos``, if any."""
+        """Anything standing on ``pos``, if anything is.
+
+        Includes the people, because they are in the way and the map has to draw
+        them. Anything that wants a *monster* wants :meth:`enemy_beside_player`
+        or :attr:`living_enemies` instead.
+        """
         if self.player.alive and self.player.position == pos:
             return self.player
         for enemy in self.enemies:
             if enemy.alive and enemy.position == pos:
                 return enemy
+        for npc in self.npcs:
+            if npc.position == pos:
+                return npc
         return None
 
-    def enemy_beside_player(self) -> Actor | None:
-        """An adjacent living enemy, if there is one."""
+    def npc_beside_player(self) -> Actor | None:
+        """Somebody standing next to the player, if anybody is."""
         from neverdeads_revenge.core.direction import DIRECTIONS
 
         for direction in DIRECTIONS:
-            neighbour = direction.step(self.player.position)
-            found = self.actor_at(neighbour)
-            if found is not None and not found.is_player:
+            found = self.actor_at(direction.step(self.player.position))
+            if found is not None and found.kind is ActorKind.NPC:
                 return found
+        return None
+
+    def enemy_beside_player(self) -> Actor | None:
+        """An adjacent living *monster*, if there is one.
+
+        Asked of ``enemies`` rather than of ``actor_at``, because a person
+        standing next to the player is not something to swing at -- and this is
+        what the bot and the revenge path use to decide whether there is a fight
+        on.
+        """
+        for enemy in self.living_enemies:
+            if chebyshev(enemy.position, self.player.position) <= 1:
+                return enemy
         return None
 
     # -- perception ---------------------------------------------------------
@@ -395,6 +428,7 @@ class GameState:
             depth=depth,
             curse_keys=tuple(CURSES),
             filled_slots=tuple(self.player.equipment) if self.player else (),
+            npc_keys=tuple(NPCS),
         )
         self.dungeon_map = floor.map
 
@@ -413,6 +447,7 @@ class GameState:
             for pos in floor.spawn_points
         ]
         self.toughen_enemies()
+        self.npcs = [make_npc(NPCS[key], pos) for pos, key in floor.npcs]
         self.turn_queue = TurnQueue([self.player, *self.enemies])
         self.refresh_vision()
         # The per-floor clock restarts; total_turns keeps counting so the run

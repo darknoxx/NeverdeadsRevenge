@@ -54,6 +54,7 @@ def test_no_actor_shares_a_glyph_with_anything_else():
     never happen is a weapon looking like a wall.
     """
     from neverdeads_revenge.game.actors import ENEMIES, HEROES
+    from neverdeads_revenge.game.npcs import NPC_GLYPH
     from neverdeads_revenge.world.items import ITEMS
 
     meanings: dict[str, set[str]] = {}
@@ -65,6 +66,7 @@ def test_no_actor_shares_a_glyph_with_anything_else():
         meanings.setdefault(template.glyph, set()).add("monster")
     for item in ITEMS.values():
         meanings.setdefault(item.glyph, set()).add(item.kind)
+    meanings.setdefault(NPC_GLYPH, set()).add("person")
 
     clashes = {glyph: kinds for glyph, kinds in meanings.items() if len(kinds) > 1}
     assert not clashes, f"these glyphs mean more than one thing: {clashes}"

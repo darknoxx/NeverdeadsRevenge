@@ -405,6 +405,80 @@ SpringScreen {
     color: #6b6b6b;
 }
 
+/* -- inventory ----------------------------------------------------------- */
+
+InventoryScreen {
+    align: center middle;
+    background: $background 70%;
+}
+
+#inventory {
+    /* Wide enough for the longest description beside the longest name: an
+       amulet's ability is a sentence, and a wrapped sentence in a column reads
+       as a mistake. It is a modal, so width is the cheap dimension. */
+    width: 80;
+    height: auto;
+    max-height: 90%;
+    padding: 1 2;
+    border: round $panel;
+    background: $surface;
+}
+
+#inventory-title {
+    width: 1fr;
+    height: auto;
+    margin: 0 0 1 0;
+    text-style: bold;
+    color: $accent;
+}
+
+#inventory-body {
+    width: 1fr;
+    height: auto;
+}
+
+#inventory-hint {
+    width: 1fr;
+    height: auto;
+    margin: 1 0 0 0;
+    color: #6b6b6b;
+}
+
+/* -- somebody talking ---------------------------------------------------- */
+
+NpcScreen {
+    align: center middle;
+    background: $background 70%;
+}
+
+#npc {
+    width: 60;
+    height: auto;
+    padding: 1 2;
+    border: round $panel;
+    background: $surface;
+}
+
+#npc-title {
+    width: 1fr;
+    height: auto;
+    text-style: bold;
+    color: $accent;
+}
+
+#npc-body {
+    width: 1fr;
+    height: auto;
+    margin: 1 0 1 0;
+}
+
+#npc-hint {
+    width: 1fr;
+    height: auto;
+    content-align: center middle;
+    color: #6b6b6b;
+}
+
 /* -- chest --------------------------------------------------------------- */
 
 ChestScreen {

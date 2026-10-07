@@ -30,7 +30,14 @@ from .items import (
 from .map import DungeonMap, GroundItem
 from .tiles import Tile
 
-__all__ = ["GeneratedFloor", "generate_floor", "enemy_count", "ESCAPE_DEPTH"]
+__all__ = [
+    "GeneratedFloor",
+    "generate_floor",
+    "enemy_count",
+    "npc_count",
+    "ESCAPE_DEPTH",
+    "NPC_CHANCE",
+]
 
 
 def enemy_count(depth: int) -> int:
@@ -41,6 +48,21 @@ def enemy_count(depth: int) -> int:
     a dial you can measure.
     """
     return 7 + depth
+
+
+#: How likely a floor is to have somebody on it.
+#:
+#: Not every floor. A person every time is furniture; a person once every four
+#: floors is somebody you remember walking into, which is the whole point of
+#: them -- they are the only thing down here that is not trying to kill you.
+NPC_CHANCE = 0.25
+
+
+def npc_count(rng: Rng, depth: int) -> int:
+    """Whether this floor has somebody on it. Never the first one."""
+    if depth < 2:
+        return 0
+    return 1 if rng.chance(NPC_CHANCE) else 0
 
 #: The floor that holds the way out instead of stairs down.
 #:
@@ -122,6 +144,8 @@ class GeneratedFloor:
     items: dict[Pos, GroundItem] = field(default_factory=dict)
     #: Where the cleansing spring is, or ``None`` on a floor without one.
     spring: Pos | None = None
+    #: Who is standing about, as ``(position, key)``. Usually nobody.
+    npcs: list[tuple[Pos, str]] = field(default_factory=list)
 
     @property
     def is_final(self) -> bool:
@@ -233,6 +257,7 @@ def generate_floor(
     enemy_budget: int | None = None,
     curse_keys: tuple[str, ...] = (),
     filled_slots: tuple[str, ...] = (),
+    npc_keys: tuple[str, ...] = (),
 ) -> GeneratedFloor:
     """Build one complete, validated dungeon floor.
 
@@ -247,6 +272,8 @@ def generate_floor(
         filled_slots: Equipment slots the player already has something in. What a
             chest holds is decided here, at build time, and a chest that hands
             out a third coat is a chest nobody opens twice.
+        npc_keys: Who might be standing on this floor. Keys only, like the
+            curses: the generator places a person and has no idea what they say.
 
     Raises:
         RuntimeError: If no connected layout could be produced. With the default
@@ -294,6 +321,10 @@ def generate_floor(
     # keeps it clear without a second exclusion list.
     spring = _place_spring(rng, dungeon_map, candidates, exit_pos, depth)
 
+    # Somebody, sometimes. Placed before the loot so the loot's plain-floor rule
+    # keeps their cell clear the same way it keeps the spring's.
+    npcs = _place_npcs(rng, dungeon_map, candidates, exit_pos, depth, npc_keys)
+
     # Loot last, and on whatever is still plain floor. Placing it after the decor
     # means an item can never be swallowed by a patch of grass.
     items = _scatter_loot(
@@ -309,6 +340,7 @@ def generate_floor(
         exit_tile=exit_tile,
         items=items,
         spring=spring,
+        npcs=npcs,
     )
 
 
@@ -339,6 +371,37 @@ def _place_spring(
     pos = rng.pick(spots)
     dungeon_map.set_tile(pos, Tile.SPRING)
     return pos
+
+
+def _place_npcs(
+    rng: Rng,
+    dungeon_map: DungeonMap,
+    candidates: list[Pos],
+    exit_pos: Pos,
+    depth: int,
+    npc_keys: tuple[str, ...],
+) -> list[tuple[Pos, str]]:
+    """Stand somebody about, if this floor has anybody and anywhere to put them.
+
+    Never on the exit: a conversation standing on the way out is a conversation
+    the player has to walk past twice.
+    """
+    if not npc_keys:
+        return []
+
+    placed: list[tuple[Pos, str]] = []
+    for _ in range(npc_count(rng, depth)):
+        spots = [
+            pos
+            for pos in candidates
+            if pos != exit_pos
+            and dungeon_map.tile_at(pos) is Tile.FLOOR
+            and all(pos != taken for taken, _ in placed)
+        ]
+        if not spots:
+            return placed
+        placed.append((rng.pick(spots), rng.pick(npc_keys)))
+    return placed
 
 
 def _scatter_loot(

@@ -198,7 +198,7 @@ def test_the_spring_asks_when_it_can_help():
     state = on_a_spring(gold=CLEANSE_COST, curses=("heavy",))
     result = perform_action(state, Action.INTERACT)
 
-    assert result.spring is True, "the UI cannot tell a spring from a chest"
+    assert result.prompt_kind == "spring", "the UI cannot tell a spring from a chest"
     assert result.prompt is not None
     assert str(CLEANSE_COST) in result.prompt
 

@@ -16,6 +16,7 @@ from neverdeads_revenge.world.map import GroundItem
 from neverdeads_revenge.world.modifiers import Modifiers
 
 from .difficulty import MAX_ENEMY_SPEED, potency, weight_at_depth
+from .npcs import NPC_COLOR, NPC_GLYPH, Npc
 
 __all__ = [
     "Stats",
@@ -33,6 +34,7 @@ __all__ = [
     "ENEMIES",
     "make_hero",
     "make_enemy",
+    "make_npc",
     "scale_template",
     "pick_enemy_template",
 ]
@@ -100,6 +102,9 @@ class ActorKind(Enum):
 
     HERO = "hero"
     ENEMY = "enemy"
+    #: Somebody who is neither. Not in the turn queue, not attackable, and in
+    #: the way -- walking into one is a conversation, not a fight.
+    NPC = "npc"
 
 
 #: What REVENGE grants a hero, and how much of it.
@@ -181,6 +186,10 @@ class Actor:
     #: Coins this actor leaves behind when it dies. Copied from the template so
     #: the kill does not have to go looking for which monster it was.
     gold: tuple[int, int] = (0, 0)
+    #: Chance per landed blow that this actor's touch leaves a curse behind.
+    curse_chance: float = 0.0
+    #: Which NPC this is, by key. ``None`` for everything that is not a person.
+    npc: str | None = None
     #: Cells entered since the run started. A run total, like ``total_turns``,
     #: and a statistic rather than a score input: the score rewards time, and
     #: walking further is the opposite of that.
@@ -505,6 +514,9 @@ class EnemyTemplate:
     #: than a number so a kill is worth something different each time, which is
     #: what makes a floor feel like it paid out unevenly.
     gold: tuple[int, int] = (2, 4)
+    #: Chance per landed blow that this monster's touch leaves a curse behind.
+    #: Zero for everything that is not the wraith.
+    curse_chance: float = 0.0
     #: Relative chance of being picked when populating a floor.
     weight: float = 1.0
     #: How much ``weight`` grows per floor descended. ``1.0`` keeps the monster
@@ -547,6 +559,11 @@ ENEMIES: dict[str, EnemyTemplate] = {
         behaviour="hunter",
         stats=Stats(max_hp=11, hp=11, speed=1.3, damage=(4, 7), evasion=3),
         gold=(5, 9),
+        # One blow in twenty. Rare enough that a run can pass without it, often
+        # enough that a wraith is something you would rather not be touched by --
+        # which is the whole point of the only monster here that is already
+        # fast, evasive and hard to out-trade.
+        curse_chance=0.05,
         weight=1.5,
         # The only monster that gets more common as you descend. It is fast and
         # evasive, which is exactly the thing that makes a floor feel unfair if
@@ -571,6 +588,25 @@ def make_enemy(template: EnemyTemplate, position: Pos) -> Actor:
         color=template.color,
         behaviour=template.behaviour,
         gold=template.gold,
+        curse_chance=template.curse_chance,
+    )
+
+
+def make_npc(npc: Npc, position: Pos) -> Actor:
+    """Create a fresh actor from an NPC definition.
+
+    One hit point and no attacks, because nothing here is a fight. They are not
+    in the turn queue and never will be, so the stats are only what the character
+    sheet would say about them, which is nothing.
+    """
+    return Actor(
+        name=npc.name,
+        kind=ActorKind.NPC,
+        stats=Stats(max_hp=1, hp=1),
+        position=position,
+        glyph=NPC_GLYPH,
+        color=NPC_COLOR,
+        npc=npc.key,
     )
 
 

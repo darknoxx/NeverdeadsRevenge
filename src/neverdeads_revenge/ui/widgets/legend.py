@@ -135,8 +135,12 @@ def _glyph_style(glyph: str) -> str:
     colour.
     """
     from ...game.actors import ENEMIES, HEROES
+    from ...game.npcs import NPC_COLOR, NPC_GLYPH
     from ...world.items import ITEMS
     from ...world.tiles import Tile
+
+    if glyph == NPC_GLYPH:
+        return f"bold {NPC_COLOR}"
 
     for hero in HEROES.values():
         if hero.glyph == glyph:

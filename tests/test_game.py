@@ -188,6 +188,7 @@ def test_the_hero_colour_is_not_another_hero_or_monster_in_disguise():
 
     from rich.color import Color
 
+    from neverdeads_revenge.game.npcs import NPC_COLOR, NPC_GLYPH
     from neverdeads_revenge.world.items import ITEMS
 
     # Keyed by glyph, because the glyph is the mark the eye finds. Items of a
@@ -200,6 +201,7 @@ def test_the_hero_colour_is_not_another_hero_or_monster_in_disguise():
         marks[template.glyph] = (f"monster {template.key}", template.color)
     for item in ITEMS.values():
         marks.setdefault(item.glyph, (f"{item.kind} items", item.color))
+    marks[NPC_GLYPH] = ("the people", NPC_COLOR)
 
     for left, right in combinations(marks, 2):
         left_name, left_colour = marks[left]
@@ -1980,3 +1982,120 @@ def test_bleed_is_a_price_and_not_a_sentence():
 
     # And it still has to cost something, or it is not a curse.
     assert steps_a_floor // every >= 2
+
+
+# -- the wraith's touch ------------------------------------------------------
+def _wraith_beside(state):
+    """A wraith that always lands, so the test is about the curse and not the dice."""
+    wraith = make_enemy(ENEMIES["wraith"], (state.player.position[0] + 1, state.player.position[1]))
+    wraith.stats.accuracy = 99
+    state.player.stats.evasion = 0
+    state.enemies = [wraith]
+    state.turn_queue = type(state.turn_queue)([state.player, wraith])
+    state.refresh_vision()
+    return wraith
+
+
+def test_only_the_wraith_leaves_a_curse_behind():
+    from neverdeads_revenge.game.actors import ENEMIES as ALL
+
+    assert ALL["wraith"].curse_chance > 0
+    for key, template in ALL.items():
+        if key != "wraith":
+            assert template.curse_chance == 0.0, key
+
+
+def test_a_wraiths_touch_can_leave_a_curse():
+    from neverdeads_revenge.game.actions import take_turn
+
+    state = start_run(NOXX, seed=3)
+    wraith = _wraith_beside(state)
+
+    for _ in range(400):
+        if state.curses:
+            break
+        state.player.stats.hp = state.player.stats.max_hp
+        take_turn(state, wraith)
+
+    assert state.curses, "the wraith never once left anything behind"
+    assert any("touch goes through you" in entry.text for entry in state.log)
+
+
+def test_a_missed_touch_leaves_nothing():
+    """The chance is per *landed* blow, and a blow that missed did not touch.
+
+    Driven through the damage handler with a synthetic miss rather than by
+    lowering the wraith's accuracy: the hit chance has a floor of 30%, so a miss
+    cannot be forced, only waited for -- and a test that waits for one is really
+    a test about the dice.
+    """
+    from neverdeads_revenge.game.actions import _player_takes_damage
+    from neverdeads_revenge.game.combat import AttackOutcome
+
+    state = start_run(NOXX, seed=3)
+    wraith = _wraith_beside(state)
+    miss = AttackOutcome(hit=False, crit=False, damage=0, killed=False, dodged=True)
+
+    for _ in range(500):
+        _player_takes_damage(state, wraith, miss)
+
+    assert not state.curses, "a miss cursed the player"
+
+
+def test_the_wraiths_touch_is_never_wither():
+    """A quarter of your health taken by a random blow in a corridor is not a
+    price, it is a mugging. WITHER belongs on a chest, where it was read first."""
+    from neverdeads_revenge.game.actions import take_turn
+    from neverdeads_revenge.game.curses import TOUCH_CURSES
+
+    assert "wither" not in TOUCH_CURSES
+
+    seen = set()
+    for seed in range(200):
+        state = start_run(NOXX, seed=seed)
+        wraith = _wraith_beside(state)
+        for _ in range(60):
+            if state.curses:
+                break
+            state.player.stats.hp = state.player.stats.max_hp
+            take_turn(state, wraith)
+        seen |= {curse.key for curse in state.curses}
+
+    assert seen, "no curse ever landed"
+    assert seen <= set(TOUCH_CURSES), f"something else got through: {seen}"
+
+
+def test_the_touch_is_rare():
+    """Rare enough that a run can pass without it, often enough that a wraith is
+    something you would rather not be touched by."""
+    from neverdeads_revenge.game.actions import take_turn
+
+    hits = 0
+    cursed = 0
+    for seed in range(300):
+        state = start_run(NOXX, seed=seed)
+        wraith = _wraith_beside(state)
+        for _ in range(20):
+            if state.curses:
+                break
+            state.player.stats.hp = state.player.stats.max_hp
+            take_turn(state, wraith)
+            hits += 1
+        cursed += bool(state.curses)
+
+    rate = cursed / hits
+    assert 0.02 < rate < 0.10, f"{rate:.1%} of blows cursed, which is not 5%"
+
+
+def test_a_killing_blow_does_not_curse_a_corpse():
+    """The player is already dead. Cursing them is one more line nobody reads."""
+    from neverdeads_revenge.game.actions import take_turn
+
+    state = start_run(NOXX, seed=3)
+    wraith = _wraith_beside(state)
+    wraith.stats.damage = (999, 999)
+
+    take_turn(state, wraith)
+
+    assert state.run_state is RunState.DEAD
+    assert not state.curses

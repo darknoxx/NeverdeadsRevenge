@@ -2434,3 +2434,181 @@ def test_the_terrain_reference_only_lists_terrain_that_exists():
     assert Tile.DOOR not in LEGEND_TERRAIN
     for tile in LEGEND_TERRAIN:
         assert tile is not Tile.DOOR
+
+
+# -- the inventory -----------------------------------------------------------
+async def test_i_opens_the_inventory_and_costs_no_turn():
+    from neverdeads_revenge.ui.screens.inventory import InventoryScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+
+        await pilot.press("i")
+        await pilot.pause()
+
+        assert isinstance(app.screen, InventoryScreen)
+        assert state.turn == 0, "looking at your own pack cost a turn"
+        assert state.total_turns == 0
+
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, GameScreen)
+
+
+async def test_the_inventory_describes_what_is_worn():
+    """The complaint this screen answers: an amulet's ability is a sentence, and
+    the only place it was written down was the shop it came from."""
+    from neverdeads_revenge.game.amulets import AMULETS
+    from neverdeads_revenge.game.shop import describe_item
+    from neverdeads_revenge.ui.screens.inventory import InventoryScreen
+    from neverdeads_revenge.world.items import ITEMS, make_item
+
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.player.equipment["amulet"] = make_item(ITEMS["deathwatch"])
+        screen.state.player.equipment["weapon"] = make_item(ITEMS["bite"])
+
+        await pilot.press("i")
+        await pilot.pause()
+
+        assert isinstance(app.screen, InventoryScreen)
+        body = str(app.screen.query_one("#inventory-body").render())
+
+        assert "the deathwatch" in body
+        assert AMULETS["deathwatch"].blurb in body, "the ability is not spelled out"
+        assert describe_item(ITEMS["bite"]) in body
+        assert "weapon" in body and "armour" in body and "amulet" in body
+
+
+async def test_the_inventory_lists_the_pack_with_what_it_is_worth():
+    from neverdeads_revenge.ui.screens.inventory import InventoryScreen
+    from neverdeads_revenge.world.items import ITEMS, make_item
+
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.inventory = [
+            make_item(ITEMS["potion"]),
+            make_item(ITEMS["potion"]),
+            make_item(ITEMS["elixir"]),
+        ]
+
+        await pilot.press("i")
+        await pilot.pause()
+
+        assert isinstance(app.screen, InventoryScreen)
+        body = str(app.screen.query_one("#inventory-body").render())
+
+        assert "2x potion" in body, "the pack is not counted"
+        assert "heals 8" in body and "heals 20" in body
+
+
+async def test_the_inventory_says_so_when_the_pack_is_empty():
+    from neverdeads_revenge.ui.screens.inventory import InventoryScreen
+
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.inventory = []
+
+        await pilot.press("i")
+        await pilot.pause()
+
+        assert isinstance(app.screen, InventoryScreen)
+        body = str(app.screen.query_one("#inventory-body").render())
+        assert "nothing" in body
+
+
+async def test_the_inventory_shows_the_curses_and_their_price():
+    from neverdeads_revenge.game.curses import CURSES
+    from neverdeads_revenge.ui.screens.inventory import InventoryScreen
+
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.add_curse(CURSES["dim"])
+
+        await pilot.press("i")
+        await pilot.pause()
+
+        assert isinstance(app.screen, InventoryScreen)
+        body = str(app.screen.query_one("#inventory-body").render())
+        assert "DIM" in body
+        assert CURSES["dim"].price in body
+
+
+def test_every_item_name_fits_the_inventory_column():
+    """The name column is a fixed width and the longest name is twenty-two.
+
+    Measured against the real items rather than trusted: a new amulet with a
+    longer name would push its own description out of the column, and a wrapped
+    description in a two-column block reads as a mistake.
+    """
+    from neverdeads_revenge.ui.screens.inventory import NAME_WIDTH
+    from neverdeads_revenge.world.items import ITEMS
+
+    for template in ITEMS.values():
+        assert len(template.name) <= NAME_WIDTH, (
+            f"{template.key}: {template.name!r} is {len(template.name)}"
+        )
+
+
+def test_every_description_fits_beside_the_name():
+    from neverdeads_revenge.game.shop import describe_item
+    from neverdeads_revenge.ui.screens.inventory import NAME_WIDTH, SLOT_WIDTH
+    from neverdeads_revenge.world.items import ITEMS
+
+    # Three columns, the indent, and the panel's border and padding.
+    width = 80 - 6
+    for template in ITEMS.values():
+        line = 2 + SLOT_WIDTH + NAME_WIDTH + len(describe_item(template))
+        assert line <= width, f"{template.key}: the row is {line} wide, the box {width}"
+
+
+# -- the people --------------------------------------------------------------
+async def test_walking_next_to_somebody_and_pressing_enter_talks():
+    from neverdeads_revenge.game.actors import make_npc
+    from neverdeads_revenge.game.npcs import NPCS
+    from neverdeads_revenge.ui.screens.npc import NpcScreen
+
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        state.npcs = [
+            make_npc(
+                NPCS["cinder"],
+                (state.player.position[0] + 1, state.player.position[1]),
+            )
+        ]
+        state.refresh_vision()
+
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert isinstance(app.screen, NpcScreen)
+        assert "CINDER" in str(app.screen.query_one("#npc-title").render())
+        body = str(app.screen.query_one("#npc-body").render())
+        assert any(line in body for line in NPCS["cinder"].lines)
+        assert state.turn == 0, "a conversation cost a turn"
+
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, GameScreen)
+
+
+async def test_the_legend_says_who_the_eights_are():
+    """Everything else in that panel is a thing to avoid or a thing to take."""
+    from neverdeads_revenge.game.npcs import NPC_GLYPH
+    from neverdeads_revenge.ui.widgets.legend import Legend
+
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        shown = screen.query_one(Legend).render().plain
+
+        assert NPC_GLYPH in shown
+        assert "talk to" in shown
