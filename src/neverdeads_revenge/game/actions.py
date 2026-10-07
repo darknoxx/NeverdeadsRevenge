@@ -284,11 +284,23 @@ def _maybe_cursed(state: GameState, enemy: Actor) -> None:
     """
     if not state.rng.chance(enemy.curse_chance):
         return
+    # Only something it can actually leave behind. Landing the curse the player
+    # already carries reads as a bug -- and two of the four touch curses do not
+    # stack, so half the time it *is* one.
+    carried = {curse.key for curse in state.curses}
+    available = [key for key in TOUCH_CURSES if key not in carried]
+    if not available:
+        state.say(
+            f"The {enemy.name}'s touch goes through you and finds nothing "
+            f"left to take.",
+            LogKind.BAD,
+        )
+        return
     state.say(
         f"The {enemy.name}'s touch goes through you, and something stays.",
         LogKind.BAD,
     )
-    state.add_curse(CURSES[state.rng.pick(TOUCH_CURSES)])
+    state.add_curse(CURSES[state.rng.pick(available)])
 
 
 def _enemy_takes_damage(state: GameState, enemy: Actor, outcome) -> None:
@@ -432,11 +444,16 @@ def _resolve_player_attack(state: GameState, target: Actor) -> None:
         state.rng,
         force_crit=first and state.has_passive("patient_knife"),
     )
-    target.struck = True
 
     if not outcome.hit:
+        # A swing that missed was not a blow, so it does not spend the knife.
+        # The grave ward is worded the same way and is read the same way -- only
+        # a landing blow spends it -- and the two amulets disagreeing about what
+        # "the first blow" means was a bug, not a rule.
         state.say(f"You swing at the {target.name} and miss.", LogKind.PLAIN)
         return
+
+    target.struck = True
 
     if outcome.crit and state.has_passive("patient_knife") and first:
         state.say("It has been waiting for this one.", LogKind.GOOD)
@@ -629,13 +646,31 @@ def _open_chest(state: GameState) -> ActionResult:
     state.say("The lid gives, and something in the dark takes note.", LogKind.SYSTEM)
 
     curse = curse_by_key(chest.curse)
-    if curse is not None:
+    if curse is not None and any(c.key == curse.key for c in state.curses):
+        # Already paid. Only reachable when a wraith's touch landed this same
+        # curse between the floor being drawn and this lid being lifted, which
+        # is why the generator's guarantee is not enough on its own. The reward
+        # is still handed over: a chest that refused would be a piece of loot
+        # the player can see and never have.
+        state.say(
+            "You have paid this price already. The lid takes no more.",
+            LogKind.PLAIN,
+        )
+    elif curse is not None:
         state.add_curse(curse)
 
     if chest.contents is not None:
         _equip(state, chest.contents)
 
-    return ActionResult(consumed_turn=False, acted=False)
+    # A turn, like a draught, and for the same reason: this is the moment the
+    # bargain lands. It was free, which made the riskiest thing in the game --
+    # a permanent curse, read and agreed to -- the only one a monster had no
+    # answer to.
+    state.turn += 1
+    state.total_turns += 1
+    advance_world(state)
+    state.refresh_vision()
+    return _outcome(state, consumed_turn=True, acted=True)
 
 
 def _pick_up(state: GameState) -> ActionResult:

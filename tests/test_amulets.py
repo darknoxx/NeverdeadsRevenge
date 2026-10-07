@@ -308,16 +308,32 @@ def test_a_missed_swing_does_not_spend_the_ward():
     brute.stats.accuracy = 0
     state.player.stats.evasion = 99
 
-    missed = 0
-    for _ in range(40):
+    # A blow that lands before the first miss is the ward doing exactly what it
+    # says it does; that one is spent by it, so it is re-armed and the wait for
+    # the miss this test is about goes on. Breaking on the first *landing* blow
+    # instead made the whole thing a coin toss on the dice.
+    for _ in range(400):
+        state.player.stats.hp = state.player.max_hp
+        before = state.player.hp
+        take_turn(state, brute)
+        if state.player.hp < before:
+            state.ward_ready = True
+            continue
+        assert state.ward_ready, "a miss spent the ward"
+        break
+    else:
+        pytest.fail("it never missed, so this proved nothing")
+
+    # And the first blow that does land spends it.
+    state.player.stats.hp = state.player.max_hp
+    for _ in range(400):
         before = state.player.hp
         take_turn(state, brute)
         if state.player.hp < before:
             break
-        missed += 1
-        assert state.ward_ready, "a miss spent the ward"
+    else:
+        pytest.fail("it never landed a blow")
 
-    assert missed, "it never missed, so this proved nothing"
     assert not state.ward_ready, "the ward survived the blow that landed"
 
 
@@ -527,6 +543,46 @@ def test_the_patient_knife_is_ready_again_for_a_new_monster():
     assert before - fresh.stats.hp == 30 - fresh.stats.armor, (
         "the knife was spent on the last one"
     )
+
+
+def test_a_miss_does_not_spend_the_patient_knife():
+    """A swing that missed was not a blow.
+
+    The grave ward is worded the same way -- "the first blow" -- and is read the
+    same way, spending itself only on one that lands. The two amulets disagreeing
+    about what that phrase means was a bug rather than a rule.
+    """
+    state, brute = duel("patient_knife", brute_hp=100_000, brute_damage=(0, 0))
+    state.player.stats.damage = (10, 10)
+    state.player.stats.crit_multiplier = 3.0
+    # Pinned to the 30% floor, so misses happen and hits still happen.
+    state.player.stats.accuracy = -99
+    brute.stats.evasion = 99
+    brute.stats.armor = 0
+
+    missed = False
+    for _ in range(600):
+        brute.stats.hp = 100_000
+        perform_action(state, Action.MOVE_EAST)
+        if 100_000 - brute.stats.hp == 0:
+            assert not brute.struck, "a miss spent the knife"
+            missed = True
+            break
+        # A landing blow before any miss is the knife working as intended, and
+        # it legitimately spends it -- re-arm and keep waiting for the miss this
+        # test is about.
+        brute.struck = False
+    assert missed, "the test never missed, so it proved nothing"
+
+    # Now land the next blow. It has to be the crit the miss did not take.
+    for _ in range(600):
+        brute.stats.hp = 100_000
+        perform_action(state, Action.MOVE_EAST)
+        dealt = 100_000 - brute.stats.hp
+        if dealt:
+            assert dealt == 30, "the miss spent the knife"
+            return
+    pytest.fail("never landed a blow after the miss")
 
 
 # -- borrowed face -----------------------------------------------------------

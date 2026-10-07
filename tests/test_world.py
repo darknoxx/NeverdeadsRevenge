@@ -351,6 +351,27 @@ def test_every_chest_names_a_curse_the_game_knows():
                 assert item.curse in CURSES
 
 
+def test_two_chests_on_one_floor_never_charge_the_same_price():
+    """The floor gets a distinct curse in each chest, so a floor with two of them
+    is two bargains rather than one sold twice."""
+    for seed in range(40):
+        floor = generate_floor(Rng(seed), depth=7, curse_keys=CURSE_KEYS)
+        keys = [i.curse for i in floor.items.values() if i.kind == "chest"]
+        assert len(keys) == len(set(keys)), f"seed {seed}: {keys}"
+
+
+def test_a_floor_never_holds_more_chests_than_there_are_prices_left():
+    """One curse left to pay means at most one chest, however deep the floor is.
+
+    The caller passes only what the player has not already paid for, and a chest
+    with no price to charge would be a free reward wearing a curse's clothes.
+    """
+    for seed in range(20):
+        floor = generate_floor(Rng(seed), depth=7, curse_keys=("dim",))
+        chests = [i for i in floor.items.values() if i.kind == "chest"]
+        assert len(chests) <= 1, f"seed {seed}: {len(chests)} chests on one price"
+
+
 # -- the way out -----------------------------------------------------------
 def test_the_rift_only_appears_on_the_escape_floor():
     """Every floor before the last holds stairs down, not a win condition.

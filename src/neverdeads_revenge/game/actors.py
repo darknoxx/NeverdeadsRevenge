@@ -508,7 +508,14 @@ class EnemyTemplate:
     glyph: str
     color: str
     stats: Stats
-    #: How this monster behaves. See game.ai.
+    #: How this monster moves. Only ``"cautious"`` is read, by the movement code
+    #: in :mod:`game.actions`: it hangs back until the player closes. Everything
+    #: else -- including the default -- walks straight at them.
+    #:
+    #: It used to say "see game.ai", which never existed, and the wraith carried
+    #: ``"hunter"``, which nothing has ever read. A label that names a behaviour
+    #: no code implements is worse than no label: it reads as a monster doing
+    #: something clever when it is doing the same thing as a ghoul.
     behaviour: str = "aggressive"
     #: Coins this monster leaves behind, before depth scaling. A range rather
     #: than a number so a kill is worth something different each time, which is
@@ -556,7 +563,6 @@ ENEMIES: dict[str, EnemyTemplate] = {
         name="wraith",
         glyph="w",
         color="magenta",
-        behaviour="hunter",
         stats=Stats(max_hp=11, hp=11, speed=1.3, damage=(4, 7), evasion=3),
         gold=(5, 9),
         # One blow in twenty. Rare enough that a run can pass without it, often

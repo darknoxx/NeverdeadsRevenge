@@ -938,7 +938,7 @@ def test_a_faster_enemy_acts_more_often_than_a_slower_one(monkeypatch):
         enemy.stats.speed = enemy_speed
         enemy.stats.max_hp = 9999
         enemy.stats.hp = 9999
-        enemy.behaviour = "hunter"
+        enemy.behaviour = "aggressive"
         state.player.stats.hp = 9999
         state.player.stats.max_hp = 9999
         # Keep both alive so the count runs the full length.
@@ -1265,6 +1265,73 @@ def test_curses_survive_a_descent():
     assert state.heal_scale == 0.5
 
 
+def test_the_unpaid_curses_are_the_ones_you_do_not_carry():
+    """A chest whose price you have already paid is a lie: the dialog reads the
+    price out and nothing further happens."""
+    from neverdeads_revenge.game.curses import CURSES
+
+    state = start_run(NOXX, seed=1)
+    assert state.unpaid_curses == tuple(CURSES)
+
+    state.add_curse(CURSES["dim"])
+
+    assert "dim" not in state.unpaid_curses
+    assert len(state.unpaid_curses) == len(CURSES) - 1
+
+
+def test_a_floor_never_offers_a_price_you_have_already_paid():
+    """Fifteen chests over a run drawn from six curses made duplicates not just
+    possible but likely -- and two of the six stack when repeated while four do
+    not, so the second one was sometimes a sentence and sometimes a no-op."""
+    from neverdeads_revenge.game.curses import CURSES
+
+    state = start_run(NOXX, seed=1)
+    for key in list(CURSES)[:-1]:
+        state.add_curse(CURSES[key])
+    state.player.position = state.stairs
+
+    perform_action(state, Action.DESCEND)
+
+    chests = [i for i in state.dungeon_map.items.values() if i.kind == "chest"]
+    assert chests, "the floor offered nothing at all"
+    held = {curse.key for curse in state.curses}
+    for chest in chests:
+        assert chest.curse not in held, f"it charged for {chest.curse} twice"
+
+
+def test_a_floor_with_every_price_paid_holds_no_chests():
+    """The same rule the generator already had for a floor told about no curses:
+    better an empty floor than a bargain that costs nothing."""
+    from neverdeads_revenge.game.curses import CURSES
+
+    state = start_run(NOXX, seed=1)
+    for key in CURSES:
+        state.add_curse(CURSES[key])
+    assert state.unpaid_curses == ()
+    state.player.position = state.stairs
+
+    perform_action(state, Action.DESCEND)
+
+    assert not [i for i in state.dungeon_map.items.values() if i.kind == "chest"]
+
+
+def test_a_wraiths_touch_never_repeats_a_curse_you_carry():
+    """Same reason as the chest: the touch is meant to leave something *new*
+    behind, and half of the four touch curses do not stack."""
+    from neverdeads_revenge.game.actions import take_turn
+    from neverdeads_revenge.game.curses import CURSES, TOUCH_CURSES
+
+    state = start_run(NOXX, seed=3)
+    wraith = _wraith_beside(state)
+    state.add_curse(CURSES[TOUCH_CURSES[0]])
+
+    for _ in range(400):
+        state.player.stats.hp = state.player.stats.max_hp
+        take_turn(state, wraith)
+        keys = [curse.key for curse in state.curses]
+        assert len(keys) == len(set(keys)), keys
+
+
 # -- chests -----------------------------------------------------------------
 def _put_a_chest(state: GameState, curse: str = "wither", contents: str = "edge"):
     """Stand the player on a chest with known contents."""
@@ -1319,6 +1386,20 @@ def test_opening_pays_the_price_and_hands_over_the_reward():
     assert [c.key for c in state.curses] == ["wither"]
     assert state.player.equipment["weapon"].name == "the runed edge"
     assert state.dungeon_map.item_at(state.player.position) is None, "the chest stayed"
+
+
+def test_opening_a_chest_costs_a_turn():
+    """The riskiest thing in the game -- a permanent curse, read and agreed to --
+    was the one action a monster had no answer to. A draught costs a turn; so
+    does this."""
+    state = start_run(NOXX, seed=1)
+    _put_a_chest(state, curse="dim", contents="edge")
+
+    result = perform_action(state, Action.OPEN_CHEST)
+
+    assert result.consumed_turn
+    assert state.total_turns == 1
+    assert [c.key for c in state.curses] == ["dim"]
 
 
 def test_opening_nothing_does_nothing():

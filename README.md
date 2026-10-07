@@ -539,7 +539,16 @@ keeps it worth the curse once every slot is full.
 **Chests** (`&`) are not loot, they are a question. Standing on one and pressing
 `enter` stops the game and shows you the price — and only the price. Whatever is
 inside is better than anything lying around, and it is not free. Say yes and you
-get both: the strong tier of weapons and armour, and a curse.
+get both: the strong tier of weapons and armour, and a curse. Lifting the lid
+costs a turn, like a draught does, so the bargain is not the one thing in the game
+a monster has no answer to.
+
+A chest never offers a price you have already paid. A run draws fifteen of them
+from six curses, so without that rule duplicates were not just possible but
+likely — and two of the six stack when repeated while four do not, which made the
+same second curse a sentence on one run and a no-op on the next. Each chest on a
+floor gets a different one, and if you carry every curse there is, the floor has
+no chests at all: better an empty floor than a lid that charges nothing.
 
 **Springs** (`{`) are the only tile that undoes something instead of doing it.
 Standing in one and pressing `enter` offers to take one curse off you, for coin.
@@ -561,7 +570,9 @@ monster here that is already fast, evasive and hard to out-trade.
 It is never WITHER. A quarter of your health taken by a random blow in a corridor
 is not a price, it is a mugging; that one belongs on a chest, where you read it
 and said yes. Every other curse in the game is something you agreed to, and this
-is the one that simply happens to you.
+is the one that simply happens to you. And it never repeats one you are already
+carrying, for the same reason a chest does not: half of the four it can leave
+behind do not stack, so the second dose would read as a bug.
 
 | curse | what it takes |
 | --- | --- |

@@ -441,12 +441,19 @@ def _scatter_loot(
         for _ in range(equipment_count(depth))
     ]
     if curse_keys:
+        # A different curse in each chest on a floor, and never more chests than
+        # there are prices left to pay. Two chests offering the same curse would
+        # be one bargain sold twice, and the second one would be a dialog that
+        # reads out a price it has already charged -- which is exactly what the
+        # caller hands us ``unpaid`` curses to avoid. Drawing from a shuffled
+        # copy keeps the choice random and the *set* distinct.
+        keys = rng.shuffled(list(curse_keys))
         to_place += [
             make_chest(
-                rng.pick(curse_keys),
+                key,
                 roll_chest_contents(rng, depth, filled_slots),
             )
-            for _ in range(chest_count(depth))
+            for key in keys[: chest_count(depth)]
         ]
     # And, rarely, the strong tier lying in the open with nothing owed for it.
     # The same two questions are asked of it: what are you missing, and how deep

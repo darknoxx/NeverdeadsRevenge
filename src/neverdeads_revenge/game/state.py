@@ -237,6 +237,25 @@ class GameState:
             )
 
     @property
+    def unpaid_curses(self) -> tuple[str, ...]:
+        """Every curse the player is not already carrying, by key.
+
+        A chest whose price you have already paid is not a bargain, it is a lie:
+        the dialog reads the price out and nothing further happens. Duplicates
+        were reachable and common -- fifteen chests over a run, drawn from six
+        curses -- and they were worse than a lie, because two of the six stack
+        when repeated and four do not, so the same second curse could be a
+        sentence or a no-op depending on which one it was.
+
+        Handed to the floor generator, which knows nothing about curses beyond
+        their names, and used by the wraith's touch for the same reason. An
+        empty tuple is a floor with no chests, which the generator already knows
+        how to draw.
+        """
+        carried = {curse.key for curse in self.curses}
+        return tuple(key for key in CURSES if key not in carried)
+
+    @property
     def sight_radius(self) -> int:
         """How far the player can see, after anything that narrows it.
 
@@ -432,7 +451,7 @@ class GameState:
         floor = generate_floor(
             self.rng,
             depth=depth,
-            curse_keys=tuple(CURSES),
+            curse_keys=self.unpaid_curses,
             filled_slots=tuple(self.player.equipment) if self.player else (),
             npc_keys=tuple(NPCS),
         )
