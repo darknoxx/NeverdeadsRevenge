@@ -29,6 +29,7 @@ __all__ = [
     "MIN_HIT_CHANCE",
     "MAX_HIT_CHANCE",
     "REVENGE_MAX_STACKS",
+    "chance_against",
     "hit_chance",
     "attack",
     "apply_revenge",
@@ -83,11 +84,21 @@ _VERBS: dict[tuple[bool, bool, bool], tuple[str, str]] = {
 }
 
 
+def chance_against(accuracy: int, evasion: int) -> float:
+    """Probability that an accuracy lands on an evasion.
+
+    Split out of :func:`hit_chance` so a screen can show a worked example
+    without building two actors to ask about. Accuracy and evasion are worth ten
+    points each and the result is clamped, which is a rule nobody can read off
+    two bare integers -- which is why the sheet says what they come to.
+    """
+    chance = BASE_HIT_CHANCE + 0.1 * (accuracy - evasion)
+    return max(MIN_HIT_CHANCE, min(MAX_HIT_CHANCE, chance))
+
+
 def hit_chance(attacker: Actor, defender: Actor) -> float:
     """Probability that ``attacker`` lands a blow on ``defender``."""
-    edge = attacker.accuracy - defender.evasion
-    chance = BASE_HIT_CHANCE + 0.1 * edge
-    return max(MIN_HIT_CHANCE, min(MAX_HIT_CHANCE, chance))
+    return chance_against(attacker.accuracy, defender.evasion)
 
 
 def attack(

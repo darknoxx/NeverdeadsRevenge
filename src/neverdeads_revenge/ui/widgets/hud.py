@@ -122,7 +122,14 @@ class Hud(Static):
             # Name the grant, not just the count. Three heroes collect three
             # different things from the same mechanic, so "REVENGE x3" alone
             # would mean a different number on each of them.
-            out.append(f"REVENGE x{state.revenge_stacks}", style="bold green")
+            #
+            # And the ceiling with it, because the ceiling is invisible
+            # otherwise: a player at five stacks has no way to learn that the
+            # sixth kill on this floor is worth nothing.
+            out.append(
+                f"REVENGE x{state.revenge_stacks}/{player.trait.cap}",
+                style="bold green",
+            )
             out.append(
                 f"  {player.trait.describe(state.revenge_stacks)}\n",
                 style="green",

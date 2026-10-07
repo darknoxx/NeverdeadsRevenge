@@ -20,6 +20,7 @@ from textual.screen import Screen
 from textual.widgets import Static
 
 from ...game.actors import HEROES, Hero
+from ...game.combat import chance_against
 from ...game.pace import MAX_ACTIONS_PER_SECOND, actions_per_second
 from ..blocks import ROWS, render_word
 
@@ -31,7 +32,7 @@ FUTURE_HEROES = ("revenant", "warden")
 #: Rows in the stat table. ``app.tcss`` pins the widget to this number, so a row
 #: added here without a row added there is a row that gets clipped -- and a
 #: locked slot has no table at all, so the widget has to hold its height anyway.
-STAT_ROWS = 7
+STAT_ROWS = 8
 
 
 class HeroSelectScreen(Screen[str]):
@@ -180,7 +181,21 @@ class HeroSelectScreen(Screen[str]):
             ),
             ("crit", f"{s.crit_chance:.0%}", f"x{s.crit_multiplier:.1f} damage"),
             ("damage", f"{s.damage[0]}-{s.damage[1]}", "per hit"),
-            ("evasion", f"{s.evasion}", "lowers their hit chance"),
+            # Accuracy was not on this screen at all, which hid the one thing
+            # Walkyrion has that neither other hero does. And both of these are
+            # worth ten points a step and clamped, so a bare integer is a number
+            # with no meaning attached: the note is the worked example against a
+            # monster with neither, which is what the floor-one templates are.
+            (
+                "accuracy",
+                f"{s.accuracy}",
+                f"hits a plain thing {chance_against(s.accuracy, 0):.0%}",
+            ),
+            (
+                "evasion",
+                f"{s.evasion}",
+                f"their hit chance {chance_against(0, s.evasion):.0%}",
+            ),
             ("armour", f"{s.armor}", "off every hit"),
             # The trait belongs on this screen. It is the difference between
             # three stat lines and three characters: Noxx gets faster, Yeti

@@ -316,7 +316,10 @@ class GameScreen(Screen[None]):
             summary.append(f"Floor reached  {state.depth}\n", style="bold cyan")
         summary.append(f"Monsters slain  {state.kills}\n")
         summary.append(f"Level reached   {state.level}\n")
-        summary.append(f"Coins gathered  {state.gold}\n")
+        # The purse, not the total picked up: a spring costs forty and the toll
+        # five a floor, and both come out of it before this line is written. It
+        # said "gathered", which read as a lifetime total and was the balance.
+        summary.append(f"Coins banked    {state.gold}\n")
         summary.append(f"Turns taken     {state.total_turns}\n")
         summary.append(f"Cells walked    {state.player.steps}\n")
         # Shown on its own line, with a sign, so it reads as something earned

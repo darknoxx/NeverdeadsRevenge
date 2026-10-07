@@ -17,6 +17,7 @@ from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
+from ...game.combat import chance_against
 from ...game.levels import KILLS_PER_LEVEL, MAX_LEVEL
 from ...game.pace import MAX_ACTIONS_PER_SECOND, actions_per_second
 from ...game.shop import describe_item
@@ -82,9 +83,22 @@ class CharacterScreen(ModalScreen[None]):
             _row("speed", f"{player.speed:.2f}   {_rate_line(player.speed)}"),
             _row("damage", f"{low}-{high}"),
             _row("crit", f"{player.crit_chance:.0%}  x{player.crit_multiplier:.1f}"),
-            _row("accuracy", f"{player.accuracy}"),
-            _row("evasion", f"{player.evasion}"),
+            # Accuracy and evasion are worth ten points each and clamped, which
+            # is a rule nobody can read off two bare integers. The worked
+            # example is against a monster with neither, which is what the
+            # floor-one templates are.
+            _row(
+                "accuracy",
+                f"{player.accuracy}   hits a plain thing "
+                f"{chance_against(player.accuracy, 0):.0%}",
+            ),
+            _row(
+                "evasion",
+                f"{player.evasion}   their hit chance "
+                f"{chance_against(0, player.evasion):.0%}",
+            ),
             _row("armour", f"{player.armor}"),
+            _row("revenge", _revenge_line(state)),
             "",
         ]
 
@@ -113,6 +127,18 @@ class CharacterScreen(ModalScreen[None]):
                 lines.append(f"  [bold red]{curse.name}[/]  [dim]{curse.price}[/]")
 
         return "\n".join(lines)
+
+
+def _revenge_line(state: GameState) -> str:
+    """What REVENGE has granted this floor, and how much more it can.
+
+    The ceiling is the reason to show it at all. Stacks lapse on every descent
+    and stop paying at five for one hero, three for another -- and a player who
+    cannot see the ceiling cannot tell a reward that has stopped from a run of
+    bad luck.
+    """
+    trait = state.player.trait
+    return f"{state.revenge_stacks}/{trait.cap}   {trait.describe(1)} per kill"
 
 
 def _rate_line(speed: float) -> str:

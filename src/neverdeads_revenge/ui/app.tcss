@@ -103,11 +103,11 @@ Screen {
     margin: 1 0 0 0;
 }
 
-/* Seven, matching STAT_ROWS in hero_select.py. Fixed, because a locked slot has
+/* Eight, matching STAT_ROWS in hero_select.py. Fixed, because a locked slot has
    no table to show at all and the card has to be the same height on every slot. */
 #hero-stats {
     width: 1fr;
-    height: 7;
+    height: 8;
     margin: 1 0 0 0;
 }
 

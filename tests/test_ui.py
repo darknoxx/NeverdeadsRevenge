@@ -386,6 +386,24 @@ async def test_the_victory_screen_answers_the_prologue():
         assert "Floor reached" in body
 
 
+async def test_the_summary_reports_the_purse_and_not_what_was_picked_up():
+    """A spring costs forty and the toll five a floor, so the number on this line
+    is the balance, not the total. It said "gathered", which read as a lifetime
+    total and was the purse."""
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        state.gold = 100
+        state.gold -= 40  # a wash at the spring
+
+        screen._game_over(won=False)
+        await pilot.pause()
+
+        body = str(app.screen.query_one("#game-over-body").render())
+        assert "Coins banked    60" in body, body
+
+
 # -- title ------------------------------------------------------------------
 def test_the_title_font_can_spell_the_whole_name():
     """Every character of the name has a glyph.
@@ -510,6 +528,46 @@ async def test_the_character_screen_shows_every_stat():
             "carried",
         ):
             assert label in sheet, f"{label} missing from the character sheet"
+
+
+async def test_the_character_screen_says_what_accuracy_and_evasion_come_to():
+    """Two bare integers, worth ten points a step and clamped. Without the worked
+    example the player has a number with no meaning attached to it."""
+    from neverdeads_revenge.game.combat import chance_against
+    from neverdeads_revenge.ui.screens.character import CharacterScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        player = screen.state.player
+        await pilot.press("c")
+        await pilot.pause()
+
+        assert isinstance(app.screen, CharacterScreen)
+        sheet = str(app.screen.query_one("#character-body").render())
+        assert f"{chance_against(player.accuracy, 0):.0%}" in sheet, "no hit chance"
+        assert f"{chance_against(0, player.evasion):.0%}" in sheet, "no dodge chance"
+
+
+async def test_the_character_screen_shows_the_revenge_ceiling():
+    """Stacks lapse on every descent and stop paying at a different number for
+    each hero, and the sheet is where a player goes to read the numbers."""
+    from neverdeads_revenge.game.combat import apply_revenge
+    from neverdeads_revenge.ui.screens.character import CharacterScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        cap = state.player.trait.cap
+        state.revenge_stacks = apply_revenge(state.player, 3)
+
+        await pilot.press("c")
+        await pilot.pause()
+
+        assert isinstance(app.screen, CharacterScreen)
+        sheet = str(app.screen.query_one("#character-body").render())
+        assert f"3/{cap}" in sheet, "the ceiling is not on the sheet"
 
 
 async def test_the_character_screen_lists_what_is_worn_and_what_it_does():
@@ -956,6 +1014,24 @@ async def test_the_hud_names_what_revenge_is_granting():
                 assert other.trait.describe(other.trait.cap) not in shown, (
                     f"{key} is shown with {other.key}'s grant"
                 )
+
+
+async def test_the_hud_shows_how_much_revenge_is_left_to_earn():
+    """The ceiling is invisible otherwise: a player at five stacks has no way to
+    learn that the sixth kill on this floor is worth nothing."""
+    from neverdeads_revenge.ui.widgets.hud import Hud
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        cap = state.player.trait.cap
+
+        state.revenge_stacks = 2
+        await pilot.press(".")
+        await pilot.pause()
+
+        assert f"REVENGE x2/{cap}" in screen.query_one(Hud).render().plain
 
 
 async def test_the_hero_select_screen_shows_each_trait():
@@ -2269,6 +2345,21 @@ def test_the_stat_table_is_the_row_count_the_css_pins_it_to():
 
     for hero in HEROES.values():
         assert len(HeroSelectScreen._stat_block(hero).splitlines()) == STAT_ROWS, hero.key
+
+
+def test_the_hero_select_says_what_accuracy_and_evasion_come_to():
+    """Accuracy was not on this screen at all, which hid the one thing Walkyrion
+    has that neither other hero does -- and both stats are worth ten points a
+    step, which is a rule nobody can read off a bare integer."""
+    from neverdeads_revenge.game.actors import HEROES
+    from neverdeads_revenge.game.combat import chance_against
+    from neverdeads_revenge.ui.screens.hero_select import HeroSelectScreen
+
+    for hero in HEROES.values():
+        block = HeroSelectScreen._stat_block(hero)
+        assert "accuracy" in block, hero.key
+        assert f"{chance_against(hero.stats.accuracy, 0):.0%}" in block, hero.key
+        assert f"{chance_against(0, hero.stats.evasion):.0%}" in block, hero.key
 
 
 async def test_the_hero_prose_and_numbers_start_on_the_same_column():
