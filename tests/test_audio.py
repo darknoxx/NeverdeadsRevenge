@@ -14,8 +14,6 @@ import sys
 import wave
 from pathlib import Path
 
-import pytest
-
 from neverdeads_revenge.game.state import LogKind
 from neverdeads_revenge.ui import audio
 from neverdeads_revenge.ui.audio import SOUNDS_DIR, Sfx, loudest_kind, sound_for_kind

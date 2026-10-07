@@ -35,7 +35,6 @@ __all__ = [
     "take_turn",
     "advance_world",
     "descend",
-    "REVENGE_MAX_STACKS",
     "MAX_ENEMY_ACTIONS_PER_PLAYER_TURN",
 ]
 
@@ -153,11 +152,23 @@ def _remove_corpse(state: GameState, enemy: Actor) -> None:
 
 
 def _kill_message(state: GameState, enemy: Actor, outcome) -> None:
-    """Report a kill and grant REVENGE when the player did it."""
+    """Report a blow that killed, and everything a kill is worth."""
     state.say(
         f"You {outcome.verb_second_person} the {enemy.name} for {outcome.damage}!",
         LogKind.CRIT if outcome.crit else LogKind.COMBAT,
     )
+    _on_death(state, enemy)
+
+
+def _on_death(state: GameState, enemy: Actor) -> None:
+    """Everything that happens because something died, however it died.
+
+    Its own function because a monster can die with the player's name on it in
+    two ways: a blow, and the mirror. The mirror used to skip straight to the
+    corpse, so a kill it finished counted for *nothing* -- no coin, no REVENGE,
+    no level and no ember -- which made an amulet quietly cost the player a
+    handful of things it had never mentioned.
+    """
     state.kills += 1
     _drop_coins(state, enemy)
     _learn(state)
@@ -851,6 +862,9 @@ def _resolve_enemy_attack(state: GameState, attacker: Actor, player: Actor) -> N
             state.say(f"The mirror gives {back} of it back.", LogKind.GOOD)
         if not attacker.stats.alive:
             state.say(f"The {attacker.name} comes apart on its own blow.", LogKind.GOOD)
+            # Its death is the player's doing -- the mirror is worn, not found --
+            # so it pays out like any other kill.
+            _on_death(state, attacker)
             _remove_corpse(state, attacker)
 
 

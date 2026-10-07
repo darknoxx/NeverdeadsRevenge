@@ -27,7 +27,6 @@ __all__ = [
     "PROLOGUE_TITLE",
     "PROLOGUE_HINT",
     "GOAL_HINT",
-    "terrain_legend",
     "terrain_help",
     "enemy_legend",
     "item_legend",
@@ -86,19 +85,18 @@ PROLOGUE_HINT = "There is a way out. It is under everything."
 #: default the eye assumes. GRASS and WATER are omitted too: they are pure
 #: decoration, and the panel has to stay short enough to fit the sidebar without
 #: the bottom of it -- the loot and the goal -- falling off the screen.
+#:
+#: DOOR is omitted for a different reason, and it is the honest one: the tile is
+#: fully specified and the field of view has a test for it, but the generator
+#: has never placed one. A reference that lists a thing no floor contains is a
+#: reference that teaches the player to look for something that is not there.
 LEGEND_TERRAIN: tuple[Tile, ...] = (
     Tile.WALL,
-    Tile.DOOR,
     Tile.RUBBLE,
     Tile.STAIRS_DOWN,
     Tile.RIFT,
     Tile.SPRING,
 )
-
-
-def terrain_legend() -> list[tuple[str, str]]:
-    """``(glyph, meaning)`` for every terrain type worth naming."""
-    return [(tile.glyph, tile.description) for tile in LEGEND_TERRAIN]
 
 
 def item_legend() -> list[tuple[str, str]]:

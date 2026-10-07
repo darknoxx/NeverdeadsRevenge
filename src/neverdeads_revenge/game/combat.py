@@ -50,10 +50,6 @@ class AttackOutcome:
     dodged: bool = False
 
     @property
-    def is_success(self) -> bool:
-        return self.hit
-
-    @property
     def verb(self) -> str:
         """Third person singular, for when a monster is the subject.
 

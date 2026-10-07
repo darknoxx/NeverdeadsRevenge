@@ -341,10 +341,6 @@ class GameState:
         """Append a message to the log."""
         self.log.append(LogEntry(text=text, kind=kind, turn=self.turn))
 
-    def recent_log(self, count: int = 8) -> list[LogEntry]:
-        """The last ``count`` messages, oldest first."""
-        return self.log[-count:]
-
     # -- queries ------------------------------------------------------------
     @property
     def over(self) -> bool:
@@ -362,12 +358,6 @@ class GameState:
             if enemy.alive and enemy.position == pos:
                 return enemy
         return None
-
-    def visible_enemies(self) -> list[Actor]:
-        """Living enemies currently in the player's line of sight."""
-        return [
-            enemy for enemy in self.living_enemies if self.dungeon_map.is_visible(enemy.position)
-        ]
 
     def enemy_beside_player(self) -> Actor | None:
         """An adjacent living enemy, if there is one."""

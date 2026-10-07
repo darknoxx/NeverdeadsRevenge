@@ -661,3 +661,49 @@ def test_a_name_that_already_has_an_article_does_not_get_two():
 
     assert not any("the the" in entry.text for entry in state.log)
     assert any("the last ember" in entry.text for entry in state.log)
+
+
+def test_a_kill_the_mirror_finishes_is_still_a_kill():
+    """It skipped straight to the corpse, so it counted for nothing at all.
+
+    No coin, no REVENGE, no level, no ember -- an amulet quietly costing the
+    player a handful of things it had never mentioned. The mirror is worn, not
+    found, so what it kills is the player's doing.
+    """
+    state, brute = duel("mirror", brute_hp=1)
+    brute.gold = (10, 10)
+
+    for _ in range(60):
+        if not brute.alive:
+            break
+        land_one_blow(state, brute)
+
+    assert not brute.alive
+    assert state.kills == 1, "the kill was not counted"
+    assert state.dungeon_map.item_at(brute.position) is not None, "no coins"
+    assert state.revenge_stacks == 1, "no REVENGE"
+
+
+def test_the_mirror_teaches_like_any_other_kill():
+    """The same bug from the other end: the kill count feeds the levels, and a
+    kill that was not counted was a level the player never got."""
+    from neverdeads_revenge.game.levels import KILLS_PER_LEVEL
+
+    state = wearing("mirror")
+    player = state.player
+    before = player.max_hp
+
+    for _ in range(KILLS_PER_LEVEL):
+        brute = _a_brute_beside(player, hp=1)
+        state.enemies = [brute]
+        state.turn_queue = type(state.turn_queue)([player, brute])
+        state.refresh_vision()
+        for _ in range(60):
+            if not brute.alive:
+                break
+            land_one_blow(state, brute)
+        assert not brute.alive, "the mirror never finished one"
+
+    assert state.kills == KILLS_PER_LEVEL
+    assert state.level == 2
+    assert player.max_hp == before + 2

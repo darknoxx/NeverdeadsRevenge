@@ -31,7 +31,7 @@ from collections.abc import Callable
 
 from neverdeads_revenge.core.direction import Pos
 
-__all__ = ["compute_fov", "compute_fov_full", "has_line_of_sight"]
+__all__ = ["compute_fov", "compute_fov_full"]
 
 Opacity = Callable[[Pos], bool]
 Bounds = Callable[[Pos], bool]
@@ -82,11 +82,6 @@ def compute_fov_full(
 def _sees(observer: Pos, target: Pos, is_opaque: Opacity) -> bool:
     """Whether ``observer`` can see ``target``, guaranteed symmetric."""
     return _line_clear(observer, target, is_opaque) or _line_clear(target, observer, is_opaque)
-
-
-def has_line_of_sight(a: Pos, b: Pos, is_opaque: Opacity) -> bool:
-    """Public wrapper around the symmetric sight test."""
-    return _sees(a, b, is_opaque)
 
 
 def _line_clear(start: Pos, end: Pos, is_opaque: Opacity) -> bool:

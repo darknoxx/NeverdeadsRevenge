@@ -31,26 +31,35 @@ death, or an escape.
 rift instead of stairs. Step into it and the run is won; die before that and the
 run is over. Both endings show the same summary screen.
 
-Enemy count scales with depth (`6 + depth`). Monster health and damage scale too
-— 15% per floor, capped at twice floor 1 from floor 8 — and wraiths get more
-common the deeper you go. The legend in the sidebar quotes the current floor's
-numbers, so it follows you down.
+Enemy count scales with depth, monster health and damage scale too, and wraiths
+get more common the deeper you go. The legend in the sidebar quotes the current
+floor's numbers, so it follows you down. The dials themselves are set out below.
 
 No hero can heal on their own; potions and elixirs on the floor are the only way
 back up. A run's health is therefore a budget you spend across ten floors, and
 skipping loot to save time is a real trade.
 
-The dungeon is built to be a wall. Measured with a bot over 40 seeds a hero --
-it kills what is beside it, drinks when hurt, picks up what it is worth walking
-to, washes a curse off when it can afford to, and beelines for the exit
-otherwise:
+The dungeon is built to be a wall. Measured with the bot in
+`tools/balance.py` over 40 seeds a hero:
+
+```bash
+python3 tools/balance.py                 # 40 seeds a hero
+python3 tools/balance.py --loadout full  # with the shop spent
+```
+
+It plays the way a competent but unimaginative player does -- kills what is
+beside it, drinks when hurt, picks up what is worth walking to, washes a curse
+off when it can afford to, and beelines for the exit otherwise. It is
+deliberately *not* a good player: a bot that kites and plans tells you what the
+game is like for somebody who has already mastered it, and the floor is what the
+dials are for.
 
 | | Noxx | Yeti | Walkyrion |
 | --- | --- | --- | --- |
-| nothing bought | 22% | 5% | 12% |
-| every permanent upgrade, a bought blade, a bought coat and a bought amulet | 62% | 48% | 42% |
+| nothing bought | 22% | 5% | 15% |
+| every permanent upgrade, a bought blade, a bought coat and a bought amulet | 62% | 50% | 42% |
 
-Of 120 runs with nothing bought, twenty-three reached floor 10 and fourteen never
+Of 120 runs with nothing bought, twenty-four reached floor 10 and fourteen never
 got past floor 3. That is the shape the wall is meant to have: **floor one is a
 real fight**, the run climbs a gentle curve on top of it, and the shop is the
 difference between the two rows of that table.

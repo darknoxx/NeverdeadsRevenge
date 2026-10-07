@@ -19,7 +19,7 @@ import pytest
 
 from neverdeads_revenge.game import actors as actors_module
 from neverdeads_revenge.game.actions import Action
-from neverdeads_revenge.game.state import GameState, RunState
+from neverdeads_revenge.game.state import RunState
 from neverdeads_revenge.ui.app import NeverdeadsRevenge
 from neverdeads_revenge.ui.hold import BAR_CELLS, HoldToContinue
 from neverdeads_revenge.ui.screens.game import GameScreen
@@ -2402,3 +2402,35 @@ async def test_the_shop_scrolls_to_whatever_is_selected():
         # The last offer is a wild one, at the very bottom of the shelf.
         rows = app.screen.query_one("#shop-rows")
         assert rows.region.y < app.screen.query_one("#shop").size.height
+
+
+async def test_a_remembered_spring_stays_on_the_map():
+    """It is a one-use resource, so it is a place worth remembering the way to.
+
+    It was missing from the list of terrain that stays legible when it is out of
+    sight, so a room the player had already found the water in went blank the
+    moment they stepped out of it -- and the whole point of the spring is that
+    you walk back to it.
+    """
+    from neverdeads_revenge.ui.widgets.map_view import MapView
+    from neverdeads_revenge.world.tiles import Tile
+
+    assert MapView._stays_legible(Tile.SPRING)
+    assert MapView._stays_legible(Tile.STAIRS_DOWN)
+    assert MapView._stays_legible(Tile.WALL)
+    assert not MapView._stays_legible(Tile.FLOOR)
+
+
+def test_the_terrain_reference_only_lists_terrain_that_exists():
+    """A reference that lists a thing no floor contains teaches the player to
+    look for something that is not there.
+
+    DOOR is the one: fully specified, transparent on purpose, and never placed
+    by the generator. When a floor gets doors, this list gets a door.
+    """
+    from neverdeads_revenge.game.prologue import LEGEND_TERRAIN
+    from neverdeads_revenge.world.tiles import Tile
+
+    assert Tile.DOOR not in LEGEND_TERRAIN
+    for tile in LEGEND_TERRAIN:
+        assert tile is not Tile.DOOR

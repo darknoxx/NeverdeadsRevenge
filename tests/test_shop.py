@@ -90,7 +90,6 @@ def test_what_is_affordable_is_marked_before_the_screen_draws():
 
     assert offer_for(progress, "potion").affordable
     assert not offer_for(progress, "bite").affordable, f"{dearest} coins on {cheapest}"
-    assert offer_for(progress, "bite").buyable is False
 
 
 def test_an_item_describes_itself():

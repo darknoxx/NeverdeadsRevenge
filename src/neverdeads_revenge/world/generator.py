@@ -212,10 +212,6 @@ def _reachable(start: Pos, dungeon_map: DungeonMap) -> set[Pos]:
     return seen
 
 
-def _pick(rng: Rng, candidates: list[Pos]) -> Pos:
-    return candidates[rng.below(len(candidates))]
-
-
 def _scatter_decor(rng: Rng, dungeon_map: DungeonMap, rooms: list[Rect], count: int) -> None:
     """Sprinkle rubble and grass for texture. Purely cosmetic, never on stairs."""
     reserved = {pos for room in rooms for pos in room.inner_positions}

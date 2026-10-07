@@ -11,8 +11,6 @@ are fixed, so a failure is reproducible.
 
 from __future__ import annotations
 
-import asyncio
-
 import random
 
 import pytest
@@ -24,7 +22,7 @@ from neverdeads_revenge.ui.screens.game_over import GameOverScreen
 from neverdeads_revenge.ui.screens.title import TitleScreen
 from neverdeads_revenge.world.tiles import Tile
 
-from .test_ui import drive_to_game, finish_run, hold_enter
+from .test_ui import drive_to_game, finish_run
 
 SIZE = (100, 34)
 

@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 
 from neverdeads_revenge.core.rng import Rng
 from neverdeads_revenge.game.amulets import AMULETS, blurb_for
-from neverdeads_revenge.world.items import ITEMS, ItemTemplate, make_item
+from neverdeads_revenge.world.items import ITEMS, ItemTemplate
 
 __all__ = [
     "MetaUpgrade",
@@ -327,9 +327,6 @@ class Offer:
     def maxed(self) -> bool:
         return bool(self.limit) and self.owned >= self.limit
 
-    @property
-    def buyable(self) -> bool:
-        return self.affordable and not self.maxed
 
 
 def describe_item(template: ItemTemplate) -> str:

@@ -49,7 +49,6 @@ from neverdeads_revenge.game.state import (
     SPEED_BONUS_PER_TURN,
     TURN_BUDGET_PER_FLOOR,
     GameState,
-    LogKind,
     RunState,
     start_run,
 )

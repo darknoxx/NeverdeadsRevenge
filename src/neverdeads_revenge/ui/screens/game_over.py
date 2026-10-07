@@ -10,7 +10,6 @@ gesture the prologue uses.
 
 from __future__ import annotations
 
-from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical

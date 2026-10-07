@@ -27,10 +27,6 @@ __all__ = ["MapView"]
 MEMORY_COLOR = "grey30"
 UNSEEN_COLOR = "black"
 
-#: Keep a little of the surrounding map on screen even when it is bigger than
-#: the viewport, so the player has spatial context.
-VIEWPORT_MARGIN = 2
-
 
 class MapView(Widget):
     """Renders the current floor, centred on the player."""
@@ -127,7 +123,15 @@ class MapView(Widget):
     def _stays_legible(tile: Tile) -> bool:
         """Whether dimmed terrain should still be drawn.
 
-        Walls and the exits give the player their mental map. Remembering the
-        colour of floor tiles is noise.
+        Walls give the player their mental map, and so does anything they might
+        walk back to on purpose -- the stairs, the rift, and the spring, which is
+        a one-use resource and therefore a place worth remembering the way to.
+        The spring was missing from this list for a while, so a room the player
+        had already found the water in went blank the moment they stepped out of
+        it. Remembering the colour of floor tiles is noise.
         """
-        return tile.blocks_movement or tile in (Tile.STAIRS_DOWN, Tile.RIFT)
+        return tile.blocks_movement or tile in (
+            Tile.STAIRS_DOWN,
+            Tile.RIFT,
+            Tile.SPRING,
+        )

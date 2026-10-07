@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-__all__ = ["Tile", "Terrain", "is_wall", "blocks_sight", "is_walkable"]
+__all__ = ["Tile", "is_walkable"]
 
 
 class Tile(Enum):
@@ -105,20 +105,6 @@ _DESCRIPTIONS: dict[Tile, str] = {
 # Rubble is walkable but opaque; everything else opaque is solid.
 _BLOCKS_MOVEMENT = frozenset({Tile.VOID, Tile.WALL, Tile.WATER})
 _BLOCKS_SIGHT = frozenset({Tile.VOID, Tile.WALL, Tile.WATER, Tile.RUBBLE})
-
-# Terrain that a generator is allowed to carve rooms out of.
-CARVABLE = frozenset({Tile.VOID})
-
-
-def is_wall(tile: Tile) -> bool:
-    """True for tiles that stop movement."""
-    return tile.blocks_movement
-
-
-def blocks_sight(tile: Tile) -> bool:
-    """True for tiles that stop line of sight."""
-    return tile.blocks_sight
-
 
 def is_walkable(tile: Tile) -> bool:
     """True for tiles an actor may stand on."""

@@ -81,25 +81,6 @@ class MetaProgress:
     best_score: int = 0
     total_kills: int = 0
 
-    def stacks(self, key: str) -> int:
-        return self.upgrades.get(key, 0)
-
-    def add_stack(self, key: str) -> int:
-        """Buy one stack of an upgrade, respecting its cap. Returns new count."""
-        upgrade = META_UPGRADES.get(key)
-        if upgrade is None:
-            raise KeyError(f"unknown meta upgrade: {key}")
-        current = min(self.stacks(key) + 1, upgrade.max_stacks)
-        self.upgrades[key] = current
-        return current
-
-    def unlock(self, hero_key: str) -> None:
-        if hero_key not in self.unlocked_heroes:
-            self.unlocked_heroes.append(hero_key)
-
-    def is_unlocked(self, hero_key: str) -> bool:
-        return hero_key in self.unlocked_heroes
-
     def record_run(
         self,
         *,
@@ -134,10 +115,6 @@ class MetaProgress:
         )
         self.scores.sort(key=lambda entry: entry.score, reverse=True)
         del self.scores[SCOREBOARD_SIZE:]
-
-    def meta_upgrade_totals(self) -> dict[str, int]:
-        """Upgrade stacks, as :func:`~neverdeads_revenge.game.state.start_run` wants them."""
-        return dict(self.upgrades)
 
     def reroll_wilds(self, rng) -> None:
         """Put two new offers on the rotating shelf.

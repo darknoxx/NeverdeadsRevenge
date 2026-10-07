@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from neverdeads_revenge.core.direction import Direction
 from neverdeads_revenge.core.rng import Rng
 from neverdeads_revenge.world.generator import (
     ESCAPE_DEPTH,

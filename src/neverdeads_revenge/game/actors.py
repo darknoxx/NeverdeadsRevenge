@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from enum import Enum
 
-from neverdeads_revenge.core.direction import Pos, chebyshev
+from neverdeads_revenge.core.direction import Pos
 from neverdeads_revenge.core.rng import Rng
 from neverdeads_revenge.world.map import GroundItem
 from neverdeads_revenge.world.modifiers import Modifiers
@@ -285,10 +285,6 @@ class Actor:
         low, high = self.stats.damage
         bonus = self.damage_bonus + self.modifiers.damage + self.passive_damage
         return (low + bonus, high + bonus)
-
-    def distance_from(self, other: Actor) -> int:
-        """Chebyshev distance to another actor."""
-        return chebyshev(self.position, other.position)
 
     def damage_roll(self, rng) -> int:
         """A damage value in this actor's range, plus every flat bonus.

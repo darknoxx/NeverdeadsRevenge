@@ -18,7 +18,6 @@ the same way it does for the icon. Edit the recipes, not the WAVs.
 from __future__ import annotations
 
 import argparse
-import math
 import random
 import struct
 import sys

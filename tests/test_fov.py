@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import pytest
 
-from neverdeads_revenge.core.direction import DIRECTIONS, Direction
 from neverdeads_revenge.core.rng import Rng
 from neverdeads_revenge.world.fov import compute_fov, compute_fov_full
 from neverdeads_revenge.world.generator import generate_floor
