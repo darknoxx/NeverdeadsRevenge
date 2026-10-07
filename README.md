@@ -341,12 +341,18 @@ If the sound is ever wrong in a way that cannot be heard from where the code was
 written, there is a log:
 
 ```bash
-NEVERDEADS_REVENGE_SOUND_LOG=/tmp/sfx.log ./ndr
+./ndr --sound-log                 # writes /tmp/ndr-sound.log
+./ndr --sound-log /tmp/mine.log   # or wherever you like
 ```
 
-Every decision lands there -- what was played, what was dropped, how long the
-sound was, and how far behind the device already was. The game cannot know whether
-a note came out of the speaker, but it can say exactly what it asked for.
+Every decision lands there -- what played, what was dropped, how long the sound
+was, and how far behind the device already was. The file exists from the moment
+the game starts, with a header saying which player was found, so it is obvious
+whether the log is on. The game cannot know whether a note came out of the
+speaker, but it can say exactly what it asked for.
+
+`NEVERDEADS_REVENGE_SOUND_LOG=/tmp/sfx.log` does the same thing if you would
+rather set it in the environment than pass a flag.
 
 ## Gold and the shop
 

@@ -252,6 +252,17 @@ class Sfx:
                 # where it is most noticeable.
                 self._open_stream()
 
+        if self._debug:
+            # A header, so the file exists from the moment the game starts. A
+            # diagnostic that only appears once something has gone wrong is a
+            # diagnostic nobody can tell is switched on.
+            command = self.player.command[0] if self.player else "none"
+            streams = self.player.streams if self.player else False
+            self._note(
+                f"--- sound log: player={command} streams={streams} "
+                f"muted={self._muted} backlog-limit={MAX_BACKLOG * 1000:.0f}ms ---"
+            )
+
     # -- the outside world ---------------------------------------------------
     @property
     def available(self) -> bool:

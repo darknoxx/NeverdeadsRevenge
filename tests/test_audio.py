@@ -556,3 +556,20 @@ def test_every_sound_is_either_short_or_urgent():
         with wave.open(str(path), "rb") as handle:
             seconds = handle.getnframes() / handle.getframerate()
         assert seconds < audio.MAX_BACKLOG or path.stem in audio.URGENT, path.stem
+
+
+def test_the_log_exists_from_the_moment_the_game_starts(tmp_path, monkeypatch):
+    """A diagnostic that only appears once something has gone wrong is a
+    diagnostic nobody can tell is switched on."""
+    path = tmp_path / "sfx.log"
+    monkeypatch.setenv(audio.DEBUG_ENV, str(path))
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player(streams=True))
+
+    sfx = Sfx(muted=True)
+
+    assert path.exists(), "the log was not created until the first sound"
+    header = path.read_text()
+    assert "sound log" in header
+    assert "aplay" in header
+    assert "streams=True" in header
+    sfx.close()
