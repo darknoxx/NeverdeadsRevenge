@@ -15,7 +15,7 @@ from neverdeads_revenge.core.rng import Rng
 from neverdeads_revenge.world.map import GroundItem
 from neverdeads_revenge.world.modifiers import Modifiers
 
-from .difficulty import MAX_ENEMY_SPEED, potency, weight_at_depth
+from .difficulty import enemy_speed, potency, weight_at_depth
 from .npcs import NPC_COLOR, NPC_GLYPH, Npc
 
 __all__ = [
@@ -613,9 +613,12 @@ def make_npc(npc: Npc, position: Pos) -> Actor:
 def scale_template(template: EnemyTemplate, depth: int) -> EnemyTemplate:
     """Return ``template`` as it appears on ``depth``.
 
-    Health and damage scale with :func:`~game.difficulty.potency`; speed scales
-    too but is clamped to :data:`~game.difficulty.MAX_ENEMY_SPEED` so nothing in
-    the dungeon ever acts more often than the hero does. Armour, evasion and
+    Health and damage scale with :func:`~game.difficulty.potency`; speed closes
+    most of the gap to :data:`~game.difficulty.MAX_ENEMY_SPEED` by
+    :func:`~game.difficulty.enemy_speed`, so a deep-floor wraith is genuinely
+    faster than a floor-1 wraith while nothing in the dungeon ever acts more
+    often than the hero does -- and, unlike a plain clamp, a fast monster stays
+    faster than a slow one all the way down. Armour, evasion and
     accuracy stay put: they are small integers, and doubling an armour value
     would subtract more from every hit than doubling damage adds.
 
@@ -635,9 +638,10 @@ def scale_template(template: EnemyTemplate, depth: int) -> EnemyTemplate:
             max(1, round(low * factor)),
             max(1, round(high * factor)),
         ),
-        # The clamp is the point: potency alone would hand a deep-floor wraith
-        # speed 2.6, faster than Noxx, and the hero would stop being the fast one.
-        speed=min(template.stats.speed * factor, MAX_ENEMY_SPEED),
+        # Closing the gap rather than clamping: a clamp gave every monster the
+        # same speed by floor five, which is the opposite of what a floor with
+        # three kinds of monster on it is for.
+        speed=enemy_speed(template.stats.speed, depth),
     )
     # The purse scales with the same factor as the damage: a deep floor pays
     # better, which is the whole reason to keep going down rather than farm the

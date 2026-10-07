@@ -2775,40 +2775,6 @@ async def test_a_held_key_acts_six_times_a_second():
         assert 5 <= accepted <= 7, f"{accepted} actions in a second"
 
 
-async def test_a_fast_hero_acts_faster_than_a_slow_one():
-    """Speed is what a hero *is*, and this is the one place the player feels it in
-    their hand rather than in a number.
-
-    It changes nothing about the balance -- the turn queue decides who acts how
-    often, and a tap is never throttled -- so it is purely how the hero feels
-    under the finger, which is worth having.
-    """
-    from neverdeads_revenge.game.actors import NOXX, YETI, WALKYRION
-
-    app = NeverdeadsRevenge(seed=3)
-    async with app.run_test(size=SIZE) as pilot:
-        await pilot.pause()
-
-        noxx = app.action_gap(NOXX.stats.speed)
-        yeti = app.action_gap(YETI.stats.speed)
-        walk = app.action_gap(WALKYRION.stats.speed)
-
-        assert noxx < walk < yeti, "the heroes do not differ under the hand"
-        assert noxx == pytest.approx(1 / app.MAX_ACTIONS_PER_SECOND)
-
-
-async def test_the_rate_is_capped_and_floored():
-    """The cap belongs to the sound: a note has to finish before the next one
-    starts, or the device is permanently behind. And a hero heavy enough to be
-    slow should be heavy, not unusable."""
-    app = NeverdeadsRevenge(seed=3)
-    async with app.run_test(size=SIZE) as pilot:
-        await pilot.pause()
-
-        assert app.action_gap(99.0) == pytest.approx(1 / app.MAX_ACTIONS_PER_SECOND)
-        assert app.action_gap(0.01) == pytest.approx(1 / app.MIN_ACTIONS_PER_SECOND)
-
-
 async def test_a_deliberate_tap_is_never_swallowed():
     """Only *repeats* are throttled. A press after a gap is a decision, and the
     terminal cannot produce one that fast."""

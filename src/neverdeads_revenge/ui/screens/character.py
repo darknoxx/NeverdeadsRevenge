@@ -18,6 +18,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Static
 
 from ...game.levels import KILLS_PER_LEVEL, MAX_LEVEL
+from ...game.pace import MAX_ACTIONS_PER_SECOND, actions_per_second
 from ...game.shop import describe_item
 from ...world.items import ITEMS
 
@@ -78,7 +79,7 @@ class CharacterScreen(ModalScreen[None]):
             "",
             _row("health", f"{player.hp} / {player.max_hp}"),
             _row("level", _level_line(state)),
-            _row("speed", f"{player.speed:.2f}"),
+            _row("speed", f"{player.speed:.2f}   {_rate_line(player.speed)}"),
             _row("damage", f"{low}-{high}"),
             _row("crit", f"{player.crit_chance:.0%}  x{player.crit_multiplier:.1f}"),
             _row("accuracy", f"{player.accuracy}"),
@@ -112,6 +113,19 @@ class CharacterScreen(ModalScreen[None]):
                 lines.append(f"  [bold red]{curse.name}[/]  [dim]{curse.price}[/]")
 
         return "\n".join(lines)
+
+
+def _rate_line(speed: float) -> str:
+    """How often a held direction acts, against the ceiling.
+
+    Shown as ``9/20`` because the number is worth seeing twice: it is what the
+    hero's speed is *for* under the hand, and it is the one place speed is felt
+    rather than read. The ceiling is there so that speed bought later has
+    somewhere to go.
+    """
+    return (
+        f"{actions_per_second(speed):.0f}/{MAX_ACTIONS_PER_SECOND:.0f} a second"
+    )
 
 
 def _level_line(state: GameState) -> str:

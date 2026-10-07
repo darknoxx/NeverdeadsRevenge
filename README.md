@@ -56,13 +56,20 @@ dials are for.
 
 | | Noxx | Yeti | Walkyrion |
 | --- | --- | --- | --- |
-| nothing bought | 22% | 5% | 15% |
-| every permanent upgrade, a bought blade, a bought coat and a bought amulet | 62% | 50% | 42% |
+| nothing bought | 23% | 5% | 5% |
+| every permanent upgrade, a bought blade, a bought coat and a bought amulet | 63% | 50% | 43% |
 
-Of 120 runs with nothing bought, twenty-four reached floor 10 and fourteen never
-got past floor 3. That is the shape the wall is meant to have: **floor one is a
-real fight**, the run climbs a gentle curve on top of it, and the shop is the
-difference between the two rows of that table.
+Sixty seeds a hero, so a hundred and eighty runs a row. Of the runs with nothing
+bought, thirty-five reached floor 10 and eighteen never got past floor 3. That is
+the shape the wall is meant to have: **floor one is a real fight**, the run climbs
+a gentle curve on top of it, and the shop is the difference between the two rows
+of that table -- it turns one run in five into two runs in three.
+
+The per-hero column is the noisy part, and worth reading as a direction rather
+than a number: at sixty seeds a swing of three runs is one standard deviation.
+Noxx is the strongest with nothing bought and the strongest with everything
+bought, which is what his speed and his crit are for; Yeti and Walkyrion close the
+gap once there is gear to close it with.
 
 The dials are the enemy templates (floor one is a fight, not a formality),
 `POTENCY_PER_FLOOR` (14% harder per floor, capped at 2.2x on floor 9), the enemy
@@ -70,6 +77,16 @@ count (`7 + depth`) and how fast wraiths grow more common (1.25x per floor). The
 slope is *shallower* than it has ever been, and that is the point: a steep curve
 over a soft floor made the early game a formality and the late game a cliff. A
 shallow curve over a hard floor makes every floor of the run tense.
+
+**Monsters attack at the speed they move**, because the turn queue counts a
+monster's action in units of `1 / speed`: a wraith acts 1.86 times as often as a
+ghoul, and has since the queue was written. Depth does not flatten that. It used
+to -- speed was scaled by potency and then clamped to the ceiling, so by floor
+five every kind of monster had arrived at 1.45 and a floor of three monsters was a
+floor of one monster three times. The curve now closes nine tenths of each
+monster's own gap to the ceiling by the last floor instead, which makes a deep
+floor quicker than a shallow one while keeping ghoul, skeleton and wraith in the
+same order, and strictly, all the way down.
 
 The hero keeps up on their own, by levelling. See below.
 
@@ -245,16 +262,20 @@ the scoreboard. In the **shop**: up/down choose, `enter` buys, `s` or `Esc`
 leaves.
 
 **Holding a direction walks, and fights, at six steps a second** -- and it scales
-with the hero's speed, so Noxx rattles along at eight and Yeti plods at four and a
+with the hero's speed, so Noxx rattles along at nine and Yeti plods at four and a
 half. A terminal repeats a held key about thirty-three times a second, which is a
 rate nobody chose: it made a fight an unreadable blur and it dropped two sounds in
 three.
 
 The scaling changes nothing about the balance. The turn queue decides who acts how
 often, and a *tap* is never throttled, so this is purely how a hero feels under
-the finger -- which is the one place speed is felt rather than read. The cap of
-eight belongs to the sound: a note has to finish before the next one starts or the
-device is permanently behind.
+the finger -- which is the one place speed is felt rather than read. Both the hero
+select and the character sheet show it against its ceiling, as `9/20 a second`,
+because the ceiling is what speed bought later has to spend: it was eight, which
+was exactly the number that flattened the one hero whose whole identity is speed.
+Past the ceiling the sound is what gives -- the audio layer measures itself
+against the length of the sound actually playing, so a fight of eighty-millisecond
+hits is capped at twelve a second and a fight of longer ones lower.
 
 Only *movement* is capped. Every other key is a deliberate press a player may well
 make twice in quick succession, and there is no way to tell a repeat from a fast

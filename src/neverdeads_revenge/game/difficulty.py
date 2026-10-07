@@ -27,7 +27,10 @@ __all__ = [
     "POTENCY_PER_FLOOR",
     "MAX_POTENCY",
     "MAX_ENEMY_SPEED",
+    "SPEED_HORIZON",
+    "GAP_CLOSED_BY_THEN",
     "potency",
+    "enemy_speed",
     "weight_at_depth",
 ]
 
@@ -60,6 +63,25 @@ MAX_POTENCY = 2.2
 #: being faster than the player.
 MAX_ENEMY_SPEED = 1.45
 
+#: The floor the speed curve is aimed at: the deepest one there is. Kept equal to
+#: :data:`~world.generator.ESCAPE_DEPTH` by a test rather than by an import, so
+#: this module stays arithmetic and touches nothing.
+SPEED_HORIZON = 10
+
+#: How much of the gap between a monster's speed and the ceiling the dungeon
+#: closes by :data:`SPEED_HORIZON`.
+#:
+#: Not all of it, and that is the point. Speed used to be scaled by potency and
+#: then clamped, which meant every kind of monster had reached the ceiling by
+#: floor five: a ghoul, a skeleton and a wraith all acted exactly as often, and
+#: the variety the three of them exist to provide was gone. The fast ones had
+#: nowhere to go, so scaling them did nothing but flatten them.
+#:
+#: Closing most of the gap instead keeps them in the same order at every depth
+#: while still making a deep floor quicker than a shallow one -- and it keeps the
+#: last sliver of the gap, which belongs to the hero.
+GAP_CLOSED_BY_THEN = 0.9
+
 
 def potency(depth: int) -> float:
     """How much harder every monster on ``depth`` hits, relative to floor 1.
@@ -69,6 +91,20 @@ def potency(depth: int) -> float:
     if depth < 1:
         return 1.0
     return min(1.0 + POTENCY_PER_FLOOR * (depth - 1), MAX_POTENCY)
+
+
+def enemy_speed(base: float, depth: int) -> float:
+    """How fast a monster of speed ``base`` acts on ``depth``.
+
+    Monotone in depth, never at or past :data:`MAX_ENEMY_SPEED`, and strictly
+    order-preserving: if one kind of monster is faster than another on floor 1 it
+    is faster on floor 10 too, and by a smaller margin rather than by none. That
+    is what a floor of mixed monsters is *for*.
+    """
+    if depth <= 1:
+        return base
+    progress = min((depth - 1) / (SPEED_HORIZON - 1), 1.0) * GAP_CLOSED_BY_THEN
+    return base + (MAX_ENEMY_SPEED - base) * progress
 
 
 def weight_at_depth(base: float, growth: float, depth: int) -> float:

@@ -1950,10 +1950,10 @@ def test_a_deep_monster_is_still_meaningfully_harder():
 def test_the_hero_must_still_be_faster_than_everything_in_the_dungeon():
     """The one hard constraint in the whole balance.
 
-    Potency scales speed as well as damage, and the clamp is the reason a
-    deep-floor wraith is faster than a floor-one wraith without ever being
-    faster than the hero. Raising potency without it would turn every other
-    stat into decoration.
+    Speed closes most of the gap to the ceiling as the floors go down, and the
+    ceiling is the reason a deep-floor wraith is faster than a floor-one wraith
+    without ever being faster than the hero. Letting potency do it unchecked
+    would turn every other stat into decoration.
     """
     from neverdeads_revenge.game.actors import ENEMIES, HEROES, scale_template
     from neverdeads_revenge.game.difficulty import MAX_ENEMY_SPEED
@@ -1965,6 +1965,54 @@ def test_the_hero_must_still_be_faster_than_everything_in_the_dungeon():
     assert MAX_ENEMY_SPEED > slowest, "the slow hero is meant to be outrun"
     for template in ENEMIES.values():
         assert scale_template(template, ESCAPE_DEPTH).stats.speed <= MAX_ENEMY_SPEED
+
+
+def test_a_faster_monster_stays_faster_all_the_way_down():
+    """The variety a floor of mixed monsters exists to provide.
+
+    Speed used to be scaled by potency and then clamped, which meant a ghoul, a
+    skeleton and a wraith all reached the ceiling by floor five and acted exactly
+    as often as each other. The order has to survive every floor, and survive
+    *strictly*: two monsters converging on the same speed is the same loss.
+    """
+    from neverdeads_revenge.game.actors import ENEMIES, scale_template
+    from neverdeads_revenge.game.difficulty import MAX_ENEMY_SPEED, SPEED_HORIZON
+
+    depths = range(1, SPEED_HORIZON + 3)
+    base_order = sorted(ENEMIES, key=lambda k: ENEMIES[k].stats.speed)
+    for depth in depths:
+        speeds = [scale_template(ENEMIES[k], depth).stats.speed for k in base_order]
+        assert speeds == sorted(speeds), (depth, speeds)
+        assert len(set(speeds)) == len(speeds), f"two monsters tie on floor {depth}"
+        assert max(speeds) <= MAX_ENEMY_SPEED, depth
+
+
+def test_the_speed_horizon_is_the_deepest_floor():
+    """Kept equal by a test rather than by an import, so that the arithmetic
+    module stays arithmetic -- and so that moving the escape depth cannot quietly
+    leave the speed curve aimed at a floor nobody reaches."""
+    from neverdeads_revenge.game.difficulty import SPEED_HORIZON
+    from neverdeads_revenge.world.generator import ESCAPE_DEPTH
+
+    assert SPEED_HORIZON == ESCAPE_DEPTH
+
+
+def test_enemy_speed_is_monotone_and_never_reaches_the_ceiling():
+    from neverdeads_revenge.game.difficulty import (
+        GAP_CLOSED_BY_THEN,
+        MAX_ENEMY_SPEED,
+        enemy_speed,
+    )
+
+    assert 0.0 < GAP_CLOSED_BY_THEN < 1.0, "the gap must not close entirely"
+    for base in (0.4, 0.7, 1.0, 1.3):
+        values = [enemy_speed(base, depth) for depth in range(1, 40)]
+        assert values == sorted(values)
+        assert values[0] == base
+        assert all(v < MAX_ENEMY_SPEED for v in values)
+    # Floor 1 is the templates exactly, which is what makes ENEMIES a reference.
+    assert enemy_speed(1.3, 1) == 1.3
+    assert enemy_speed(1.3, 0) == 1.3
 
 
 def test_bleed_is_a_price_and_not_a_sentence():

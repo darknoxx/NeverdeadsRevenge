@@ -327,7 +327,11 @@ class Sfx:
             )
             return
 
-        # Queued behind whatever is playing, not on top of it.
+        # Queued behind whatever is playing, not on top of it. That is the rate
+        # limit, and it is a better one than a fixed number of sounds a second:
+        # it is measured against the length of the sound actually being played,
+        # so a fight of eighty-millisecond hits is capped at twelve a second and
+        # a fight of longer ones is capped lower, without anybody choosing.
         self._free_at = max(now, self._free_at) + clip.seconds
         self._note(
             f"PLAY {name} ({clip.seconds * 1000:.0f}ms) "

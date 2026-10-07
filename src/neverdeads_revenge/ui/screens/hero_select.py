@@ -20,6 +20,7 @@ from textual.screen import Screen
 from textual.widgets import Static
 
 from ...game.actors import HEROES, Hero
+from ...game.pace import MAX_ACTIONS_PER_SECOND, actions_per_second
 from ..blocks import ROWS, render_word
 
 __all__ = ["HeroSelectScreen", "FUTURE_HEROES", "STAT_ROWS"]
@@ -169,7 +170,14 @@ class HeroSelectScreen(Screen[str]):
         s = hero.stats
         rows = [
             ("health", f"{s.max_hp}", HeroSelectScreen._health_note(s.max_hp)),
-            ("speed", f"{s.speed:.2f}", "actions per turn"),
+            # The rate rather than the raw speed, and against its ceiling:
+            # "9/20 a second" is what the number is *for*, and the ceiling is
+            # what later equipment and upgrades have to spend.
+            (
+                "speed",
+                f"{s.speed:.2f}",
+                f"{actions_per_second(s.speed):.0f}/{MAX_ACTIONS_PER_SECOND:.0f} a second",
+            ),
             ("crit", f"{s.crit_chance:.0%}", f"x{s.crit_multiplier:.1f} damage"),
             ("damage", f"{s.damage[0]}-{s.damage[1]}", "per hit"),
             ("evasion", f"{s.evasion}", "lowers their hit chance"),
