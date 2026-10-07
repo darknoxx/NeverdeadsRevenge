@@ -101,3 +101,21 @@ def test_launcher_reaches_the_app_in_a_subprocess():
     assert "ModuleNotFoundError" not in combined, combined
     assert "ImportError" not in combined, combined
     assert "Traceback" not in combined, combined
+
+def test_the_entry_point_accepts_no_sound():
+    """The flag has to reach argparse, not the game.
+
+    Checked through ``--help`` rather than by launching: the app does not exit
+    on its own, and a test that has to kill it can only assert that it started.
+    """
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import neverdeads_revenge.__main__ as m; m.main(['--no-sound', '--help'])",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--no-sound" in result.stdout

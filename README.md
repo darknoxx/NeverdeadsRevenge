@@ -275,13 +275,28 @@ turn that produces three lines sounds like the worst thing that happened in it
 rather than like all three at once. Levels, descents, chests and the two endings
 are named events and get their own.
 
-**It is silent when it has to be.** A terminal game has no business assuming it
-can make a noise, so the player looks for `paplay`, `aplay`, `ffplay` or
-`afplay` (or the standard library on Windows), plays through one worker thread so
-sounds queue rather than overlap, and does nothing at all if it finds none -- no
-error, no delay, no missing feature. If the audio server goes away mid-run the
-game goes quiet and carries on. `m` in the pause menu turns it off, and
-`NEVERDEADS_REVENGE_MUTE=1` starts it off.
+**It is never late.** Spawning a player per sound measured at 190ms on the
+machine this was written on, of which the sound itself was fifty: a fight is
+faster than that, so the first blow made no noise and the next four arrived in a
+heap. The fix is to keep one player open and write raw samples into its standard
+input -- ten microseconds a sound instead of a hundred and ninety milliseconds --
+and to drop a sound whose moment has passed rather than queueing it behind the
+one playing. Levels, descents, chests and the two endings are never dropped:
+a hit that arrives late is about a moment that has gone, and a level arriving
+late is still the level.
+
+**And it is silent when it has to be.** A terminal game has no business assuming
+it can make a noise, so the player looks for `aplay` or `ffplay` (which can be
+kept open) and falls back to `pw-play`, `paplay` or `afplay` (which take a
+filename), or the standard library on Windows -- and does nothing at all if it
+finds none. No error, no delay, no missing feature. If the audio server goes away
+mid-run the game goes quiet and carries on.
+
+`m` in the pause menu turns it off, `--no-sound` starts it off, and
+`NEVERDEADS_REVENGE_MUTE=1` starts it off and cannot be overridden -- the one
+caller that matters is the test suite. The pause menu's choice is written to the
+save file, because a player who turns the sound off in a library means it for the
+next time too.
 
 ## Gold and the shop
 

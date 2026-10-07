@@ -67,7 +67,13 @@ class PauseScreen(ModalScreen[str]):
 
     def action_toggle_sound(self) -> None:
         if self.sfx is not None:
-            self.sfx.toggle()
+            # Through the app when there is one, so the choice is written down
+            # and survives the next launch; the bare toggle is for the tests
+            # that push this screen without an app behind it.
+            if hasattr(self.app, "set_muted"):
+                self.app.set_muted(not self.sfx.muted)
+            else:
+                self.sfx.toggle()
             self._draw()
 
     def action_resume(self) -> None:

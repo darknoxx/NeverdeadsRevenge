@@ -68,6 +68,9 @@ class MetaProgress:
     scores: list[ScoreEntry] = field(default_factory=list)
     #: The name used last, so the next run costs one keypress rather than five.
     last_name: str = ""
+    #: Sound off. A setting rather than a session flag, because a player who
+    #: turns the sound off in a library means it for the next time too.
+    muted: bool = False
     #: Items bought for the next run, by key. Emptied when that run starts.
     pending: list[str] = field(default_factory=list)
     #: Wild offers bought and not yet spent. Emptied when that run starts.
@@ -187,6 +190,7 @@ def load_meta(path: Path | None = None) -> MetaProgress:
                 if isinstance(entry, dict)
             ],
             last_name=str(raw.get("last_name", "")),
+            muted=bool(raw.get("muted", False)),
             pending=[str(key) for key in raw.get("pending", [])],
             wilds=[str(key) for key in raw.get("wilds", [])],
             wild_stock=[str(key) for key in raw.get("wild_stock", [])],

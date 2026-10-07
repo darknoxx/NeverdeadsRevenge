@@ -58,7 +58,7 @@ class NeverdeadsRevenge(App[None]):
 
     BINDINGS = [("ctrl+q", "quit", "Quit")]
 
-    def __init__(self, seed: int | None = None) -> None:
+    def __init__(self, seed: int | None = None, muted: bool | None = None) -> None:
         super().__init__()
         #: Fixes the dungeon for every run this app starts. Without it a run is
         #: seeded from system randomness, which makes any test that asserts on
@@ -68,10 +68,12 @@ class NeverdeadsRevenge(App[None]):
         self.run_seed = seed
         #: What outlives a run. Loaded once, written on every ending. The file
         #: has been sitting there unread since the persistence layer was built.
+        #: What outlives a run. Loaded before the sound, because the sound is a
+        #: setting and the setting is in there.
+        self.progress = load_meta()
         #: Sound. Constructed once for the whole session and silent on a machine
         #: with no player, which is most of them.
-        self.sfx = Sfx()
-        self.progress = load_meta()
+        self.sfx = Sfx(muted=self.progress.muted if muted is None else muted)
         # A save from a build without the rotating shelf has none on it, and an
         # empty shelf is not a shop.
         if not self.progress.wild_stock:
@@ -114,6 +116,16 @@ class NeverdeadsRevenge(App[None]):
         # over and everything after it is somebody pressing on purpose.
         self._filter_repeats = False
         return False
+
+    def set_muted(self, muted: bool) -> None:
+        """Turn the sound off or on, and remember it.
+
+        Written to the save file straight away: a setting that survives until
+        the next crash is not a setting.
+        """
+        self.sfx.set_muted(muted)
+        self.progress.muted = muted
+        self.save_progress()
 
     def save_progress(self) -> None:
         """Write the save file, best effort.

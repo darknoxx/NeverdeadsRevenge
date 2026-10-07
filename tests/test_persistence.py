@@ -153,3 +153,21 @@ def test_a_future_version_is_not_guessed_at(tmp_path: Path):
 
 def test_a_missing_file_is_just_a_fresh_start(tmp_path: Path):
     assert load_meta(tmp_path / "nothing-here.json").best_score == 0
+
+
+# -- settings ----------------------------------------------------------------
+def test_the_sound_setting_survives_the_file(tmp_path: Path):
+    """A setting rather than a session flag: somebody who turns the sound off in
+    a library means it for the next time too."""
+    path = tmp_path / "meta.json"
+    save_meta(MetaProgress(muted=True), path)
+
+    assert load_meta(path).muted is True
+
+
+def test_an_old_save_without_the_setting_means_the_sound_is_on(tmp_path: Path):
+    """The default, and the least surprising thing for a file that never said."""
+    path = tmp_path / "meta.json"
+    path.write_text(json.dumps({"version": 1, "unlocked_heroes": ["noxx"]}))
+
+    assert load_meta(path).muted is False

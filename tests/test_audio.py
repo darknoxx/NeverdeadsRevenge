@@ -11,8 +11,11 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import time
 import wave
 from pathlib import Path
+
+import pytest
 
 from neverdeads_revenge.game.state import LogKind
 from neverdeads_revenge.ui import audio
@@ -117,11 +120,53 @@ def test_a_crit_is_louder_than_a_hit():
 
 
 # -- the player --------------------------------------------------------------
+class _FakeStream:
+    """A stand-in for the open player, recording what is written into it."""
+
+    def __init__(self, alive: bool = True) -> None:
+        self.written: list[bytes] = []
+        self.stdin = self
+        self.closed = False
+        self._alive = alive
+
+    def write(self, data: bytes) -> None:
+        self.written.append(data)
+
+    def flush(self) -> None:
+        pass
+
+    def close(self) -> None:
+        self.closed = True
+
+    def poll(self):
+        return None if self._alive else 1
+
+    def wait(self, timeout=None) -> int:
+        return 0
+
+    def kill(self) -> None:
+        pass
+
+
+def _a_player(name: str = "aplay", streams: bool = True) -> audio.Player:
+    return audio.Player([name], streams=streams)
+
+
+def _recording(monkeypatch) -> tuple[Sfx, list[str]]:
+    """An Sfx whose emission is recorded instead of played."""
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player())
+    sfx = Sfx(muted=True)
+    played: list[str] = []
+    monkeypatch.setattr(sfx, "_emit", lambda clip: played.append(clip.path.stem))
+    sfx._muted = False
+    return sfx, played
+
+
 def test_with_no_player_it_is_silent_and_harmless(monkeypatch):
     """The common case, and the one that has to be perfect: most machines
     running a terminal game have nothing to play a sound with."""
     monkeypatch.setattr(audio, "_find_player", lambda: None)
-    sfx = Sfx(enabled=True)
+    sfx = Sfx()
 
     assert not sfx.available
     sfx.play("hit")
@@ -130,16 +175,15 @@ def test_with_no_player_it_is_silent_and_harmless(monkeypatch):
 
 
 def test_muting_it_means_nothing_is_queued(monkeypatch):
-    monkeypatch.setattr(audio, "_find_player", lambda: ["aplay"])
-    sfx = Sfx(enabled=True)
-    sfx.set_muted(True)
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player())
+    sfx = Sfx(muted=True)
     sfx.play("hit")
     assert sfx._queue.empty(), "a muted sound was queued anyway"
 
 
 def test_toggling_reports_the_new_state(monkeypatch):
-    monkeypatch.setattr(audio, "_find_player", lambda: ["aplay"])
-    sfx = Sfx(enabled=False)
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player())
+    sfx = Sfx(muted=True)
     assert sfx.muted
     assert sfx.toggle() is False, "toggling off should come back on"
     assert not sfx.muted
@@ -148,15 +192,28 @@ def test_toggling_reports_the_new_state(monkeypatch):
 
 def test_the_environment_can_start_it_muted(monkeypatch):
     monkeypatch.setenv(audio.MUTE_ENV, "1")
-    monkeypatch.setattr(audio, "_find_player", lambda: ["aplay"])
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player())
     assert Sfx().muted
+
+
+def test_the_environment_cannot_be_overridden_by_the_setting(monkeypatch):
+    """The one caller that matters is the test suite.
+
+    A save file that says "sound on" must not be able to turn the sound on in a
+    test run, or the suite would be audible on any machine that happens to have
+    a player installed.
+    """
+    monkeypatch.setenv(audio.MUTE_ENV, "1")
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player())
+    assert Sfx(muted=False).muted
 
 
 def test_a_player_that_vanishes_goes_quiet_rather_than_crashing(monkeypatch):
     """A sound is never worth a crash. The audio server going away mid-run has
     to cost the player their sound effects and nothing else."""
-    monkeypatch.setattr(audio, "_find_player", lambda: ["no-such-player-at-all"])
-    sfx = Sfx(enabled=True)
+    monkeypatch.delenv(audio.MUTE_ENV, raising=False)
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player("no-such-player"))
+    sfx = Sfx()
     assert sfx.available
 
     sfx.play("hit")
@@ -166,11 +223,124 @@ def test_a_player_that_vanishes_goes_quiet_rather_than_crashing(monkeypatch):
 
 
 def test_a_missing_file_is_not_an_error(monkeypatch):
-    monkeypatch.setattr(audio, "_find_player", lambda: ["aplay"])
-    sfx = Sfx(enabled=True)
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player())
+    sfx = Sfx(muted=True)
+    sfx._muted = False
     sfx.play("no-such-sound")
     sfx._queue.join()
     assert not sfx.muted, "a missing file muted the whole game"
+
+
+# -- never late --------------------------------------------------------------
+def test_a_sound_whose_moment_has_passed_is_dropped(monkeypatch):
+    """A fight is faster than the sounds are long.
+
+    Queuing them means the first blow makes no noise and the next four arrive in
+    a heap, which is exactly what the old per-file player did: 190ms a sound, of
+    which the sound itself was fifty.
+    """
+    sfx, played = _recording(monkeypatch)
+    sfx._free_at = time.monotonic() + 1.0  # the device is busy
+
+    sfx._play_now("hit")
+
+    assert played == [], "a stale sound was played"
+
+
+def test_an_urgent_sound_is_never_dropped(monkeypatch):
+    """A hit that arrives late is about a moment that has gone. A level arriving
+    late is still the level."""
+    sfx, played = _recording(monkeypatch)
+    sfx._free_at = time.monotonic() + 1.0
+
+    sfx._play_now("level")
+
+    assert played == ["level"]
+
+
+def test_the_device_is_booked_for_the_length_of_the_sound(monkeypatch):
+    sfx, _ = _recording(monkeypatch)
+    sfx._free_at = 0.0
+    before = time.monotonic()
+
+    sfx._play_now("hit")
+
+    seconds = sfx._clip("hit").seconds
+    assert sfx._free_at == pytest.approx(before + seconds, abs=0.05)
+
+
+def test_a_sound_that_lands_while_the_device_is_free_plays(monkeypatch):
+    sfx, played = _recording(monkeypatch)
+    sfx._free_at = 0.0
+    sfx._play_now("hit")
+    assert played == ["hit"]
+
+
+def test_the_stream_stays_open_across_sounds(monkeypatch):
+    """The whole point of the pipe: one player, fed for the rest of the session.
+
+    Spawning one per sound measured at 190ms, and the sound itself was fifty.
+    """
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player(streams=True))
+    sfx = Sfx(muted=True)
+    sfx._muted = False
+    stream = _FakeStream()
+    sfx._stream = stream
+
+    for name in ("hit", "crit", "kill"):
+        sfx._free_at = 0.0
+        sfx._play_now(name)
+
+    assert len(stream.written) == 3, "not everything went into the open player"
+    assert all(chunk for chunk in stream.written), "raw samples went missing"
+
+
+def test_a_stream_that_died_is_opened_again(monkeypatch):
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player(streams=True))
+    sfx = Sfx(muted=True)
+    sfx._muted = False
+    sfx._free_at = 0.0
+    sfx._stream = _FakeStream(alive=False)
+
+    opened: list[int] = []
+    fresh = _FakeStream()
+    monkeypatch.setattr(
+        sfx, "_open_stream", lambda: (opened.append(1), setattr(sfx, "_stream", fresh))
+    )
+
+    sfx._play_now("hit")
+
+    assert opened, "a dead player was written to instead of replaced"
+    assert fresh.written, "the replacement was not used"
+
+
+def test_closing_lets_go_of_the_player(monkeypatch):
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player(streams=True))
+    sfx = Sfx(muted=True)
+    stream = _FakeStream()
+    sfx._stream = stream
+
+    sfx.close()
+
+    assert stream.closed, "the player was left running"
+    assert sfx._stream is None
+
+
+def test_a_player_that_takes_files_is_still_used(monkeypatch):
+    """afplay takes a filename and nothing else. Late is worse than early and
+    much better than silent."""
+    monkeypatch.delenv(audio.MUTE_ENV, raising=False)
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player("afplay", streams=False))
+    sfx = Sfx()
+    assert sfx.available
+    assert not sfx.player.streams
+
+    spawned: list[str] = []
+    monkeypatch.setattr(sfx, "_spawn", lambda clip: spawned.append(clip.path.stem))
+    sfx._free_at = 0.0
+    sfx._play_now("hit")
+
+    assert spawned == ["hit"]
 
 
 def test_the_sounds_live_inside_the_package():
