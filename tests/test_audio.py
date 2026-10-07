@@ -439,3 +439,120 @@ def test_a_good_sound_clears_the_count(monkeypatch):
 
     assert sfx._failures == 0
     assert not sfx.muted
+
+
+# -- how far behind the device may fall ---------------------------------------
+def test_a_long_sound_does_not_swallow_the_next_one(monkeypatch):
+    """The old rule dropped a sound the moment the device was busy with any of
+    the previous one.
+
+    Which meant a kill -- a hundred and ninety milliseconds -- ate the blow that
+    landed on top of it, and the player heard a fight with holes in it. A quarter
+    of a second of backlog is inaudible; more than that is not.
+    """
+    sfx, played = _recording(monkeypatch)
+    sfx._free_at = 0.0
+    sfx._play_now("kill")
+
+    # Well inside the backlog a kill leaves behind.
+    sfx._free_at = time.monotonic() + 0.14
+    sfx._play_now("hit")
+
+    assert played == ["kill", "hit"], "the second blow was thrown away"
+
+
+def test_a_swamped_device_still_drops(monkeypatch):
+    """Past the threshold the moment really has gone, and a blow that sounds
+    three blows late is worse than one that does not sound."""
+    sfx, played = _recording(monkeypatch)
+    sfx._free_at = 0.0
+    sfx._play_now("hit")
+
+    sfx._free_at = time.monotonic() + audio.MAX_BACKLOG + 0.5
+    sfx._play_now("hit")
+
+    assert played == ["hit"], "a stale sound was played anyway"
+
+
+def test_the_backlog_threshold_is_a_fraction_of_a_second():
+    assert 0.1 <= audio.MAX_BACKLOG <= 0.5
+
+
+# -- the diagnostic ----------------------------------------------------------
+def test_the_diagnostic_log_says_what_was_asked_for(tmp_path, monkeypatch):
+    """The game cannot know whether a note came out of the speaker.
+
+    It can say exactly what it asked for, when, and how far behind the device
+    already was -- which is the difference between a bug and a guess.
+    """
+    path = tmp_path / "sfx.log"
+    monkeypatch.setenv(audio.DEBUG_ENV, str(path))
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player(streams=True))
+
+    sfx = Sfx(muted=True)
+    sfx._stream = _FakeStream()
+    sfx._muted = False
+    sfx._free_at = 0.0
+    sfx._play_now("hit")
+
+    written = path.read_text()
+    assert "PLAY hit" in written
+    assert "50ms" in written, "the length is not in the log"
+
+
+def test_the_log_records_a_drop_too(tmp_path, monkeypatch):
+    path = tmp_path / "sfx.log"
+    monkeypatch.setenv(audio.DEBUG_ENV, str(path))
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player())
+
+    sfx = Sfx(muted=True)
+    sfx._muted = False
+    sfx._free_at = time.monotonic() + 5.0
+    sfx._play_now("hit")
+
+    assert "DROP hit" in path.read_text()
+
+
+def test_a_log_that_cannot_be_written_is_not_an_error(monkeypatch, tmp_path):
+    monkeypatch.setenv(audio.DEBUG_ENV, str(tmp_path / "no" / "such" / "dir" / "x.log"))
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player())
+    sfx = Sfx(muted=True)
+    sfx._muted = False
+    sfx._free_at = 0.0
+
+    sfx._play_now("hit")  # must not raise
+
+    assert sfx._debug is None, "it kept trying to write a log it cannot write"
+
+
+def test_no_droppable_sound_outlasts_the_backlog():
+    """The invariant that keeps the drop rule from ever firing in practice.
+
+    A sound may only be dropped when the device is further behind than
+    ``MAX_BACKLOG``. So a sound that is itself longer than that would push the
+    device past the threshold on its own and eat the next one -- which is exactly
+    what a kill did before the threshold existed. The four that *are* longer are
+    all in ``URGENT``, and are queued rather than dropped.
+    """
+    from neverdeads_revenge.game.actors import HEROES  # noqa: F401  (import check)
+    from neverdeads_revenge.ui.audio import SOUNDS_DIR
+
+    for path in sorted(SOUNDS_DIR.glob("*.wav")):
+        with wave.open(str(path), "rb") as handle:
+            seconds = handle.getnframes() / handle.getframerate()
+        if path.stem in audio.URGENT:
+            continue
+        assert seconds < audio.MAX_BACKLOG, (
+            f"{path.stem} is {seconds:.2f}s and may be dropped, "
+            f"but the device is allowed to fall {audio.MAX_BACKLOG:.2f}s behind"
+        )
+
+
+def test_every_sound_is_either_short_or_urgent():
+    """Nothing may be both long and disposable."""
+    from neverdeads_revenge.ui.audio import SOUNDS_DIR
+
+    for path in sorted(SOUNDS_DIR.glob("*.wav")):
+        with wave.open(str(path), "rb") as handle:
+            seconds = handle.getnframes() / handle.getframerate()
+        assert seconds < audio.MAX_BACKLOG or path.stem in audio.URGENT, path.stem

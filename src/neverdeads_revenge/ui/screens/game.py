@@ -213,7 +213,7 @@ class GameScreen(Screen[None]):
         # event. So the rule is the one that is *safe* to apply to both.
         if (
             action.direction is not Direction.NONE
-            and not self.app.allows_action(event.key)
+            and not self.app.allows_action(event.key, self.state.player.speed)
         ):
             return
         self._do(action)

@@ -98,16 +98,40 @@ class NeverdeadsRevenge(App[None]):
         """
         self._filter_repeats = True
 
-    #: The shortest gap between two actions from a *held* key, in seconds.
+    #: Actions a second for a hero of speed 1.0.
     #:
-    #: Four a second. A terminal repeats a held key thirty-three times a second,
-    #: which is a rate nobody chose: it made a fight an unreadable blur and it
-    #: made the sound drop two blows in three. Four is fast enough to fight with
-    #: and slow enough to see -- and slow enough that every blow's sound and its
-    #: flash land while the blow still means something.
-    ACTION_GAP = 0.25
+    #: A terminal repeats a held key thirty-three times a second, which is a rate
+    #: nobody chose: it made a fight an unreadable blur and it dropped two sounds
+    #: in three. Six is fast enough to fight with and slow enough to see.
+    #:
+    #: And it scales with the hero's speed, because speed is what a hero *is*:
+    #: holding a direction as Noxx rattles along at nine a second and as Yeti it
+    #: plods at four and a half. It changes nothing about the balance -- the turn
+    #: queue decides who acts how often, and a *tap* is never throttled -- so it
+    #: is purely how the hero feels under the hand, which is worth having.
+    ACTIONS_PER_SECOND = 6.0
 
-    def allows_action(self, key: str) -> bool:
+    #: The fastest a held key may ever act, however fast the hero is.
+    #:
+    #: The cap belongs to the sound: a note has to finish before the next one
+    #: starts or the device is permanently behind. Eight a second is a hundred
+    #: and twenty-five milliseconds, which is longer than every sound the game
+    #: makes except the four that are allowed to queue.
+    MAX_ACTIONS_PER_SECOND = 8.0
+
+    #: The slowest, so a hero carrying grave iron is heavy and not unusable.
+    MIN_ACTIONS_PER_SECOND = 3.0
+
+    def action_gap(self, speed: float = 1.0) -> float:
+        """The shortest gap between two actions from a held key, in seconds."""
+        rate = self.ACTIONS_PER_SECOND * max(0.0, speed)
+        rate = max(
+            self.MIN_ACTIONS_PER_SECOND,
+            min(self.MAX_ACTIONS_PER_SECOND, rate),
+        )
+        return 1.0 / rate
+
+    def allows_action(self, key: str, speed: float = 1.0) -> bool:
         """Whether this press should act, or is a held key repeating.
 
         A fresh press is a decision and always acts. A *held* key is the terminal
@@ -128,7 +152,7 @@ class NeverdeadsRevenge(App[None]):
         if not repeat:
             self._last_action_time = now
             return True
-        if now - self._last_action_time < self.ACTION_GAP:
+        if now - self._last_action_time < self.action_gap(speed):
             return False
         self._last_action_time = now
         return True

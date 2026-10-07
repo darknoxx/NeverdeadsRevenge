@@ -244,12 +244,21 @@ On the **title screen**: any key starts a run, `s` opens the shop and `h` opens
 the scoreboard. In the **shop**: up/down choose, `enter` buys, `s` or `Esc`
 leaves.
 
-**Holding a direction walks, and fights, at four steps a second.** A terminal
-repeats a held key about thirty-three times a second, which is a rate nobody
-chose: it made a fight an unreadable blur and it dropped two sounds in three.
-Four is fast enough to fight with and slow enough to see. Only *movement* is
-capped -- every other key is a deliberate press a player may well make twice in
-quick succession, and there is no way to tell a repeat from a fast press anyway.
+**Holding a direction walks, and fights, at six steps a second** -- and it scales
+with the hero's speed, so Noxx rattles along at eight and Yeti plods at four and a
+half. A terminal repeats a held key about thirty-three times a second, which is a
+rate nobody chose: it made a fight an unreadable blur and it dropped two sounds in
+three.
+
+The scaling changes nothing about the balance. The turn queue decides who acts how
+often, and a *tap* is never throttled, so this is purely how a hero feels under
+the finger -- which is the one place speed is felt rather than read. The cap of
+eight belongs to the sound: a note has to finish before the next one starts or the
+device is permanently behind.
+
+Only *movement* is capped. Every other key is a deliberate press a player may well
+make twice in quick succession, and there is no way to tell a repeat from a fast
+press anyway -- Textual's key event carries only ``key`` and ``character``.
 
 **A blow that lands flashes.** The cell it landed on is drawn inverted until your
 next action -- the monster you hit, and your own cell when you take one. It is
@@ -307,6 +316,14 @@ filename), or the standard library on Windows -- and does nothing at all if it
 finds none. No error, no delay, no missing feature. If the audio server goes away
 mid-run the game goes quiet and carries on.
 
+**And a sound is not thrown away for being a fifth of a second late.** The old
+rule dropped one the moment the device was busy with any of the previous one,
+which meant a kill -- a hundred and ninety milliseconds -- ate the blow that
+landed on top of it, and a fight came out with holes in it. The device may now
+fall a quarter of a second behind before anything is dropped; a sound shorter than
+that can never push it past the threshold on its own, and a test holds every sound
+to it.
+
 **And it does not go quiet by accident.** The device is opened before the first
 blow rather than on it -- opening it costs about a hundred and forty milliseconds,
 and paying that on the first hit of the first fight is paying it where it shows.
@@ -319,6 +336,17 @@ a row and it gives up; one, and it tries again.
 caller that matters is the test suite. The pause menu's choice is written to the
 save file, because a player who turns the sound off in a library means it for the
 next time too.
+
+If the sound is ever wrong in a way that cannot be heard from where the code was
+written, there is a log:
+
+```bash
+NEVERDEADS_REVENGE_SOUND_LOG=/tmp/sfx.log ./ndr
+```
+
+Every decision lands there -- what was played, what was dropped, how long the
+sound was, and how far behind the device already was. The game cannot know whether
+a note came out of the speaker, but it can say exactly what it asked for.
 
 ## Gold and the shop
 

@@ -63,6 +63,24 @@ RATE = 11025
 #: matters is the test suite.
 MUTE_ENV = "NEVERDEADS_REVENGE_MUTE"
 
+#: Set this to a path and every sound decision is appended to it.
+#:
+#: For the case where the sound is wrong and nobody can hear it from where the
+#: code was written. The game cannot know whether a note came out of the
+#: speaker, but it can say exactly what it asked for, when, and how far behind
+#: the device already was -- and that is the difference between a bug and a
+#: guess.
+DEBUG_ENV = "NEVERDEADS_REVENGE_SOUND_LOG"
+
+#: How far behind the device may fall before a sound is dropped rather than
+#: queued.
+#:
+#: The old rule dropped a sound the moment the device was busy with any of the
+#: previous one, which is why a kill -- a hundred and ninety milliseconds --
+#: swallowed the blow that landed on top of it. A quarter of a second of backlog
+#: is inaudible and is not a reason to throw a sound away; more than that is.
+MAX_BACKLOG = 0.25
+
 #: Marks the in-process Windows player, which has no command line.
 WINSOUND = "__winsound__"
 
@@ -219,6 +237,7 @@ class Sfx:
         self._free_at = 0.0
         #: Failures in a row, so a hiccup does not silence the session.
         self._failures = 0
+        self._debug = os.environ.get(DEBUG_ENV)
         self._queue: queue.Queue[str | None] = queue.Queue()
         self._thread: threading.Thread | None = None
         if self.player is not None:
@@ -285,15 +304,39 @@ class Sfx:
             return
 
         now = time.monotonic()
-        if now < self._free_at and name not in URGENT:
-            # Its moment has passed. A fight is faster than the sounds are long,
-            # and a blow that sounds three blows late is worse than a blow that
-            # does not sound at all.
+        backlog = self._free_at - now
+        if backlog > MAX_BACKLOG and name not in URGENT:
+            # Genuinely swamped, and its moment has passed. A blow that sounds
+            # three blows late is worse than one that does not sound at all --
+            # but a blow that sounds a fifth of a second late is not, which is
+            # why the threshold is a quarter of a second rather than zero.
+            self._note(
+                f"DROP {name} ({clip.seconds * 1000:.0f}ms) "
+                f"backlog={max(0.0, backlog) * 1000:.0f}ms"
+            )
             return
 
         # Queued behind whatever is playing, not on top of it.
         self._free_at = max(now, self._free_at) + clip.seconds
+        self._note(
+            f"PLAY {name} ({clip.seconds * 1000:.0f}ms) "
+            f"backlog={max(0.0, backlog) * 1000:.0f}ms"
+        )
         self._emit(clip)
+
+    def _note(self, line: str) -> None:
+        """Write one line to the diagnostic log, if there is one.
+
+        Only ever written from the worker thread, so it needs no lock -- and a
+        log that cannot be written is not worth failing over.
+        """
+        if not self._debug:
+            return
+        try:
+            with open(self._debug, "a", encoding="utf-8") as handle:
+                handle.write(f"{time.monotonic():.3f} {line}\n")
+        except OSError:
+            self._debug = None
 
     def _emit(self, clip: Clip) -> None:
         if self.player is not None and self.player.streams:

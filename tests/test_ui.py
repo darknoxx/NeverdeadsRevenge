@@ -2750,13 +2750,13 @@ async def test_a_fresh_press_always_acts_and_a_repeat_is_throttled():
         app._last_key = ""
         app._last_action_time = 0.0
 
-        assert app.allows_action("d"), "a fresh press was refused"
+        assert app.allows_action("d", 1.0), "a fresh press was refused"
         # Immediately after, the same key can only be the terminal repeating.
         for _ in range(5):
-            assert not app.allows_action("d")
+            assert not app.allows_action("d", 1.0)
 
 
-async def test_a_held_key_acts_four_times_a_second():
+async def test_a_held_key_acts_six_times_a_second():
     """A terminal repeats a held key thirty-three times a second, which is a rate
     nobody chose: it made a fight an unreadable blur and it dropped two sounds in
     three."""
@@ -2768,11 +2768,45 @@ async def test_a_held_key_acts_four_times_a_second():
 
         accepted = 0
         for _ in range(100):  # a hundred repeats over one second
-            if app.allows_action("d"):
+            if app.allows_action("d", 1.0):
                 accepted += 1
             await asyncio.sleep(0.01)
 
-        assert 3 <= accepted <= 5, f"{accepted} actions in a second"
+        assert 5 <= accepted <= 7, f"{accepted} actions in a second"
+
+
+async def test_a_fast_hero_acts_faster_than_a_slow_one():
+    """Speed is what a hero *is*, and this is the one place the player feels it in
+    their hand rather than in a number.
+
+    It changes nothing about the balance -- the turn queue decides who acts how
+    often, and a tap is never throttled -- so it is purely how the hero feels
+    under the finger, which is worth having.
+    """
+    from neverdeads_revenge.game.actors import NOXX, YETI, WALKYRION
+
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+
+        noxx = app.action_gap(NOXX.stats.speed)
+        yeti = app.action_gap(YETI.stats.speed)
+        walk = app.action_gap(WALKYRION.stats.speed)
+
+        assert noxx < walk < yeti, "the heroes do not differ under the hand"
+        assert noxx == pytest.approx(1 / app.MAX_ACTIONS_PER_SECOND)
+
+
+async def test_the_rate_is_capped_and_floored():
+    """The cap belongs to the sound: a note has to finish before the next one
+    starts, or the device is permanently behind. And a hero heavy enough to be
+    slow should be heavy, not unusable."""
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+
+        assert app.action_gap(99.0) == pytest.approx(1 / app.MAX_ACTIONS_PER_SECOND)
+        assert app.action_gap(0.01) == pytest.approx(1 / app.MIN_ACTIONS_PER_SECOND)
 
 
 async def test_a_deliberate_tap_is_never_swallowed():
@@ -2785,7 +2819,7 @@ async def test_a_deliberate_tap_is_never_swallowed():
         app._last_action_time = 0.0
 
         for _ in range(4):
-            assert app.allows_action("d"), "a deliberate tap was refused"
+            assert app.allows_action("d", 1.0), "a deliberate tap was refused"
             await asyncio.sleep(0.2)  # a person, not a keyboard
 
 
@@ -2798,12 +2832,12 @@ async def test_a_held_direction_is_throttled_and_waiting_is_not():
         screen = await drive_to_game(app, pilot)
         before = screen.state.total_turns
 
-        app.allows_action = lambda key: False
+        app.allows_action = lambda key, speed=1.0: False
         await pilot.press("d")
         await pilot.pause()
         assert screen.state.total_turns == before, "a throttled direction acted"
 
-        app.allows_action = lambda key: True
+        app.allows_action = lambda key, speed=1.0: True
         await pilot.press(".")
         await pilot.press(".")
         await pilot.pause()
