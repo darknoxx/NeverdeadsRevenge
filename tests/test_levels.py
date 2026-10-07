@@ -48,6 +48,27 @@ def test_the_curve_stops_teaching_at_the_cap():
     assert gains_for(MAX_LEVEL + 20) == Gain()
 
 
+def test_the_cap_sits_where_a_run_can_still_be_working_toward_it():
+    """A cap below the ceiling is a wall a thorough run can feel without ever
+    being told it is there, which is what twenty was.
+
+    A perfect clear is every monster on all ten floors. The cap has to be
+    reachable, and it must not leave more than the last level unearned -- a
+    whole level of kills that teach nothing would be the same wall again.
+    """
+    from neverdeads_revenge.world.generator import ESCAPE_DEPTH, enemy_count
+
+    perfect = sum(enemy_count(depth) for depth in range(1, ESCAPE_DEPTH + 1))
+    # Uncapped, because level_for clamps and would make this test vacuous.
+    ceiling = 1 + perfect // KILLS_PER_LEVEL
+
+    assert ceiling >= MAX_LEVEL, f"a perfect clear is level {ceiling}, below the cap"
+    assert ceiling - MAX_LEVEL <= 1, (
+        f"a perfect clear is level {ceiling}, so the cap wastes {ceiling - MAX_LEVEL} "
+        f"of them"
+    )
+
+
 def test_every_level_after_the_first_grants_something():
     for level in range(2, MAX_LEVEL + 1):
         assert not gains_for(level).is_empty, level

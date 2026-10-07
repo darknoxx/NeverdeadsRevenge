@@ -204,7 +204,10 @@ Health every level, because health is the resource a run spends and the one you
 watch. Then a rotation, with coprime lengths on purpose: if two of them shared a
 period the run would feel like a staircase instead of a curve. A run that dies on
 floor three has had none of the rotation; a run that reaches floor nine has had
-all of it a few times. The cap is level 20.
+all of it a few times. The cap is level 31: a perfect clear is every monster on
+all ten floors, which is 125 kills, which is level 32 — so the cap sits where a
+run can still be working toward it rather than being a wall nobody was told about.
+It was twenty.
 
 It is automatic rather than a choice. A talent pick needs a screen and a key, and
 the point of this is that you notice yourself getting stronger without stopping
