@@ -244,6 +244,20 @@ On the **title screen**: any key starts a run, `s` opens the shop and `h` opens
 the scoreboard. In the **shop**: up/down choose, `enter` buys, `s` or `Esc`
 leaves.
 
+**Holding a direction walks, and fights, at four steps a second.** A terminal
+repeats a held key about thirty-three times a second, which is a rate nobody
+chose: it made a fight an unreadable blur and it dropped two sounds in three.
+Four is fast enough to fight with and slow enough to see. Only *movement* is
+capped -- every other key is a deliberate press a player may well make twice in
+quick succession, and there is no way to tell a repeat from a fast press anyway.
+
+**A blow that lands flashes.** The cell it landed on is drawn inverted until your
+next action -- the monster you hit, and your own cell when you take one. It is
+the useful half of a hit you cannot see coming: the log scrolls and the map is
+where you are looking. No timer, because there are none in this project and for a
+good reason; the flash ends because the next action clears it, which is what the
+throttle above makes long enough to see.
+
 The prologue and the run summary close on a **held enter**, not a single press.
 They are the only prose in the game and the only place a run is added up, and a
 stray key should not throw either away. The arrows scroll the prologue, and the
@@ -292,6 +306,13 @@ kept open) and falls back to `pw-play`, `paplay` or `afplay` (which take a
 filename), or the standard library on Windows -- and does nothing at all if it
 finds none. No error, no delay, no missing feature. If the audio server goes away
 mid-run the game goes quiet and carries on.
+
+**And it does not go quiet by accident.** The device is opened before the first
+blow rather than on it -- opening it costs about a hundred and forty milliseconds,
+and paying that on the first hit of the first fight is paying it where it shows.
+And a failure is counted rather than obeyed: one hiccup used to silence the rest
+of the session, which is why the sound used to stop and never come back. Three in
+a row and it gives up; one, and it tries again.
 
 `m` in the pause menu turns it off, `--no-sound` starts it off, and
 `NEVERDEADS_REVENGE_MUTE=1` starts it off and cannot be overridden -- the one

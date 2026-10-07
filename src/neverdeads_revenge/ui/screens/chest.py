@@ -56,6 +56,12 @@ class ChestScreen(ModalScreen[bool]):
             )
 
     def action_open_it(self) -> None:
+        # Enter is *bound*, so it never reaches ``on_key`` -- Textual checks the
+        # bindings first. Holding enter on a chest used to open it before the
+        # dialog had been read, which is the one thing this dialog exists to
+        # prevent.
+        if self.app.note_key("enter"):
+            return
         self.dismiss(True)
 
     def action_leave_it(self) -> None:

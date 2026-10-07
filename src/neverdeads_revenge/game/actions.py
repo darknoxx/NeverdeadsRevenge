@@ -254,6 +254,10 @@ def _drop_coins(state: GameState, enemy: Actor) -> None:
 
 def _player_takes_damage(state: GameState, enemy: Actor, outcome) -> None:
     if outcome.hit:
+        # The player's own cell, so a blow you take is something you see as well
+        # as read. The useful half of the flash, and the half a message log
+        # cannot do: the log scrolls, and the map is where you are looking.
+        state.hits.append(state.player.position)
         state.say(
             f"The {enemy.name} {outcome.verb} you for {outcome.damage}.",
             LogKind.BAD if outcome.killed else LogKind.DAMAGE,
@@ -288,6 +292,7 @@ def _maybe_cursed(state: GameState, enemy: Actor) -> None:
 
 
 def _enemy_takes_damage(state: GameState, enemy: Actor, outcome) -> None:
+    state.hits.append(enemy.position)
     if outcome.killed:
         _kill_message(state, enemy, outcome)
         return
@@ -325,6 +330,9 @@ def perform_action(state: GameState, action: Action) -> ActionResult:
         return _outcome(state, consumed_turn=False, acted=False)
 
     state.refresh_passives()
+    # Everything struck from here on is this action's. Cleared here rather than
+    # by the screen, so the flash cannot outlive the turn it belongs to.
+    state.hits.clear()
 
     match action:
         case Action.INTERACT:
@@ -912,6 +920,7 @@ def _resolve_enemy_attack(state: GameState, attacker: Actor, player: Actor) -> N
         # crowd of small things into a decision.
         back = attacker.stats.reflect(MIRROR_REFLECTION)
         if back:
+            state.hits.append(attacker.position)
             state.say(f"The mirror gives {back} of it back.", LogKind.GOOD)
         if not attacker.stats.alive:
             state.say(f"The {attacker.name} comes apart on its own blow.", LogKind.GOOD)

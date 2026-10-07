@@ -66,6 +66,14 @@ MUTE_ENV = "NEVERDEADS_REVENGE_MUTE"
 #: Marks the in-process Windows player, which has no command line.
 WINSOUND = "__winsound__"
 
+#: How many failures in a row before the game gives up on sound.
+#:
+#: One was too few. A single hiccup -- a broken pipe at the wrong moment, a
+#: transient error from the audio server -- used to silence the rest of the
+#: session, and the player would hear nothing for the rest of the run without
+#: being told why. A hiccup is not a broken machine; three in a row is.
+GIVE_UP_AFTER = 3
+
 #: Which sound a message gets, by the log's own classification.
 #:
 #: The log already sorts itself into combat, damage and the rest, so the sound
@@ -209,6 +217,8 @@ class Sfx:
         #: When the device will be free again. Sounds that arrive before this
         #: are dropped rather than queued, unless they are urgent.
         self._free_at = 0.0
+        #: Failures in a row, so a hiccup does not silence the session.
+        self._failures = 0
         self._queue: queue.Queue[str | None] = queue.Queue()
         self._thread: threading.Thread | None = None
         if self.player is not None:
@@ -216,6 +226,12 @@ class Sfx:
                 target=self._work, name="ndr-sfx", daemon=True
             )
             self._thread.start()
+            if not self._muted:
+                # Warm the device up now rather than on the first blow. Opening
+                # it costs about a hundred and forty milliseconds, and paying
+                # that on the first hit of the first fight is paying it exactly
+                # where it is most noticeable.
+                self._open_stream()
 
     # -- the outside world ---------------------------------------------------
     @property
@@ -230,6 +246,10 @@ class Sfx:
     def set_muted(self, muted: bool) -> None:
         """Turn the sound off or on again, from the pause menu."""
         self._muted = muted
+        self._failures = 0
+        if not muted:
+            # Unmuting after the device was never opened still needs opening.
+            self._open_stream()
 
     def toggle(self) -> bool:
         """Flip the mute and report the new state."""
@@ -293,10 +313,13 @@ class Sfx:
         try:
             process.stdin.write(clip.frames)
             process.stdin.flush()
+            self._failures = 0
         except OSError:
-            # The device went away underneath us. Say so once, fall back to
-            # spawning, and let the fallback be as late as it has to be.
+            # The device went away underneath us. Fall back to spawning, and let
+            # the fallback be as late as it has to be -- late is much better
+            # than silent.
             self._stream = None
+            self._failures += 1
             self._spawn(clip)
 
     def _open_stream(self) -> None:
@@ -309,8 +332,10 @@ class Sfx:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
+            self._failures = 0
         except OSError:
             self._stream = None
+            self._failures += 1
 
     def _close_stream(self) -> None:
         process = self._stream
@@ -331,19 +356,34 @@ class Sfx:
                 import winsound
 
                 winsound.PlaySound(str(clip.path), winsound.SND_FILENAME)
+                self._failures = 0
                 return
+
             assert self.player is not None
-            subprocess.run(
+            result = subprocess.run(
                 [*self.player.command, str(clip.path)],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 check=False,
             )
+            # A player that exits non-zero did not play anything, and
+            # ``check=False`` would otherwise call that a success.
+            if result.returncode != 0:
+                self._count_failure()
+            else:
+                self._failures = 0
         except Exception:
-            # A sound is never worth a crash. The player vanished, the audio
-            # server went away, the platform said no -- the game goes quiet and
-            # carries on, which is the same thing it does on a machine that
-            # never had a player at all.
+            self._count_failure()
+
+    def _count_failure(self) -> None:
+        """Count a failure, and go quiet only if they keep coming.
+
+        A sound is never worth a crash, and a hiccup is not a broken machine.
+        The old version muted the whole session on the first exception, which is
+        why the sound used to stop and never come back.
+        """
+        self._failures += 1
+        if self._failures >= GIVE_UP_AFTER:
             self._muted = True
 
     # -- the sounds ----------------------------------------------------------

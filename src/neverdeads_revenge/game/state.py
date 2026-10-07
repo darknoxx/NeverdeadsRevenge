@@ -150,6 +150,12 @@ class GameState:
     #: which is why it is kept apart from the score: one is a record of the run,
     #: the other is what the run was worth to you afterwards.
     gold: int = 0
+    #: Cells a blow landed on since the player's last action, for the map to
+    #: flash. A UI-facing field like ``log``, and here for the same reason: the
+    #: domain knows where a blow landed and the map is the only thing that can
+    #: draw it. Cleared at the start of every action, which is what makes the
+    #: flash last exactly one action and need no timer to end.
+    hits: list[Pos] = field(default_factory=list)
 
     # -- what the shop sent with you ----------------------------------------
     #

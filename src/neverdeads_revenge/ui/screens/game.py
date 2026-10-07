@@ -20,6 +20,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Footer
 
+from ...core.direction import Direction
 from ...game.actions import Action, perform_action
 from ...game.actors import HEROES
 from ...game.shop import Loadout
@@ -198,6 +199,23 @@ class GameScreen(Screen[None]):
 
         event.stop()
         event.prevent_default()
+        # Only *movement* is throttled, and the narrowness is the point.
+        #
+        # A direction held down is the terminal talking at thirty-three words a
+        # second, and that is the thing that made a fight an unreadable blur and
+        # dropped two sounds in three. Every other key is a deliberate press
+        # that a player may well make twice in quick succession -- take the
+        # draught and then the stairs, wait and then wait again -- and swallowing
+        # one of those would be the throttle costing more than it pays for.
+        #
+        # There is no way to tell a repeat from a fast press: Textual's key
+        # event carries only ``key`` and ``character``, and the two are the same
+        # event. So the rule is the one that is *safe* to apply to both.
+        if (
+            action.direction is not Direction.NONE
+            and not self.app.allows_action(event.key)
+        ):
+            return
         self._do(action)
 
     def _do(self, action: Action) -> None:
@@ -207,6 +225,7 @@ class GameScreen(Screen[None]):
             # A look, not a turn. The domain verb still exists and is still
             # headless -- it reports the pack as a line of text -- and the screen
             # is what the UI does with the same question.
+            self.app.arm_repeat_filter()
             self.app.push_screen(InventoryScreen(self.state))
             return
 
@@ -222,6 +241,11 @@ class GameScreen(Screen[None]):
             # The domain says a decision is needed; the UI asks for it. The deed
             # happens only if the answer comes back yes, which is why neither
             # opening a chest nor washing a curse is bound to a key.
+            #
+            # Armed before every dialog: whatever key opened it is still down,
+            # and a dialog that reads its own opening keypress answers a question
+            # the player has not been asked yet.
+            self.app.arm_repeat_filter()
             if result.prompt_kind == "spring":
                 self.app.push_screen(SpringScreen(result.prompt), self._spring_answer)
             elif result.prompt_kind == "npc":
@@ -337,11 +361,13 @@ class GameScreen(Screen[None]):
 
     # -- actions ------------------------------------------------------------
     def action_help(self) -> None:
+        self.app.arm_repeat_filter()
         self.app.push_screen("help")
 
     def action_character(self) -> None:
         """The full sheet. Costs no turn -- it is only a look."""
         assert self.state is not None
+        self.app.arm_repeat_filter()
         self.app.push_screen(CharacterScreen(self.state))
 
     def action_menu(self) -> None:

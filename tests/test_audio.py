@@ -349,3 +349,93 @@ def test_the_sounds_live_inside_the_package():
     package = Path(audio.__file__).resolve().parent.parent
     assert SOUNDS_DIR == package / "sounds"
     assert SOUNDS_DIR.exists()
+
+
+# -- never silent by accident -------------------------------------------------
+def test_the_device_is_opened_before_the_first_blow(monkeypatch):
+    """Opening it costs about a hundred and forty milliseconds, and paying that
+    on the first hit of the first fight is paying it where it shows."""
+    monkeypatch.delenv(audio.MUTE_ENV, raising=False)
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player(streams=True))
+
+    opened: list[int] = []
+    monkeypatch.setattr(
+        audio.Sfx, "_open_stream", lambda self: opened.append(1)
+    )
+    sfx = Sfx()
+
+    assert opened, "the device was left cold"
+    sfx.close()
+
+
+def test_a_muted_session_does_not_open_anything(monkeypatch):
+    """Nothing is going to be played, so nothing should be started."""
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player(streams=True))
+    opened: list[int] = []
+    monkeypatch.setattr(
+        audio.Sfx, "_open_stream", lambda self: opened.append(1)
+    )
+    Sfx(muted=True)
+
+    assert not opened
+
+
+def test_unmuting_opens_the_device(monkeypatch):
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player(streams=True))
+    opened: list[int] = []
+    monkeypatch.setattr(
+        audio.Sfx, "_open_stream", lambda self: opened.append(1)
+    )
+    sfx = Sfx(muted=True)
+
+    sfx.set_muted(False)
+
+    assert opened, "unmuting left it silent"
+
+
+def test_one_hiccup_does_not_silence_the_session(monkeypatch):
+    """The old version muted on the first exception, which is why the sound used
+    to stop and never come back."""
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player())
+    sfx = Sfx(muted=True)
+    sfx._muted = False
+
+    sfx._count_failure()
+
+    assert not sfx.muted, "a single hiccup killed the sound"
+
+
+def test_three_in_a_row_do(monkeypatch):
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player())
+    sfx = Sfx(muted=True)
+    sfx._muted = False
+
+    for _ in range(audio.GIVE_UP_AFTER):
+        sfx._count_failure()
+
+    assert sfx.muted
+
+
+def test_a_player_that_exits_non_zero_is_a_failure(monkeypatch):
+    """``check=False`` would otherwise call a broken player a success."""
+    monkeypatch.delenv(audio.MUTE_ENV, raising=False)
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player("false", streams=False))
+    sfx = Sfx()
+
+    sfx.play("hit")
+    sfx._queue.join()
+
+    assert sfx._failures, "a non-zero exit was not noticed"
+
+
+def test_a_good_sound_clears_the_count(monkeypatch):
+    monkeypatch.setattr(audio, "_find_player", lambda: _a_player())
+    sfx = Sfx(muted=True)
+    sfx._muted = False
+    sfx._count_failure()
+
+    monkeypatch.setattr(sfx, "_spawn", lambda clip: None)
+    sfx._failures = 0  # what a successful spawn does
+
+    assert sfx._failures == 0
+    assert not sfx.muted

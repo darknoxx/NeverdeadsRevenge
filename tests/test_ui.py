@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from neverdeads_revenge.game import actors as actors_module
-from neverdeads_revenge.game.actions import Action
+from neverdeads_revenge.game.actions import Action, perform_action
 from neverdeads_revenge.game.state import RunState
 from neverdeads_revenge.ui.app import NeverdeadsRevenge
 from neverdeads_revenge.ui.hold import BAR_CELLS, HoldToContinue
@@ -2740,3 +2740,170 @@ async def test_the_best_score_on_the_title_is_not_stale():
         assert isinstance(app.screen, TitleScreen)
         shown = str(app.screen.query_one("#title-best").render())
         assert str(score) in shown, f"the title still says {shown!r}"
+
+
+# -- how fast a held key acts ------------------------------------------------
+async def test_a_fresh_press_always_acts_and_a_repeat_is_throttled():
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        app._last_key = ""
+        app._last_action_time = 0.0
+
+        assert app.allows_action("d"), "a fresh press was refused"
+        # Immediately after, the same key can only be the terminal repeating.
+        for _ in range(5):
+            assert not app.allows_action("d")
+
+
+async def test_a_held_key_acts_four_times_a_second():
+    """A terminal repeats a held key thirty-three times a second, which is a rate
+    nobody chose: it made a fight an unreadable blur and it dropped two sounds in
+    three."""
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        app._last_key = ""
+        app._last_action_time = 0.0
+
+        accepted = 0
+        for _ in range(100):  # a hundred repeats over one second
+            if app.allows_action("d"):
+                accepted += 1
+            await asyncio.sleep(0.01)
+
+        assert 3 <= accepted <= 5, f"{accepted} actions in a second"
+
+
+async def test_a_deliberate_tap_is_never_swallowed():
+    """Only *repeats* are throttled. A press after a gap is a decision, and the
+    terminal cannot produce one that fast."""
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        app._last_key = ""
+        app._last_action_time = 0.0
+
+        for _ in range(4):
+            assert app.allows_action("d"), "a deliberate tap was refused"
+            await asyncio.sleep(0.2)  # a person, not a keyboard
+
+
+async def test_a_held_direction_is_throttled_and_waiting_is_not():
+    """The narrowness is the point: a direction held down is the terminal
+    talking, and every other key is a deliberate press a player may well make
+    twice in a row."""
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        before = screen.state.total_turns
+
+        app.allows_action = lambda key: False
+        await pilot.press("d")
+        await pilot.pause()
+        assert screen.state.total_turns == before, "a throttled direction acted"
+
+        app.allows_action = lambda key: True
+        await pilot.press(".")
+        await pilot.press(".")
+        await pilot.pause()
+        assert screen.state.total_turns == before + 2, "waiting was throttled"
+
+
+# -- dialogs and held keys ---------------------------------------------------
+async def test_holding_the_sheet_key_does_not_flicker_the_sheet():
+    from neverdeads_revenge.ui.screens.character import CharacterScreen
+
+    """Bindings are checked before ``on_key``, so the sheet is opened by a key
+    the sheet itself will also see -- and a repeat of it used to close the sheet
+    thirty times a second."""
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+
+        app.note_key = lambda key: True  # a held key, still repeating
+        await pilot.press("c")
+        await pilot.pause()
+
+        assert isinstance(app.screen, CharacterScreen), "the sheet closed itself"
+
+
+async def test_a_chest_dialog_does_not_answer_its_own_opening_key():
+    """Enter is *bound*, so it never reaches ``on_key`` -- the guard has to be in
+    the action. Holding enter on a chest used to open it before the price had
+    been read, which is the one thing the dialog exists to prevent."""
+    from neverdeads_revenge.ui.screens.chest import ChestScreen
+    from neverdeads_revenge.world.items import ITEMS, make_chest
+
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        state.dungeon_map.add_item(
+            state.player.position, make_chest("wither", ITEMS["edge"])
+        )
+
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, ChestScreen)
+
+        app.note_key = lambda key: True  # still holding
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert isinstance(app.screen, ChestScreen), "the chest opened itself"
+
+
+async def test_the_map_draws_a_cell_a_blow_landed_on_upside_down():
+    """Reversed rather than coloured: the palette is full, and a blow landing is
+    not a new kind of thing on the map."""
+    from neverdeads_revenge.game.actors import ENEMIES, make_enemy
+    from neverdeads_revenge.ui.widgets.map_view import MapView
+
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        ghoul = make_enemy(
+            ENEMIES["ghoul"], (state.player.position[0] + 1, state.player.position[1])
+        )
+        ghoul.stats.hp = 99
+        state.enemies = [ghoul]
+        state.turn_queue = type(state.turn_queue)([state.player, ghoul])
+        state.refresh_vision()
+        view = screen.query_one(MapView)
+
+        plain = view._cell(ghoul.position, state)
+        assert "reverse" not in str(plain.style)
+
+        perform_action(state, Action.MOVE_EAST)
+        flashed = view._cell(ghoul.position, state)
+
+        assert "reverse" in str(flashed.style)
+        assert str(flashed) == str(plain), "the flash changed the glyph"
+
+
+async def test_enter_is_not_throttled():
+    """The one key a player presses twice in quick succession on purpose.
+
+    Take the draught, then take the stairs -- and the second press lands well
+    inside the throttle's window. Swallowing it would be the throttle costing
+    more than it pays for, which it did until this test was written.
+    """
+    from neverdeads_revenge.world.items import ITEMS, make_item
+
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+
+        # Something to take, then the stairs, one after the other with no pause.
+        state.player.position = state.stairs
+        state.dungeon_map.add_item(state.player.position, make_item(ITEMS["potion"]))
+
+        await pilot.press("enter")
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert state.depth == 2, "the second enter was swallowed"
+        assert [item.item_id for item in state.inventory] == ["potion"]

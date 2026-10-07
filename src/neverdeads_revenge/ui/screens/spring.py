@@ -56,6 +56,8 @@ class SpringScreen(ModalScreen[bool]):
             )
 
     def action_wash_it(self) -> None:
+        if self.app.note_key("enter"):
+            return
         self.dismiss(True)
 
     def action_leave_it(self) -> None:

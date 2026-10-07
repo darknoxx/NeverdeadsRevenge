@@ -87,6 +87,7 @@ class NeverdeadsRevenge(App[None]):
             self.roll_wilds()
         self._last_key = ""
         self._last_key_time = 0.0
+        self._last_action_time = 0.0
         self._filter_repeats = False
 
     def arm_repeat_filter(self) -> None:
@@ -96,6 +97,41 @@ class NeverdeadsRevenge(App[None]):
         key is known to be down as the screen changes.
         """
         self._filter_repeats = True
+
+    #: The shortest gap between two actions from a *held* key, in seconds.
+    #:
+    #: Four a second. A terminal repeats a held key thirty-three times a second,
+    #: which is a rate nobody chose: it made a fight an unreadable blur and it
+    #: made the sound drop two blows in three. Four is fast enough to fight with
+    #: and slow enough to see -- and slow enough that every blow's sound and its
+    #: flash land while the blow still means something.
+    ACTION_GAP = 0.25
+
+    def allows_action(self, key: str) -> bool:
+        """Whether this press should act, or is a held key repeating.
+
+        A fresh press is a decision and always acts. A *held* key is the terminal
+        talking, and it talks far faster than anybody reads, so a repeat is let
+        through at most every :data:`ACTION_GAP` -- which is what makes holding a
+        direction a steady four steps a second rather than a landslide.
+
+        Told apart by the gap, not by a flag: Textual's key event carries only
+        ``key`` and ``character``, and the terminal repeats far faster than
+        anybody presses a key twice on purpose. No timer, for the reason
+        :meth:`note_key` gives.
+        """
+        now = time.monotonic()
+        repeat = key == self._last_key and now - self._last_key_time < REPEAT_GAP
+        self._last_key = key
+        self._last_key_time = now
+
+        if not repeat:
+            self._last_action_time = now
+            return True
+        if now - self._last_action_time < self.ACTION_GAP:
+            return False
+        self._last_action_time = now
+        return True
 
     def note_key(self, key: str) -> bool:
         """Record a key event. True when it is a repeat of the one before.

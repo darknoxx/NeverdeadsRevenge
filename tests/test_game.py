@@ -43,6 +43,7 @@ from neverdeads_revenge.game.difficulty import (
     potency,
     weight_at_depth,
 )
+from neverdeads_revenge.game.shop import Loadout
 from neverdeads_revenge.game.state import (
     VIEW_RADIUS,
     ESCAPE_BONUS,
@@ -2099,3 +2100,81 @@ def test_a_killing_blow_does_not_curse_a_corpse():
 
     assert state.run_state is RunState.DEAD
     assert not state.curses
+
+
+# -- the flash ---------------------------------------------------------------
+def test_a_blow_that_lands_marks_the_cell_it_landed_on():
+    state = start_run(NOXX, seed=3)
+    ghoul = make_enemy(ENEMIES["ghoul"], (state.player.position[0] + 1, state.player.position[1]))
+    ghoul.stats.hp = 99
+    state.enemies = [ghoul]
+    state.turn_queue = type(state.turn_queue)([state.player, ghoul])
+    state.refresh_vision()
+
+    perform_action(state, Action.MOVE_EAST)
+
+    assert ghoul.position in state.hits
+
+
+def test_a_blow_you_take_marks_your_own_cell():
+    """The useful half: the log scrolls, and the map is where you are looking."""
+    from neverdeads_revenge.game.actions import _player_takes_damage
+    from neverdeads_revenge.game.combat import AttackOutcome
+
+    state = start_run(NOXX, seed=3)
+    ghoul = make_enemy(ENEMIES["ghoul"], (state.player.position[0] + 1, state.player.position[1]))
+    hit = AttackOutcome(hit=True, crit=False, damage=3, killed=False)
+
+    _player_takes_damage(state, ghoul, hit)
+
+    assert state.player.position in state.hits
+
+
+def test_a_miss_marks_nothing():
+    from neverdeads_revenge.game.actions import _player_takes_damage
+    from neverdeads_revenge.game.combat import AttackOutcome
+
+    state = start_run(NOXX, seed=3)
+    ghoul = make_enemy(ENEMIES["ghoul"], (state.player.position[0] + 1, state.player.position[1]))
+    miss = AttackOutcome(hit=False, crit=False, damage=0, killed=False, dodged=True)
+
+    _player_takes_damage(state, ghoul, miss)
+
+    assert state.hits == []
+
+
+def test_the_flash_lasts_exactly_one_action():
+    """Cleared at the start of every action rather than by a timer, which is
+    what lets it blink without one -- and the project has no timers at all."""
+    state = start_run(NOXX, seed=3)
+    ghoul = make_enemy(ENEMIES["ghoul"], (state.player.position[0] + 1, state.player.position[1]))
+    ghoul.stats.hp = 99
+    state.enemies = [ghoul]
+    state.turn_queue = type(state.turn_queue)([state.player, ghoul])
+    state.refresh_vision()
+    perform_action(state, Action.MOVE_EAST)
+    assert state.hits
+
+    perform_action(state, Action.WAIT)
+
+    assert state.hits == [], "the flash outlived its turn"
+
+
+def test_the_mirror_marks_what_it_strikes_back():
+    from neverdeads_revenge.game.actions import _resolve_enemy_attack
+
+    state = start_run(NOXX, seed=3, loadout=Loadout(pending=("mirror",)))
+    ghoul = make_enemy(ENEMIES["ghoul"], (state.player.position[0] + 1, state.player.position[1]))
+    ghoul.stats.accuracy = 99
+    state.player.stats.evasion = 0
+    state.enemies = [ghoul]
+    state.turn_queue = type(state.turn_queue)([state.player, ghoul])
+    state.refresh_vision()
+
+    for _ in range(40):
+        state.hits.clear()
+        _resolve_enemy_attack(state, ghoul, state.player)
+        if ghoul.position in state.hits:
+            break
+
+    assert ghoul.position in state.hits, "the reflection did not flash"

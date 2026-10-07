@@ -45,5 +45,11 @@ class NpcScreen(ModalScreen[None]):
             yield Static("press any key", id="npc-hint")
 
     def on_key(self, event) -> None:
+        # A key still repeating from the screen before this one must not close
+        # this one on the way in: holding ``c`` used to open and close the sheet
+        # thirty times a second. See App.note_key.
+        if self.app.note_key(event.key):
+            event.stop()
+            return
         event.stop()
         self.dismiss()

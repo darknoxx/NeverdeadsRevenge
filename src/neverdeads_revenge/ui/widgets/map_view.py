@@ -88,7 +88,22 @@ class MapView(Widget):
         return Text("\n").join(lines)
 
     def _cell(self, position, state: GameState) -> Text:
-        """One map cell: an actor if there is one, otherwise loot, else terrain."""
+        """One map cell, flashed if a blow landed on it this action.
+
+        Reversed rather than coloured, and that is not a shortcut: the palette is
+        full -- the last new mark on this map cleared the perceptual-distance
+        test by four thousand six hundred, and there was one other candidate left
+        in the whole colour space. A blow landing is not a new *kind* of thing on
+        the map, it is a thing on the map happening right now, and inverting what
+        is already there says exactly that and costs no colour at all.
+        """
+        glyph, style = self._cell_content(position, state)
+        if position in state.hits:
+            style = f"{style} reverse"
+        return Text(glyph, style=style)
+
+    def _cell_content(self, position, state: GameState) -> tuple[str, str]:
+        """The glyph and style of one cell: an actor, else loot, else terrain."""
         dungeon = state.dungeon_map
         visible = dungeon.is_visible(position)
 
@@ -98,26 +113,26 @@ class MapView(Widget):
             # un-bolded because an ``@`` does not need the help, but a named
             # hero in his own colour is the thing the eye should land on first
             # and must not be the dimmest mark on the map.
-            return Text(actor.glyph, style=f"bold {actor.color}")
+            return actor.glyph, f"bold {actor.color}"
 
         # Loot sits on the ground, so it is drawn over the terrain and under any
         # monster standing on it -- which is exactly the choice the player has to
         # make about whether the potion is worth the fight.
         item = dungeon.item_at(position)
         if item is not None and visible:
-            return Text(item.glyph, style=f"bold {item.color}")
+            return item.glyph, f"bold {item.color}"
 
         tile = dungeon.tile_at(position)
         if visible:
-            return Text(tile.glyph, style=tile.color)
+            return tile.glyph, tile.color
 
         if dungeon.is_explored(position) and self._stays_legible(tile):
             # Remembered ground: walls and the way onward stay readable, the
             # rest fades. Remembered loot is deliberately not drawn: you know
             # the room, not what is still lying in it.
-            return Text(tile.glyph, style=MEMORY_COLOR)
+            return tile.glyph, MEMORY_COLOR
 
-        return Text(" ", style=UNSEEN_COLOR)
+        return " ", UNSEEN_COLOR
 
     @staticmethod
     def _stays_legible(tile: Tile) -> bool:
