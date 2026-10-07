@@ -106,6 +106,7 @@ class GameScreen(Screen[None]):
         hero_key: str = "noxx",
         seed: int | None = None,
         loadout: Loadout | None = None,
+        state: GameState | None = None,
     ) -> None:
         super().__init__()
         # Loud on an unknown key rather than falling back to the first hero. The
@@ -116,7 +117,10 @@ class GameScreen(Screen[None]):
         self.seed = seed
         #: What the shop sold for this run. Empty for a run that bought nothing.
         self.loadout = loadout or Loadout()
-        self.state: GameState | None = None
+        #: A run picked up from the disk rather than started fresh. Handed in
+        #: ready-made, because the whole point of a save is that the floor is the
+        #: floor you left.
+        self.state: GameState | None = state
 
     # -- composition --------------------------------------------------------
     def compose(self) -> ComposeResult:
@@ -134,8 +138,9 @@ class GameScreen(Screen[None]):
 
     # -- run lifecycle ------------------------------------------------------
     def _start_run(self) -> None:
-        seed = self.seed if self.seed is not None else _fresh_seed()
-        self.state = start_run(self.hero, seed=seed, loadout=self.loadout)
+        if self.state is None:
+            seed = self.seed if self.seed is not None else _fresh_seed()
+            self.state = start_run(self.hero, seed=seed, loadout=self.loadout)
         map_view = self.query_one(MapView)
         map_view.state = self.state
         self.query_one(Hud).state = self.state
@@ -345,8 +350,15 @@ class GameScreen(Screen[None]):
         self.app.push_screen(PauseScreen(self.app.sfx), self._pause_result)
 
     def _pause_result(self, result: str | None) -> None:
-        """Quit from the pause menu ends the run without a death."""
-        if result == "quit":
+        """Quit from the pause menu ends the run without a death.
+
+        Two ways out, and the difference matters: one writes the floor down and
+        one does not. Neither is a death, so neither is recorded as a run.
+        """
+        if result == "save":
+            self.app.save_run()
+            self.app.return_to_title()
+        elif result == "quit":
             self.app.return_to_title()
 
 

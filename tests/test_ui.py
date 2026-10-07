@@ -2612,3 +2612,131 @@ async def test_the_legend_says_who_the_eights_are():
 
         assert NPC_GLYPH in shown
         assert "talk to" in shown
+
+
+# -- saving a run ------------------------------------------------------------
+async def test_the_pause_menu_writes_the_run_down_and_the_title_offers_it():
+    from neverdeads_revenge.persistence import run_path
+
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.build_floor(6)
+        screen.state.gold = 77
+
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, PauseScreen)
+
+        await pilot.press("s")
+        await pilot.pause()
+
+        assert isinstance(app.screen, TitleScreen)
+        assert run_path().exists(), "nothing was written"
+        shown = str(app.screen.query_one("#title-saved").render())
+        assert "floor 6" in shown, "the title does not offer the run"
+
+
+async def test_picking_the_run_up_lands_on_the_floor_it_was_left_on():
+    from neverdeads_revenge.persistence import run_path
+
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.build_floor(6)
+        screen.state.gold = 77
+        screen.state.kills = 9
+        before = (screen.state.depth, screen.state.gold, screen.state.kills)
+        tiles = screen.state.dungeon_map.tiles
+
+        await pilot.press("escape")
+        await pilot.pause()
+        await pilot.press("s")
+        await pilot.pause()
+
+        await pilot.press("c")
+        await pilot.pause()
+
+        assert isinstance(app.screen, GameScreen)
+        state = app.screen.state
+        assert (state.depth, state.gold, state.kills) == before
+        assert state.dungeon_map.tiles == tiles, "a different floor was rolled"
+        assert state.hero.key == "noxx"
+
+
+async def test_the_saved_run_is_consumed_when_it_is_picked_up():
+    """A run that can be loaded twice is a run that can be re-rolled, and one
+    slot is only worth having if quitting in front of a monster is a decision."""
+    from neverdeads_revenge.persistence import run_path
+
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.build_floor(4)
+
+        await pilot.press("escape")
+        await pilot.pause()
+        await pilot.press("s")
+        await pilot.pause()
+        assert run_path().exists()
+
+        await pilot.press("c")
+        await pilot.pause()
+
+        assert not run_path().exists(), "the save survived being read"
+        assert isinstance(app.screen, GameScreen)
+
+
+async def test_quitting_without_saving_writes_nothing():
+    from neverdeads_revenge.persistence import run_path
+
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        await drive_to_game(app, pilot)
+
+        await pilot.press("escape")
+        await pilot.pause()
+        await pilot.press("q")
+        await pilot.pause()
+
+        assert isinstance(app.screen, TitleScreen)
+        assert not run_path().exists(), "quitting saved the run anyway"
+
+
+async def test_c_with_nothing_saved_starts_a_run_like_any_other_key():
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, TitleScreen)
+
+        await pilot.press("c")
+        await pilot.pause()
+
+        assert isinstance(app.screen, HeroSelectScreen), "c was swallowed"
+
+
+async def test_the_best_score_on_the_title_is_not_stale():
+    """It was wrong from the day it was added.
+
+    A run ending pops back to the title that was *already there* rather than
+    building a new one, so ``on_mount`` runs once per session -- and the one
+    thing that ever changes the best score is a run, which always comes back
+    here. Re-read on resume instead.
+    """
+    app = NeverdeadsRevenge(seed=3)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        assert "best" not in str(app.screen.query_one("#title-best").render())
+
+        screen = await drive_to_game(app, pilot)
+        screen.state.floors_cleared = 4
+        screen.state.total_turns = 0
+        score = screen.state.score
+
+        screen._game_over()
+        await pilot.pause()
+        await finish_run(pilot)
+
+        assert isinstance(app.screen, TitleScreen)
+        shown = str(app.screen.query_one("#title-best").render())
+        assert str(score) in shown, f"the title still says {shown!r}"

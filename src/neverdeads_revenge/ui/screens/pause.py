@@ -24,6 +24,7 @@ class PauseScreen(ModalScreen[str]):
     BINDINGS = [
         Binding("escape", "resume", "Resume"),
         Binding("r", "resume", "Resume"),
+        Binding("s", "save_and_quit", "Save and quit"),
         Binding("m", "toggle_sound", "Sound"),
         Binding("q", "quit_game", "Quit to title"),
     ]
@@ -53,7 +54,8 @@ class PauseScreen(ModalScreen[str]):
     def _draw(self) -> None:
         self.query_one("#pause-body", Static).update(
             "[bold]r[/] / [bold]escape[/]  resume\n"
-            "[bold]q[/]                quit to title\n"
+            "[bold]s[/]                save and quit\n"
+            "[bold]q[/]                quit to title, and lose the run\n"
             f"[bold]m[/]                sound: {self._sound_line()}\n"
         )
 
@@ -78,6 +80,9 @@ class PauseScreen(ModalScreen[str]):
 
     def action_resume(self) -> None:
         self.dismiss("resume")
+
+    def action_save_and_quit(self) -> None:
+        self.dismiss("save")
 
     def action_quit_game(self) -> None:
         self.dismiss("quit")

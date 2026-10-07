@@ -37,6 +37,14 @@ Screen {
     color: #6b6b6b;
 }
 
+/* Blank unless a run is waiting to be picked up. */
+#title-saved {
+    width: 1fr;
+    height: auto;
+    content-align: center middle;
+    color: $accent;
+}
+
 /* Blank until there has been a run, so it is styled but usually empty. */
 #title-best {
     width: 1fr;

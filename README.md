@@ -238,7 +238,7 @@ mistake rather than a style.
 | `i` | What you are carrying and wearing, and what each of them does |
 | `i` | Show what you are carrying |
 | `?` | Controls and the terrain reference |
-| `Esc` | Menu: `r` resume, `m` sound on/off, `q` quit to title |
+| `Esc` | Menu: `r` resume, `s` save and quit, `m` sound on/off, `q` quit to title |
 
 On the **title screen**: any key starts a run, `s` opens the shop and `h` opens
 the scoreboard. In the **shop**: up/down choose, `enter` buys, `s` or `Esc`
@@ -374,6 +374,30 @@ and that is deliberate. A line of lore is the cheapest thing in the game to add
 and the most expensive to get wrong, so the first version is one sentence and no
 promise. A quest is a promise, and a promise needs a system behind it.
 
+## Saving a run
+
+`Esc` then `s` writes the run down and quits to the title. The title then offers
+to pick it up, with `c`, and the save is **deleted the moment it is read**.
+
+That is the whole design. One slot, overwritten, consumed on load -- so quitting
+in front of a monster you do not like the look of and coming back to a fresh roll
+of the dice is not a thing you can do twice. What it is for is the terminal being
+closed and the laptop running out of battery, and the twenty minutes already
+spent.
+
+It is a real save, not a snapshot: the floor is the floor you left, tile for tile,
+the map remembers what you had explored, the generator comes back exactly where it
+left off, and the turn order is the order it was. It is about forty kilobytes of
+JSON, in its own file beside the progress file, because one being corrupt should
+not take the other with it.
+
+The codec is generic -- it walks dataclasses by reflection rather than listing
+fields -- because a list of fields is a list somebody has to remember to add to.
+What makes that safe is the round-trip test: it builds a run with every field the
+game can put in one, saves it, reads it back and compares the two field by field,
+recursively. A field added to the game and forgotten by the codec fails *there*
+instead of in somebody's saved run.
+
 ## High score
 
 Every run ends by asking for a name — five slots, on a death and on an escape
@@ -483,9 +507,9 @@ has been done to you.
 ## Not implemented yet
 
 A talent tree (levels are automatic for now, not a choice), a fourth equipment
-slot, music as opposed to sound effects, saving mid-run, and hero unlocks. Two
-roster slots are shown locked and are not playable yet. The people have nothing
-to trade and nothing to ask of you yet: quests are the next thing they need.
+slot, music as opposed to sound effects, and hero unlocks. Two roster slots are
+shown locked and are not playable yet. The people have nothing to trade and
+nothing to ask of you yet: quests are the next thing they need.
 
 The prologue is the only prose in the game, and it is shown once per session
 rather than once per run — told every run it stops being a premise and becomes a

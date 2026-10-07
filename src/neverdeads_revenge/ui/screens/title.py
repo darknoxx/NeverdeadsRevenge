@@ -73,6 +73,19 @@ class TitleScreen(Screen[None]):
         """Swap between the block art and the plain name as the width allows."""
         self._fit_title()
 
+    def on_screen_resume(self) -> None:
+        """Re-read everything when the title is uncovered again.
+
+        A run ending pops back to the title that was *already there* rather than
+        building a new one -- the stack unwinds to it -- so ``on_mount`` runs
+        once per session and every line here can be a run out of date. The best
+        score has been wrong on this screen since the day it was added, because
+        the only thing that ever changed it was a run, and a run always came back
+        here rather than through a fresh mount.
+        """
+        self._fit_title()
+        self._show_best()
+
     def _show_best(self) -> None:
         from textual.widgets import Static
 
@@ -80,6 +93,22 @@ class TitleScreen(Screen[None]):
         self.query_one("#title-best", Static).update(
             best_line(best.best_score if best else 0)
         )
+        self.query_one("#title-saved", Static).update(self._saved_line())
+
+    def _saved_line(self) -> str:
+        """A run waiting to be picked up, if one is."""
+        payload = getattr(self.app, "saved_run", lambda: None)()
+        if not payload:
+            return ""
+        depth = payload.get("depth", 1)
+        return f"[bold]c[/]  pick up the run you left on floor {depth}"
+
+    def action_continue(self) -> None:
+        """``c`` picks the saved run up instead of starting a new one."""
+        self.app.continue_run()
+
+    def _has_saved_run(self) -> bool:
+        return bool(getattr(self.app, "saved_run", lambda: None)())
 
     def _fit_title(self) -> None:
         from textual.widgets import Static
@@ -110,6 +139,12 @@ class TitleScreen(Screen[None]):
         """
         if event.key in ("s", "h", "escape", "q"):
             return  # a binding has it
+        if event.key == "c" and self._has_saved_run():
+            # Only swallowed when there is something to pick up; otherwise "c"
+            # is any other key and starts a run like everything else.
+            event.stop()
+            self.app.continue_run()
+            return
         if self.app.note_key(event.key):
             event.stop()
             return
@@ -125,6 +160,7 @@ def _centered():
         yield Static(TITLE_ART, id="title-art")
         yield Static(TAGLINE, id="title-subtitle")
         yield Static(id="title-best")
+        yield Static(id="title-saved")
         yield Static(
             "\npress any key   ·   [bold]s[/] shop   ·   [bold]h[/] scores",
             id="title-hint",

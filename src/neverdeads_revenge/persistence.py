@@ -26,6 +26,10 @@ __all__ = [
     "META_UPGRADES",
     "data_dir",
     "save_path",
+    "run_path",
+    "save_run",
+    "load_run",
+    "clear_run",
     "load_meta",
     "save_meta",
 ]
@@ -153,6 +157,43 @@ def save_path() -> Path:
     return data_dir() / "meta.json"
 
 
+def run_path() -> Path:
+    """Where the run in progress is kept.
+
+    Its own file rather than a corner of ``meta.json``: a run is forty kilobytes
+    of map and a few hundred bytes of progress are not the same kind of thing,
+    and one being corrupt should not take the other with it.
+    """
+    return data_dir() / "run.json"
+
+
+def save_run(payload: dict) -> None:
+    """Write the run in progress, over whatever was there before.
+
+    One slot. There is no second one to write to, which is the whole reason
+    quitting and reloading is not a thing a player can do twice.
+    """
+    _write_json(run_path(), payload)
+
+
+def load_run() -> dict | None:
+    """The saved run, or ``None`` if there is not one."""
+    try:
+        payload = json.loads(run_path().read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def clear_run() -> None:
+    """Throw the saved run away.
+
+    Called the moment one is picked up again: a run that can be reloaded is a run
+    that can be re-rolled, and the whole point of one slot is that it cannot.
+    """
+    run_path().unlink(missing_ok=True)
+
+
 def load_meta(path: Path | None = None) -> MetaProgress:
     """Load saved progress, or return fresh progress if there is none.
 
@@ -205,15 +246,19 @@ def load_meta(path: Path | None = None) -> MetaProgress:
 
 
 def save_meta(progress: MetaProgress, path: Path | None = None) -> None:
-    """Write progress to disk atomically.
+    """Write progress to disk atomically."""
+    _write_json(path or save_path(), asdict(progress), indent=2)
 
-    Writes to a temporary file in the same directory and renames it, so an
-    interrupted save cannot leave a half-written file behind.
+
+def _write_json(target: Path, payload, indent: int | None = None) -> None:
+    """Write JSON to ``target`` atomically.
+
+    A temporary file in the same directory, renamed over the target, so an
+    interrupted save cannot leave a half-written file behind -- and so the run in
+    progress cannot be lost to a terminal being closed at the wrong moment.
     """
-    target = path or save_path()
     target.parent.mkdir(parents=True, exist_ok=True)
-
-    payload = json.dumps(asdict(progress), indent=2)
+    payload = json.dumps(payload, indent=indent)
     handle = tempfile.NamedTemporaryFile(
         "w",
         encoding="utf-8",

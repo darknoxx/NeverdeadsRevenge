@@ -20,9 +20,16 @@ import time
 from textual.app import App
 
 from ..core.rng import Rng
+from ..game.savegame import SaveError, dump, load
 from ..game.shop import Loadout, loadout_from
 from ..game.state import GameState, RunState
-from ..persistence import load_meta, save_meta
+from ..persistence import (
+    clear_run,
+    load_meta,
+    load_run,
+    save_meta,
+    save_run as write_run,
+)
 from .audio import Sfx
 from .hold import REPEAT_GAP
 from .screens.game import GameScreen
@@ -116,6 +123,46 @@ class NeverdeadsRevenge(App[None]):
         # over and everything after it is somebody pressing on purpose.
         self._filter_repeats = False
         return False
+
+    def saved_run(self) -> dict | None:
+        """The run waiting to be picked up, if there is one."""
+        return load_run()
+
+    def save_run(self) -> None:
+        """Put the run in progress on disk. One slot, overwritten.
+
+        Best effort, like everything else that touches the disk: a home
+        directory that cannot be written to is worth a shrug, and it is
+        certainly not worth losing the run over.
+        """
+        state = getattr(self.screen, "state", None)
+        if state is None:
+            return
+        try:
+            write_run(dump(state))
+        except OSError:
+            pass
+
+    def continue_run(self) -> None:
+        """Pick the saved run up, and throw the save away as it is read.
+
+        Consumed rather than kept, and that is the whole design: a run that can
+        be loaded twice is a run that can be re-rolled, and one slot is only
+        worth having if quitting in front of a monster is a real decision.
+        """
+        payload = load_run()
+        if payload is None:
+            return
+        try:
+            state = load(payload)
+        except SaveError:
+            clear_run()
+            return
+
+        clear_run()
+        self.push_screen(
+            GameScreen(state.hero.key, seed=state.seed, state=state)
+        )
 
     def set_muted(self, muted: bool) -> None:
         """Turn the sound off or on, and remember it.
