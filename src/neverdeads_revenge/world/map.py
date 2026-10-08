@@ -112,6 +112,33 @@ class DungeonMap:
         """All eight neighbours that are in bounds."""
         return [n for n in (d.step(pos) for d in Direction if d is not Direction.NONE) if self.in_bounds(n)]
 
+    def display_tile(self, pos: Pos) -> Tile:
+        """What to *draw* at ``pos``, which is not always what is there.
+
+        Rock that touches a walkable cell is drawn as wall. The generator carves
+        rooms out of solid stone and gives only some of a room's boundary a wall
+        tile; the rest is floor against void, which is a room with no wall on
+        one side. Nothing about the *rules* changes -- void is still not
+        walkable and still not visible until it has been seen -- but a room the
+        player can see the edge of should look like a room.
+
+        It lives here rather than in either screen because both of them draw the
+        same dungeon and neither of them should be the one that knows.
+        """
+        tile = self.tile_at(pos)
+        if tile is Tile.VOID and self._touches_walkable(pos):
+            return Tile.WALL
+        return tile
+
+    def _touches_walkable(self, pos: Pos) -> bool:
+        """Whether anything walkable is within one cell, diagonals included.
+
+        Diagonals matter: a room's corner is only diagonal to the floor inside
+        it, and a boundary with four pinholes at its corners is a boundary that
+        reads as broken.
+        """
+        return any(self.is_walkable(n) for n in self.neighbours8(pos))
+
     # -- perception ---------------------------------------------------------
     def is_visible(self, pos: Pos) -> bool:
         return pos in self.visible

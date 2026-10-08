@@ -600,3 +600,59 @@ def test_a_floor_with_nothing_worn_can_hold_anything():
             if item.kind == "chest" and item.contents is not None:
                 held.add(item.contents.slot)
     assert len(held) > 1, "with nothing worn the chest should have a choice"
+
+
+# -- what the map is drawn as, as opposed to what it is -----------------------
+def test_a_room_looks_like_a_room():
+    """Rock that touches walkable ground is drawn as wall.
+
+    The generator carves rooms out of solid stone and gives only *some* of a
+    room's boundary a wall tile; the rest is floor against void. In a terminal
+    that is a room with no wall on one side, which is what the player sees, and
+    the fix belongs here rather than in either screen -- both of them draw the
+    same dungeon and neither should be the one that knows.
+    """
+    for seed in (1, 7, 23):
+        dungeon = generate_floor(Rng(seed), depth=1).map
+        for pos in dungeon.walkable_positions():
+            for neighbour in dungeon.neighbours8(pos):
+                if dungeon.tile_at(neighbour) is not Tile.VOID:
+                    continue
+                assert dungeon.display_tile(neighbour) is Tile.WALL, (seed, neighbour)
+
+
+def test_the_world_is_not_walled_in():
+    """The rule draws the *edge*, not the world.
+
+    Rock nobody has been near is still nothing at all -- otherwise the map would
+    be wall from corner to corner and the fog would have nothing left to hide.
+    """
+    dungeon = generate_floor(Rng(23), depth=1).map
+    walled = sum(
+        1
+        for y in range(dungeon.height)
+        for x in range(dungeon.width)
+        if dungeon.display_tile((x, y)) is Tile.WALL
+    )
+    assert walled < (dungeon.width * dungeon.height) // 2
+
+
+def test_drawing_a_wall_does_not_make_one():
+    """It is a drawing rule and not a rule. Void stays void.
+
+    Every cell drawn as wall that is *not* wall underneath has to still be
+    unwalkable -- otherwise the edge of a room would quietly become floor and
+    the player could walk out of the dungeon.
+    """
+    dungeon = generate_floor(Rng(7), depth=1).map
+    drawn = 0
+    for y in range(dungeon.height):
+        for x in range(dungeon.width):
+            pos = (x, y)
+            if dungeon.tile_at(pos) is not Tile.VOID:
+                continue
+            if dungeon.display_tile(pos) is not Tile.WALL:
+                continue
+            drawn += 1
+            assert not dungeon.is_walkable(pos), pos
+    assert drawn, "nothing was drawn as wall, so this proved nothing"

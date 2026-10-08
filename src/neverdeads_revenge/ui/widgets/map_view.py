@@ -122,7 +122,10 @@ class MapView(Widget):
         if item is not None and visible:
             return item.glyph, f"bold {item.color}"
 
-        tile = dungeon.tile_at(position)
+        # ``display_tile`` rather than ``tile_at``: rock that touches the floor
+        # is drawn as wall, because a room the player can see the edge of should
+        # look like a room. See ``DungeonMap.display_tile``.
+        tile = dungeon.display_tile(position)
         if visible:
             return tile.glyph, tile.color
 
