@@ -209,3 +209,54 @@ async def test_a_page_found_in_a_run_goes_onto_the_shelf_at_once():
             break
 
         assert app.progress.pages == [9], "the page never reached the shelf"
+
+
+async def test_the_book_can_be_read_to_the_end():
+    """It could not, once.
+
+    The body was ``height: 1fr`` -- which is *exactly* the height of the frame --
+    so the text was clipped to the frame instead of running past it, and a thing
+    clipped to its frame has nothing to scroll. The symptom was a reader stuck on
+    the fourth page of a thirty-seven page book with no scrollbar and no reason
+    to think there was more.
+    """
+    from textual.containers import VerticalScroll
+
+    from neverdeads_revenge.ui.app import NeverdeadsRevenge
+    from neverdeads_revenge.ui.screens.lore import LoreScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=(100, 34)) as pilot:
+        app.push_screen(LoreScreen(app.progress))
+        await pilot.pause()
+
+        scroll = app.screen.query_one("#lore-scroll", VerticalScroll)
+        assert scroll.max_scroll_y > 0, "the book does not scroll at all"
+
+        await pilot.press("end")
+        await pilot.pause()
+
+        assert scroll.scroll_y == scroll.max_scroll_y, "the end is unreachable"
+
+
+async def test_the_keys_scroll_the_book_without_anything_being_focused():
+    """The arrows are bound by the screen rather than left to the scroll view's
+    own focus, because a reader with nothing focused presses down and the page
+    does not move -- and that is invisible until somebody tries it."""
+    from textual.containers import VerticalScroll
+
+    from neverdeads_revenge.ui.app import NeverdeadsRevenge
+    from neverdeads_revenge.ui.screens.lore import LoreScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=(100, 34)) as pilot:
+        app.push_screen(LoreScreen(app.progress))
+        await pilot.pause()
+
+        scroll = app.screen.query_one("#lore-scroll", VerticalScroll)
+        before = scroll.scroll_y
+
+        await pilot.press("pagedown")
+        await pilot.pause()
+
+        assert scroll.scroll_y > before, "the arrows do nothing"
