@@ -90,6 +90,10 @@ class Action(Enum):
     #: player has been shown the price and said yes, so the dialog is the only
     #: thing that issues it.
     OPEN_CHEST = "open_chest"
+    #: Pay the price and leave the reward: a curse bought for a bigger score
+    #: rather than for the thing behind the lid. Never bound to a key, like
+    #: OPEN_CHEST, because it is a third answer to the same question.
+    TAKE_FAME = "take_fame"
     #: Wash a curse off in the spring. Like OPEN_CHEST, never bound to a key:
     #: it only happens after the player has been shown the price and said yes.
     CLEANSE = "cleanse"
@@ -353,6 +357,8 @@ def perform_action(state: GameState, action: Action) -> ActionResult:
             return _pick_up(state)
         case Action.OPEN_CHEST:
             return _open_chest(state)
+        case Action.TAKE_FAME:
+            return _take_fame(state)
         case Action.CLEANSE:
             return _cleanse(state)
         case Action.QUAFF:
@@ -666,6 +672,49 @@ def _open_chest(state: GameState) -> ActionResult:
     # bargain lands. It was free, which made the riskiest thing in the game --
     # a permanent curse, read and agreed to -- the only one a monster had no
     # answer to.
+    state.turn += 1
+    state.total_turns += 1
+    advance_world(state)
+    state.refresh_vision()
+    return _outcome(state, consumed_turn=True, acted=True)
+
+
+def _take_fame(state: GameState) -> ActionResult:
+    """Take the curse, and the promise with it.
+
+    The third answer to a chest, and the only one that trades *now* for *later*:
+    the price is paid, the thing inside is left where it lies, and what the
+    player gets instead is a bigger number at the end of the run. The score is
+    the board and the board is the only fame there is, which is the joke.
+
+    There is no ceiling on it and there does not need to be one -- a chest is
+    only ever placed for a curse the player has not already paid, so the six
+    curses are the ceiling. Taking all six is nearly a death sentence, and that
+    is the shape the wager should have.
+    """
+    chest = state.dungeon_map.item_at(state.player.position)
+    if chest is None or chest.kind != "chest":
+        return ActionResult(consumed_turn=False, acted=False)
+
+    state.dungeon_map.remove_item(state.player.position)
+
+    curse = curse_by_key(chest.curse)
+    if curse is not None and not any(c.key == curse.key for c in state.curses):
+        state.add_curse(curse)
+
+    state.fame += 1
+    state.say(
+        "You take the curse and leave the blade where it lies. "
+        "The dark will remember your name.",
+        LogKind.GOOD,
+    )
+    state.say(
+        f"FAME {state.fame}: this run is worth "
+        f"{state.score_multiplier:.2f}x.",
+        LogKind.GOOD,
+    )
+
+    # A turn, like opening it. The bargain lands either way.
     state.turn += 1
     state.total_turns += 1
     advance_world(state)

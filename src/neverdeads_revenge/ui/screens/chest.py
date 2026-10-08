@@ -7,6 +7,9 @@ What it shows is the price and nothing else. The reward stays behind the lid
 until it is open -- that is what makes the chest daring rather than arithmetic.
 Shown both, the player would be comparing two numbers and the answer would
 always be the same one.
+
+Three answers, and the third is the interesting one. The price is the same
+either way; what changes is what is bought with it. The blade, or the name.
 """
 
 from __future__ import annotations
@@ -20,12 +23,19 @@ from textual.widgets import Static
 __all__ = ["ChestScreen"]
 
 
-class ChestScreen(ModalScreen[bool]):
-    """Ask before opening. Returns ``True`` to go ahead."""
+#: What the dialog can come back with. ``None`` is walking away, which costs
+#: nothing -- and is why it is not one of these.
+OPEN = "open"
+FAME = "fame"
+
+
+class ChestScreen(ModalScreen[str | None]):
+    """Ask before opening. Returns ``OPEN``, ``FAME``, or ``None``."""
 
     BINDINGS = [
         Binding("enter", "open_it", "Open"),
         Binding("return", "open_it", "Open"),
+        Binding("f", "take_fame", "Fame"),
         Binding("escape", "leave_it", "Leave"),
         Binding("n", "leave_it", "Leave"),
     ]
@@ -47,11 +57,15 @@ class ChestScreen(ModalScreen[bool]):
             yield Static(
                 "It glows. Whatever is inside is worth having, and it is not "
                 "free.\n\n"
-                f"[bold]{self.price}[/]",
+                f"[bold]{self.price}[/]\n\n"
+                "Pay it and take what is in it. Or pay it and take nothing at "
+                "all -- and the dark will remember your name.",
                 id="chest-body",
             )
             yield Static(
-                "[bold]enter[/]  open it        [bold]escape[/]  walk away",
+                "[bold]enter[/]  open it      "
+                "[bold]f[/]  the curse, for fame      "
+                "[bold]escape[/]  walk away",
                 id="chest-hint",
             )
 
@@ -62,7 +76,14 @@ class ChestScreen(ModalScreen[bool]):
         # prevent.
         if self.app.note_key("enter"):
             return
-        self.dismiss(True)
+        self.dismiss(OPEN)
+
+    def action_take_fame(self) -> None:
+        # Bound rather than handled in ``on_key``, for the same reason enter is:
+        # a key that is bound never reaches ``on_key`` at all.
+        if self.app.note_key("f"):
+            return
+        self.dismiss(FAME)
 
     def action_leave_it(self) -> None:
-        self.dismiss(False)
+        self.dismiss(None)

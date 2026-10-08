@@ -58,12 +58,25 @@ dials are for.
 | --- | --- | --- | --- |
 | nothing bought | 23% | 5% | 5% |
 | every permanent upgrade, a bought blade, a bought coat and a bought amulet | 63% | 50% | 43% |
+| nothing bought, and every chest paid for fame | 0% | 0% | 0% |
 
 Sixty seeds a hero, so a hundred and eighty runs a row. Of the runs with nothing
 bought, thirty-five reached floor 10 and eighteen never got past floor 3. That is
 the shape the wall is meant to have: **floor one is a real fight**, the run climbs
 a gentle curve on top of it, and the shop is the difference between the two rows
 of that table -- it turns one run in five into two runs in three.
+
+That last row is the bot walking to every chest on the floor and taking the
+promise instead of the blade, forty seeds a hero. It escapes *never*: it takes
+about two curses a run and dies on floor three, and the depth it loses is worth
+far more than the multiplier it gains. Which is the shape the wager should have
+-- but it is also the one line in this table that says nothing about a good
+player, because the bot is deliberately unimaginative and taking a curse for
+fame is exactly the judgement it does not make. Run the same bot taking fame only
+when a chest happens to be underfoot and it takes it sixteen times in a hundred
+and twenty runs, which is too few to measure. The upside is real -- the best run
+in that sample scored 14076 against 11058 without -- and whether the risk is
+worth it is a question for a player.
 
 The per-hero column is the noisy part, and worth reading as a direction rather
 than a number: at sixty seeds a swing of three runs is one standard deviation.
@@ -162,23 +175,45 @@ sidebar gets cramped below about 30 rows.
 
 ## Scoring
 
-A run is scored on three things, and walking is not one of them:
+A run is scored on four things, and walking is not one of them:
 
 ```
 floors cleared x 250                        how far you got
++ kills x 30, scaled by depth               what you fought through
 + speed bonus                               how quickly you got there
 + 5000 if you got out alive                 the only ending that really counts
 ```
 
-Killing things is not in there. It pays in coin instead, and the two are kept
-apart on purpose: the score is a record of the run, the purse is what the run was
-worth to you afterwards. Running them together made every fight worth points
-whether or not it was worth fighting.
+...and then the whole thing is multiplied, by two things that are each a wager
+against the other currency:
 
-The two currencies are also set against each other on purpose. The nameless run
-halves the score and doubles the coin, and the pilgrim's toll charges for every
-floor down while paying better for what you find there. A run is allowed to be
-about one or the other.
+| | |
+| --- | --- |
+| the nameless run | halves the score, and pays double the coin |
+| a promise of fame | +20% each, and pays in nothing but the score |
+
+**A kill is worth less than the fight costs in time**, and that is the whole
+balance of it. A fight is five to nine player turns -- an approach and the blows;
+the enemy's own turns cost the player nothing -- and a turn is worth ten points
+of the speed bonus under budget, so the cheapest fight costs fifty. At thirty a
+kill, killing is still score-*negative*: the score goes on rewarding leaving
+early, the purse goes on rewarding the fight, and the decision between them stays
+a decision. A kill worth more than it costs turns the game into a floor-sweeper
+and the speed bonus into a rounding error.
+
+**A promise of fame** is the third answer to a chest. The price is the same
+either way; what changes is what is bought with it. Take the blade behind the
+lid, or leave it and take the name -- a bigger score at the end of the run. It
+has no ceiling and does not need one: a chest is only ever placed for a curse the
+player has *not* already paid, so the six curses are the ceiling. Six promises is
+2.2x, and six curses at once is WITHER, BLEED, FRAIL, HEAVY, DIM and FAMINE
+together, which is very nearly a death sentence. A spring can free a curse for
+another promise, at forty coin and a detour.
+
+The two currencies are set against each other on purpose, in both directions. The
+nameless run halves the score and doubles the coin; fame raises the score and
+pays in nothing at all, because the score *is* the board and the board is the only
+fame there is.
 
 The speed bonus is `(80 x floors cleared) - turns`, times ten, and never below
 zero. Eighty turns a floor is the budget; across 144 bot runs the median floor

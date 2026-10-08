@@ -32,7 +32,7 @@ from ..widgets.legend import Legend
 from ..widgets.map_view import MapView
 from ..widgets.message_log import MessageLog
 from .character import CharacterScreen
-from .chest import ChestScreen
+from .chest import OPEN, ChestScreen
 from .game_over import GameOverScreen
 from .inventory import InventoryScreen
 from .name_entry import NameEntryScreen
@@ -295,12 +295,17 @@ class GameScreen(Screen[None]):
         if name:
             self.app.sfx.play(name)
 
-    def _chest_answer(self, open_it: bool | None) -> None:
-        """Act on the answer. Walking away costs nothing at all."""
-        if not open_it or self.state is None:
+    def _chest_answer(self, answer: str | None) -> None:
+        """Act on the answer. Walking away costs nothing at all.
+
+        The price is the same either way; what changes is what is bought with
+        it -- the blade behind the lid, or the name at the end of the run.
+        """
+        if not answer or self.state is None:
             return
         self._play("chest")
-        result = perform_action(self.state, Action.OPEN_CHEST)
+        action = Action.OPEN_CHEST if answer == OPEN else Action.TAKE_FAME
+        result = perform_action(self.state, action)
         self._refresh_all()
         if result.died or result.escaped:
             self._game_over(won=result.escaped)
@@ -315,6 +320,12 @@ class GameScreen(Screen[None]):
         else:
             summary.append(f"Floor reached  {state.depth}\n", style="bold cyan")
         summary.append(f"Monsters slain  {state.kills}\n")
+        # The score has four parts now, so the summary names them all: a number
+        # nobody can break down is a number nobody can play for.
+        summary.append(
+            f"Kill score      {state.kill_score}\n",
+            style="bold white" if state.kill_score else "dim",
+        )
         summary.append(f"Level reached   {state.level}\n")
         # The purse, not the total picked up: a spring costs forty and the toll
         # five a floor, and both come out of it before this line is written. It
@@ -329,6 +340,12 @@ class GameScreen(Screen[None]):
             f"Speed bonus     {state.speed_bonus:+d}\n",
             style="bold green" if state.speed_bonus else "dim",
         )
+        if state.fame:
+            summary.append(
+                f"Fame            {state.fame}  "
+                f"(the run is worth {state.score_multiplier:.2f}x)\n",
+                style="bold green",
+            )
         summary.append(f"Score           {state.score}\n")
         if won:
             # The prologue opened by telling the player death was not granted to

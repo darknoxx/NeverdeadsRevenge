@@ -34,6 +34,7 @@ from .actors import (
 )
 from .combat import apply_revenge
 from .curses import CURSES, Curse
+from .difficulty import potency
 from .npcs import NPCS, Npc, npc_by_key
 from .shop import META_UPGRADES, Loadout
 
@@ -44,6 +45,8 @@ __all__ = [
     "GameState",
     "VIEW_RADIUS",
     "ESCAPE_BONUS",
+    "KILL_SCORE",
+    "FAME_PER_CHEST",
     "TURN_BUDGET_PER_FLOOR",
     "SPEED_BONUS_PER_TURN",
     "CLEANSE_COST",
@@ -62,6 +65,32 @@ ESCAPE_BONUS = 5000
 #: while still going to zero for a slow one. A budget nobody beats is
 #: decoration; one everybody beats is noise.
 TURN_BUDGET_PER_FLOOR = 80
+
+#: Points a kill is worth, before depth scaling.
+#:
+#: Deliberately *less than a fight costs in time*. A fight is five to nine
+#: player turns -- an approach and the blows; the enemy's own turns cost the
+#: player nothing -- and a turn is worth ten points under budget, so a fight
+#: costs fifty to ninety. Thirty keeps killing score-*negative*: the score goes
+#: on rewarding leaving early and the purse goes on rewarding the fight, and the
+#: decision between them stays a decision.
+#:
+#: A kill worth more than it costs in time turns the game into a floor-sweeper
+#: and the speed bonus into a rounding error.
+KILL_SCORE = 30
+
+#: What one promise of fame is worth, added to the score multiplier.
+#:
+#: Added rather than multiplied. A fifth each sounds small, but six of them
+#: multiplied is two and a half times and the top of the board stops being about
+#: the run at all.
+#:
+#: There is no ceiling, and there does not need to be one: a chest is only ever
+#: placed for a curse the player has *not* already paid, so the six curses are
+#: the ceiling. Six promises is 2.2x -- and six curses at once is WITHER, BLEED,
+#: FRAIL, HEAVY, DIM and FAMINE together, which is very nearly a death sentence.
+#: A spring can free a curse for another promise, at forty coin and a detour.
+FAME_PER_CHEST = 0.20
 
 #: Points per turn saved against that budget.
 #:
@@ -150,6 +179,11 @@ class GameState:
     #: which is why it is kept apart from the score: one is a record of the run,
     #: the other is what the run was worth to you afterwards.
     gold: int = 0
+    #: Promises of fame taken at chests. Each one is a curse paid for a bigger
+    #: score rather than for the loot behind the lid, and each one raises what
+    #: the whole run is worth. Kept as a count rather than as a multiplier so the
+    #: summary can say how many promises it was.
+    fame: int = 0
     #: Cells a blow landed on since the player's last action, for the map to
     #: flash. A UI-facing field like ``log``, and here for the same reason: the
     #: domain knows where a blow landed and the map is the only thing that can
@@ -335,10 +369,14 @@ class GameState:
     def score_multiplier(self) -> float:
         """What the run is worth on the board.
 
-        The nameless run halves it and pays in coin instead, which is the two
-        currencies of this game set against each other on purpose.
+        Two things move it and both are a wager against the other currency: the
+        nameless run halves it and pays in coin, and a promise of fame raises it
+        and pays in nothing at all -- the fame *is* the score, and the score is
+        the board.
         """
-        return 0.5 if self.has_wild("nameless_run") else 1.0
+        return (1.0 + self.fame_bonus) * (
+            0.5 if self.has_wild("nameless_run") else 1.0
+        )
 
     @property
     def coin_factor(self) -> float:
@@ -638,6 +676,22 @@ class GameState:
         return self.floors_cleared * 250
 
     @property
+    def kill_score(self) -> int:
+        """Points for what the run killed.
+
+        Scaled by depth the way a coin is, so a deep floor is worth the risk.
+        Derived from the kill count and the depth rather than accumulated, so
+        the summary can be checked by hand and nothing can drift -- which is the
+        same reason the level is derived from the kills.
+        """
+        return round(self.kills * KILL_SCORE * potency(self.depth))
+
+    @property
+    def fame_bonus(self) -> float:
+        """What the promises add to the score multiplier. Zero for most runs."""
+        return self.fame * FAME_PER_CHEST
+
+    @property
     def speed_bonus(self) -> int:
         """Points for getting through the floors quickly.
 
@@ -663,9 +717,8 @@ class GameState:
         escape below a run that died on floor ten one step from the rift.
         """
         escape = ESCAPE_BONUS if self.run_state is RunState.ESCAPED else 0
-        return round(
-            (self.base_score + self.speed_bonus + escape) * self.score_multiplier
-        )
+        total = self.base_score + self.speed_bonus + self.kill_score + escape
+        return round(total * self.score_multiplier)
 
 
 def start_run(

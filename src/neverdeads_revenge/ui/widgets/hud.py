@@ -166,7 +166,13 @@ class Hud(Static):
         out.append(f"Floor {state.depth}", style="bold cyan")
         out.append(f"/{ESCAPE_DEPTH}", style="dim cyan")
         out.append("  Score ", style="dim")
-        out.append(f"{state.score}\n", style="bold white")
+        out.append(f"{state.score}", style="bold white")
+        if state.fame:
+            # A promise of fame is invisible otherwise: the number it moves is
+            # the one at the end of the run, and the player has to be able to
+            # watch it move.
+            out.append(f"  x{state.score_multiplier:.2f}", style="bold green")
+        out.append("\n")
         if state.at_the_rift:
             out.append("The rift hums.\n", style="bold bright_cyan")
 

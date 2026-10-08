@@ -188,6 +188,7 @@ def dump(state: GameState) -> dict:
         "inventory": [_encode(item) for item in state.inventory],
         "curses": [_encode(curse) for curse in state.curses],
         "gold": state.gold,
+        "fame": state.fame,
         "sight_bonus": state.sight_bonus,
         "coin_multiplier": state.coin_multiplier,
         "enemy_hp_multiplier": state.enemy_hp_multiplier,
@@ -244,6 +245,10 @@ def load(payload: dict) -> GameState:
         state.inventory = [_decode(item) for item in payload["inventory"]]
         state.curses = [_decode(curse) for curse in payload["curses"]]
         state.gold = payload["gold"]
+        # ``get`` rather than ``[]``, and the version is not bumped for it: a
+        # promise of fame is a count that starts at nothing, so a run saved
+        # before there was such a thing still resumes -- it simply has none.
+        state.fame = payload.get("fame", 0)
         state.sight_bonus = payload["sight_bonus"]
         state.coin_multiplier = payload["coin_multiplier"]
         state.enemy_hp_multiplier = payload["enemy_hp_multiplier"]

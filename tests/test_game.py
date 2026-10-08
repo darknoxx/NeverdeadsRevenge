@@ -989,24 +989,42 @@ def test_no_actions_are_accepted_after_death():
     assert state.turn == before
 
 
-def test_score_rewards_depth_and_not_kills():
-    """Killing pays in coin now, so the score is about how far and how fast.
+def test_a_kill_is_worth_less_than_the_time_it_costs():
+    """Killing pays score now -- but not enough to make farming the best line.
 
-    Running them together made every fight worth points whether or not it was
-    worth fighting; the purse is the thing that should reward a fight.
+    A fight is five to nine player turns and a turn is worth ten points under
+    budget, so the cheapest fight costs fifty points of speed bonus. A kill has
+    to be worth less than that or the game becomes a floor-sweeper and the speed
+    bonus a rounding error, and the decision between fighting and leaving stops
+    being a decision.
+
+    This is the whole balance of the change, so it is the test that states it.
     """
+    from neverdeads_revenge.game.state import KILL_SCORE, SPEED_BONUS_PER_TURN
+
     state = start_run(NOXX, seed=6)
     assert state.score == 0
 
-    state.floors_cleared = 2
-    # Spend the whole turn budget, so this is testing the base and nothing else.
-    state.total_turns = TURN_BUDGET_PER_FLOOR * state.floors_cleared
-    without_kills = state.base_score
+    state.depth = 1  # potency 1, so a kill is worth exactly KILL_SCORE
+    state.kills = 1
+    cheapest_fight = 5 * SPEED_BONUS_PER_TURN
 
-    state.kills = 30
-    assert state.base_score == without_kills, "kills moved the score"
-    assert state.base_score == 2 * 250
-    assert state.speed_bonus == 0
+    assert state.kill_score == KILL_SCORE
+    assert state.kill_score < cheapest_fight, (
+        "a kill pays more than the cheapest fight costs in time"
+    )
+
+
+def test_a_deep_kill_is_worth_more_than_a_shallow_one():
+    """Scaled by depth the way a coin is, so the deep floor is worth the risk."""
+    shallow = start_run(NOXX, seed=6)
+    deep = start_run(NOXX, seed=6)
+    for state in (shallow, deep):
+        state.kills = 10
+    shallow.depth = 1
+    deep.depth = 10
+
+    assert deep.kill_score > shallow.kill_score
 
 
 def test_score_rewards_speed():
@@ -1908,13 +1926,22 @@ def test_a_kill_leaves_coins_where_the_monster_fell():
     assert low <= dropped.gold <= high
 
 
-def test_killing_does_not_pay_score():
-    """The two clocks are separate: one is a record, the other is a purse."""
+def test_killing_pays_score_and_the_base_is_still_depth():
+    """The two clocks are separate, and they now overlap by a little.
+
+    ``base_score`` is depth and only depth -- a kill does not move it -- but the
+    run's score has a kill term of its own. The purse is still what rewards a
+    fight; the score only acknowledges that one happened.
+    """
     state = start_run(NOXX, seed=3)
-    before = state.base_score
+    before_base = state.base_score
+    before_kill = state.kill_score
+
     _kill_one(state)
-    assert state.base_score == before
+
+    assert state.base_score == before_base, "a kill moved the depth score"
     assert state.kills == 1
+    assert state.kill_score > before_kill, "a kill paid nothing at all"
 
 
 def test_picking_coins_up_adds_them_to_the_purse():
@@ -2307,3 +2334,101 @@ def test_the_mirror_marks_what_it_strikes_back():
             break
 
     assert ghoul.position in state.hits, "the reflection did not flash"
+
+
+# -- promises of fame ---------------------------------------------------------
+def test_a_promise_of_fame_raises_what_the_run_is_worth():
+    """The third answer to a chest: the price is the same, the reward is later."""
+    from neverdeads_revenge.game.state import FAME_PER_CHEST
+
+    state = start_run(NOXX, seed=3)
+    assert state.fame == 0
+    assert state.score_multiplier == 1.0
+
+    state.fame = 3
+    assert state.fame_bonus == pytest.approx(3 * FAME_PER_CHEST)
+    assert state.score_multiplier == pytest.approx(1 + 3 * FAME_PER_CHEST)
+
+
+def test_fame_is_added_and_not_multiplied():
+    """A fifth each sounds small; six of them multiplied is two and a half times.
+
+    There is no ceiling on it and none is needed -- a chest is only ever placed
+    for a curse the player has not paid, so the six curses are the ceiling.
+    """
+    state = start_run(NOXX, seed=3)
+    state.fame = 2
+    doubled = state.score_multiplier
+
+    state.fame = 4
+    assert state.score_multiplier == pytest.approx(2 * doubled - 1), (
+        "fame compounded instead of adding"
+    )
+
+
+def test_fame_multiplies_the_escape_bonus_too():
+    """Everything, or the summary has to explain what exactly it multiplies."""
+    state = start_run(NOXX, seed=3)
+    state.floors_cleared = 9
+    state.run_state = RunState.ESCAPED
+    state.total_turns = TURN_BUDGET_PER_FLOOR * 9
+    plain = state.score
+
+    state.fame = 1
+    assert state.score > plain
+    assert state.score == round(plain * state.score_multiplier)
+
+
+def test_fame_and_the_nameless_run_are_both_wagers():
+    """One halves the score and pays in coin; the other raises it and pays in
+    nothing at all. They stack, because a player can take both."""
+    state = start_run(NOXX, seed=3)
+    state.fame = 2
+    with_fame = state.score_multiplier
+
+    state.wilds.add("nameless_run")
+    assert state.score_multiplier == pytest.approx(with_fame * 0.5)
+
+
+def test_taking_fame_pays_the_price_and_leaves_the_reward():
+    """The curse is taken, the loot is not, and the name goes on the run."""
+    from neverdeads_revenge.world.items import ITEMS, make_chest
+
+    state = start_run(NOXX, seed=1)
+    _put_a_chest(state, curse="dim", contents="edge")
+
+    result = perform_action(state, Action.TAKE_FAME)
+
+    assert result.consumed_turn, "a bargain that lands costs a turn"
+    assert [c.key for c in state.curses] == ["dim"], "the price was not paid"
+    assert state.player.equipment == {}, "the reward was taken as well"
+    assert state.fame == 1
+    assert state.dungeon_map.item_at(state.player.position) is None, "the chest stayed"
+
+
+def test_taking_fame_from_nothing_does_nothing():
+    state = start_run(NOXX, seed=1)
+    state.player.position = next(
+        pos
+        for pos in state.dungeon_map.floor_positions()
+        if state.dungeon_map.item_at(pos) is None
+    )
+
+    result = perform_action(state, Action.TAKE_FAME)
+
+    assert not result.acted
+    assert state.fame == 0
+
+
+def test_fame_survives_a_save_and_an_old_save_does_not_have_it():
+    """A promise is a count, so a run saved before there was such a thing still
+    resumes -- it simply has none, and the schema version does not move."""
+    from neverdeads_revenge.game.savegame import dump, load
+
+    state = start_run(NOXX, seed=3)
+    state.fame = 4
+    assert load(dump(state)).fame == 4
+
+    payload = dump(state)
+    payload.pop("fame")
+    assert load(payload).fame == 0

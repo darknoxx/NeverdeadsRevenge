@@ -69,6 +69,8 @@ class Run:
     kills: int = 0
     turns: int = 0
     gold: int = 0
+    score: int = 0
+    fame: int = 0
     level: int = 1
     curses: int = 0
     cleansed: int = 0
@@ -123,8 +125,20 @@ def _bfs_step(state, goals) -> tuple[int, int] | None:
     return None
 
 
-def play(seed: int, hero: str = "noxx", loadout: Loadout | None = None) -> Run:
-    """Play one run to its end and report what happened."""
+def play(
+    seed: int,
+    hero: str = "noxx",
+    loadout: Loadout | None = None,
+    fame: bool = False,
+) -> Run:
+    """Play one run to its end and report what happened.
+
+    ``fame`` turns the bot into a *score* player for one axis: it walks to chests
+    and pays every price for the promise instead of for the blade. That is not
+    the ordinary bot -- the ordinary bot is deliberately unimaginative -- but it
+    is the only way to measure what the wager costs, and a wager nobody can
+    measure is a guess.
+    """
     state = start_run(HEROES[hero], seed=seed, loadout=loadout)
     run = Run(hero=hero, seed=seed)
     idle = 0
@@ -151,7 +165,7 @@ def play(seed: int, hero: str = "noxx", loadout: Loadout | None = None) -> Run:
             continue
 
         if on_chest and healthy:
-            action = Action.OPEN_CHEST
+            action = Action.TAKE_FAME if fame else Action.OPEN_CHEST
         elif beside is not None:
             action = _towards(state, beside.position)
         elif standing_on is not None and not on_chest:
@@ -161,6 +175,9 @@ def play(seed: int, hero: str = "noxx", loadout: Loadout | None = None) -> Run:
         elif state.on_exit:
             action = Action.DESCEND
         else:
+            # Deliberately *not* seeking chests even in fame mode: walking to
+            # one costs turns and depth, and a measurement that mixes the
+            # detour with the curse measures neither.
             action = _explore(state, can_afford_a_wash)
 
         perform_action(state, action)
@@ -171,15 +188,24 @@ def play(seed: int, hero: str = "noxx", loadout: Loadout | None = None) -> Run:
     run.kills = state.kills
     run.turns = state.total_turns
     run.gold = state.gold
+    run.score = state.score
+    run.fame = state.fame
     run.level = state.level
     run.curses = len(state.curses)
     run.escaped = state.run_state is RunState.ESCAPED
     return run
 
 
-def _explore(state, can_afford_a_wash: bool) -> Action:
+def _explore(state, can_afford_a_wash: bool, seek_chests: bool = False) -> Action:
     """Walk towards whatever is worth walking to, or towards the exit."""
     targets: list[tuple[int, int]] = []
+
+    if seek_chests:
+        targets += [
+            pos
+            for pos, item in state.dungeon_map.items.items()
+            if item.kind == "chest"
+        ]
 
     if state.curses and can_afford_a_wash and state.spring_pos is not None:
         targets.append(state.spring_pos)
@@ -226,8 +252,13 @@ class Report:
         return sum(run.escaped for run in self.runs) / len(self.runs)
 
     def __str__(self) -> str:
-        return (
-            f"{self.label:26} "
+        """Two lines: how the runs went, and what they were worth.
+
+        Split rather than run together because the score is now four things
+        added up and multiplied, and a line of eleven numbers is a line nobody
+        reads.
+        """
+        survival = (
             f"escaped {sum(r.escaped for r in self.runs):2}/{len(self.runs)} "
             f"({self.escaped:4.0%})  "
             f"depth mean {statistics.mean(r.depth for r in self.runs):5.2f} "
@@ -236,13 +267,27 @@ class Report:
             f"gold {statistics.mean(r.gold for r in self.runs):5.1f}  "
             f"washed {sum(r.cleansed for r in self.runs):3}"
         )
+        scoring = (
+            f"kills {statistics.mean(r.kills for r in self.runs):5.1f}  "
+            f"turns {statistics.mean(r.turns for r in self.runs):6.1f}  "
+            f"score {statistics.mean(r.score for r in self.runs):6.0f}  "
+            f"best {max(r.score for r in self.runs):6}  "
+            f"fame taken {sum(r.fame for r in self.runs):3}"
+        )
+        return f"{self.label:26} {survival}\n{'':26} {scoring}"
 
 
-def batch(heroes, seeds: int, loadout: Loadout | None = None, label: str = "") -> list[Run]:
+def batch(
+    heroes,
+    seeds: int,
+    loadout: Loadout | None = None,
+    label: str = "",
+    fame: bool = False,
+) -> list[Run]:
     """Play ``seeds`` runs a hero and report them."""
     runs: list[Run] = []
     for hero in heroes:
-        hero_runs = [play(seed, hero, loadout) for seed in range(seeds)]
+        hero_runs = [play(seed, hero, loadout, fame=fame) for seed in range(seeds)]
         runs += hero_runs
         name = f"{hero}{label}"
         print(Report(name, hero_runs))
@@ -259,6 +304,11 @@ def main(argv: list[str] | None = None) -> int:
         default="none",
         help="what the shop has already sold the bot",
     )
+    parser.add_argument(
+        "--fame",
+        action="store_true",
+        help="pay every chest's price for the promise instead of the blade",
+    )
     args = parser.parse_args(argv)
 
     heroes = args.hero or list(HEROES)
@@ -267,8 +317,11 @@ def main(argv: list[str] | None = None) -> int:
             parser.error(f"no hero called {hero!r}; try one of {', '.join(HEROES)}")
 
     loadout = FULL if args.loadout == "full" else None
-    print(f"{args.seeds} seeds a hero, loadout: {args.loadout}\n")
-    runs = batch(heroes, args.seeds, loadout)
+    print(
+        f"{args.seeds} seeds a hero, loadout: {args.loadout}"
+        f"{', every chest taken for fame' if args.fame else ''}\n"
+    )
+    runs = batch(heroes, args.seeds, loadout, fame=args.fame)
 
     print()
     depths = Counter(run.depth for run in runs)

@@ -669,6 +669,55 @@ async def test_saying_yes_opens_the_chest():
         assert state.sight_radius == 5, "the price was not paid"
 
 
+async def test_the_chest_offers_the_name_as_well_as_the_blade():
+    """Three answers, and the player has to be able to see that there are three.
+
+    The price is the same either way; what changes is what is bought with it.
+    A third option nobody can find is not an option.
+    """
+    from neverdeads_revenge.ui.screens.chest import ChestScreen
+    from neverdeads_revenge.world.items import ITEMS, make_chest
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        state.dungeon_map.add_item(state.player.position, make_chest("dim", ITEMS["warden"]))
+
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, ChestScreen)
+
+        body = str(app.screen.query_one("#chest-body").render()).lower()
+        hint = str(app.screen.query_one("#chest-hint").render()).lower()
+        assert "name" in body, "the third answer is never offered"
+        assert "fame" in hint, "the key for it is never shown"
+
+
+async def test_f_takes_the_curse_for_fame():
+    """The third answer: the price is paid, the blade stays behind the lid."""
+    from neverdeads_revenge.ui.screens.chest import ChestScreen
+    from neverdeads_revenge.world.items import ITEMS, make_chest
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        state = screen.state
+        state.dungeon_map.add_item(state.player.position, make_chest("dim", ITEMS["warden"]))
+
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, ChestScreen)
+
+        await pilot.press("f")
+        await pilot.pause()
+
+        assert isinstance(app.screen, GameScreen)
+        assert [c.key for c in state.curses] == ["dim"], "the price was not paid"
+        assert state.fame == 1
+        assert state.player.equipment == {}, "the blade came with it"
+
+
 async def test_walking_away_costs_nothing():
     """Declining has to be free, or it is not a choice."""
     from neverdeads_revenge.world.items import ITEMS, make_chest

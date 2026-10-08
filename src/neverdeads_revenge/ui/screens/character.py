@@ -98,6 +98,12 @@ class CharacterScreen(ModalScreen[None]):
                 f"{chance_against(0, player.evasion):.0%}",
             ),
             _row("armour", f"{player.armor}"),
+            *(
+                [_row("fame", f"{state.fame}   this run is worth "
+                              f"{state.score_multiplier:.2f}x")]
+                if state.fame
+                else []
+            ),
             _row("revenge", _revenge_line(state)),
             "",
         ]
