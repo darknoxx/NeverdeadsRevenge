@@ -260,3 +260,83 @@ async def test_the_keys_scroll_the_book_without_anything_being_focused():
         await pilot.pause()
 
         assert scroll.scroll_y > before, "the arrows do nothing"
+
+
+async def test_a_page_opens_the_moment_it_is_picked_up():
+    """A page that went silently into a book the player has not opened yet would
+    be a collectible nobody read -- and the message log is no place for it,
+    because a line there scrolls away in four turns."""
+    from neverdeads_revenge.ui.app import NeverdeadsRevenge
+    from neverdeads_revenge.ui.screens.game import GameScreen
+    from neverdeads_revenge.ui.screens.page import PageScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=(100, 34)) as pilot:
+        app.progress.pages.clear()
+        app.push_screen(GameScreen("noxx", seed=3, pages=(9,)))
+        await pilot.pause()
+        state = app.screen.state
+
+        for pos, item in list(state.dungeon_map.items.items()):
+            if item.kind == "page":
+                state.player.position = pos
+                break
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert isinstance(app.screen, PageScreen), "the page did not open"
+        assert page(9)[:50] in str(app.screen.query_one("#page-body").render())
+
+
+async def test_closing_the_page_leaves_the_run_where_it_was():
+    """It asks nothing. The page is already in the book by the time it is shown,
+    so there is nothing to lose by closing it early."""
+    from neverdeads_revenge.ui.app import NeverdeadsRevenge
+    from neverdeads_revenge.ui.screens.game import GameScreen
+    from neverdeads_revenge.ui.screens.page import PageScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=(100, 34)) as pilot:
+        app.progress.pages.clear()
+        app.push_screen(GameScreen("noxx", seed=3, pages=(9,)))
+        await pilot.pause()
+        screen = app.screen
+        state = screen.state
+
+        for pos, item in list(state.dungeon_map.items.items()):
+            if item.kind == "page":
+                state.player.position = pos
+                break
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, PageScreen)
+
+        await pilot.press("space")
+        await pilot.pause()
+
+        assert app.screen is screen, "closing the page did not come back to the run"
+        assert app.progress.pages == [9], "the page was not kept"
+
+
+async def test_a_page_already_in_the_book_does_not_open_itself_again():
+    """A run picked up from a save has its pages already filed, and it stays
+    quiet about them -- the screen is gated on the page being *new*."""
+    from neverdeads_revenge.ui.app import NeverdeadsRevenge
+    from neverdeads_revenge.ui.screens.game import GameScreen
+    from neverdeads_revenge.ui.screens.page import PageScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=(100, 34)) as pilot:
+        app.progress.pages = [9]
+        app.push_screen(GameScreen("noxx", seed=3, pages=(9,)))
+        await pilot.pause()
+        state = app.screen.state
+
+        for pos, item in list(state.dungeon_map.items.items()):
+            if item.kind == "page":
+                state.player.position = pos
+                break
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert not isinstance(app.screen, PageScreen), "a known page opened again"

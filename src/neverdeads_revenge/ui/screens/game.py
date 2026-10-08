@@ -23,6 +23,7 @@ from textual.widgets import Footer
 from ...core.direction import Direction
 from ...game.actions import Action, perform_action
 from ...game.actors import HEROES
+from ...game.lore import page
 from ...game.shop import Loadout
 from ...game.prologue import GOAL_HINT, terrain_help
 from ...game.state import GameState, start_run
@@ -37,6 +38,7 @@ from .game_over import REWIND, GameOverScreen
 from .inventory import InventoryScreen
 from .name_entry import NameEntryScreen
 from .npc import NpcScreen
+from .page import PageScreen
 from .pause import PauseScreen
 from .spring import SpringScreen
 
@@ -308,21 +310,37 @@ class GameScreen(Screen[None]):
             self.app.sfx.play(name)
 
     def _file_pages(self) -> None:
-        """Put whatever the run has found into the book, at once.
+        """Put whatever the run has found into the book -- and open it.
 
         At once rather than at the end of the run, and that is a decision worth
         writing down: gold is banked when a run ends because gold is a *price*,
         and a run that dies still spent it. A page is knowledge -- a player who
         dies on the next step should not have to find the same page again.
 
-        ``record_page`` answers whether the page was new, so this is safe to run
-        over the whole list every time; it is a handful of numbers.
+        The screen is the other half of that. A page that went silently into a
+        book the player has not opened yet is a collectible nobody read, so the
+        game stops and shows it, the way it stops for a chest: this is prose, and
+        prose in the message log scrolls away in four turns.
+
+        ``record_page`` answers whether the page was new, which is what makes
+        this safe to run over the whole list every time *and* what keeps the
+        screen from appearing twice -- a run picked up from a save has its pages
+        already in the book, and it stays quiet about them.
         """
         assert self.state is not None
         for number in self.state.found_pages:
-            if self.app.progress.record_page(number):
-                self._play("item")
-                self.app.save_progress()
+            if not self.app.progress.record_page(number):
+                continue
+            self._play("item")
+            self.app.save_progress()
+            text = page(number)
+            if text is None:
+                continue
+            # Armed first: the page was picked up with a key that is still down,
+            # and the screen closes on any key. Without this the page opens and
+            # shuts before a word of it is read.
+            self.app.arm_repeat_filter()
+            self.app.push_screen(PageScreen(number, text))
 
     def _chest_answer(self, answer: str | None) -> None:
         """Act on the answer. Walking away costs nothing at all.

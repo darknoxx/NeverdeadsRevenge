@@ -487,6 +487,53 @@ NpcScreen {
     color: #6b6b6b;
 }
 
+/* -- a page of the chronicle --------------------------------------------- */
+
+#page {
+    /* Wider than a chest and narrower than the book: this is a page of prose,
+       and prose needs a measure. The max keeps a long fragment -- they run to
+       ninety-seven words -- from running off a short terminal. */
+    width: 76;
+    height: auto;
+    max-height: 90%;
+    padding: 1 2;
+    border: round #8a9ba8;
+    background: $surface;
+}
+
+#page-title {
+    width: 1fr;
+    height: auto;
+    content-align: center middle;
+    text-style: bold;
+    color: #e8e8e0;
+}
+
+#page-subtitle {
+    width: 1fr;
+    height: auto;
+    margin: 0 0 1 0;
+    content-align: center middle;
+    color: #8a9ba8;
+}
+
+#page-body {
+    width: 1fr;
+    height: auto;
+    margin: 1 0 1 0;
+    /* The prologue's prose colour: just off white, so it reads as remembered
+       rather than reported. A page of the chronicle is the same kind of
+       writing, and full-brightness text in a dark panel reads as a form. */
+    color: #c8c8c8;
+}
+
+#page-hint {
+    width: 1fr;
+    height: auto;
+    content-align: center middle;
+    color: #6b6b6b;
+}
+
 /* -- chest --------------------------------------------------------------- */
 
 ChestScreen {

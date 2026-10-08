@@ -564,6 +564,13 @@ should not have to find the same page twice. So the save is written as the page
 is read, mid-run, and a page never appears again — not on the next floor and not
 in the next run either. The generator draws from what is still missing.
 
+**The page opens where it is found.** It stops the run and shows the fragment,
+the way a chest stops it, and for the same reason: the message log is no place
+for prose, because a line there scrolls away in four turns and thirty-seven
+fragments read that way are thirty-seven fragments nobody reads. It asks
+nothing, and any key closes it — the page is in the book by the time you see it,
+so there is nothing to lose by closing it early and nothing to gain by staying.
+
 The `?` on the map is the one mark in the game that is not about the run at all.
 It is deliberately **not in the legend**: the panel is clipped and it is for what
 can kill you and what can keep you alive, and a page is neither. It is also the
