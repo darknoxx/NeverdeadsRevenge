@@ -33,7 +33,7 @@ from ..widgets.map_view import MapView
 from ..widgets.message_log import MessageLog
 from .character import CharacterScreen
 from .chest import OPEN, ChestScreen
-from .game_over import GameOverScreen
+from .game_over import REWIND, GameOverScreen
 from .inventory import InventoryScreen
 from .name_entry import NameEntryScreen
 from .npc import NpcScreen
@@ -69,6 +69,10 @@ KEY_BINDINGS: dict[str, Action] = {
     "space": Action.WAIT,
     "i": Action.INVENTORY,
     "q": Action.QUAFF,
+    # The borrowed hour. Bound always, and does nothing without the gift --
+    # ``perform_action`` refuses it when there is no hour in hand, which is the
+    # same place every other refusal lives.
+    "r": Action.REWIND,
     ">": Action.DESCEND,
     # Enter is the interaction key: it takes what is under the player, or takes
     # the stairs if there is nothing to take. One key for "do the thing here",
@@ -364,9 +368,24 @@ class GameScreen(Screen[None]):
                 score=state.score,
                 won=won,
                 best=best,
+                can_rewind=state.rewind_ready and not won,
             ),
-            lambda _result: self._ask_for_a_name(state),
+            lambda answer: self._after_summary(state, answer),
         )
+
+    def _after_summary(self, state: GameState, answer: str | None) -> None:
+        """The hour, or the name.
+
+        The only way back into a run that has ended, and it is deliberately the
+        *first* thing offered: a player who has just died is looking at the
+        number, not at the hint, and the hour is spent the moment they carry on.
+        """
+        if answer != REWIND:
+            self._ask_for_a_name(state)
+            return
+        self.app.arm_repeat_filter()
+        perform_action(state, Action.REWIND)
+        self._refresh_all()
 
     def _ask_for_a_name(self, state: GameState) -> None:
         """Every run gets a name, win or lose -- both collected points."""

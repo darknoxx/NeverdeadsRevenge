@@ -18,17 +18,31 @@ from textual.widgets import Static
 
 from ..hold import BAR_CELLS, HoldToContinue
 
-__all__ = ["GameOverScreen"]
+__all__ = ["GameOverScreen", "REWIND"]
+
+#: What the dialog comes back with when the player spends a borrowed hour
+#: instead of accepting the ending. A string rather than ``True`` because the
+#: summary already returns ``None`` for "carry on" and a boolean would be the
+#: wrong shape for a third thing.
+REWIND = "rewind"
 
 _FILLED = "#a855f7"
 
 
-class GameOverScreen(ModalScreen[None]):
-    """Run summary. A held enter returns to the title."""
+class GameOverScreen(ModalScreen[str | None]):
+    """Run summary. A held enter returns to the title.
+
+    With a borrowed hour in hand, ``r`` takes the ending back instead -- which is
+    the whole reason the gift exists, and the only moment it can be spent on the
+    mistake there is no other way to unmake.
+    """
 
     # Escape is here for the same reason enter is: it is the key people reach for
     # when they want out, and it goes through the same hold.
-    BINDINGS = [Binding("escape", "close", "Close")]
+    BINDINGS = [
+        Binding("escape", "close", "Close"),
+        Binding("r", "rewind", "Rewind"),
+    ]
 
     DEFAULT_CSS = """
     GameOverScreen {
@@ -45,6 +59,7 @@ class GameOverScreen(ModalScreen[None]):
         score: int,
         won: bool = False,
         best: int = 0,
+        can_rewind: bool = False,
     ) -> None:
         super().__init__()
         self.summary = summary
@@ -52,6 +67,7 @@ class GameOverScreen(ModalScreen[None]):
         self.score = score
         self.won = won
         self.best = best
+        self.can_rewind = can_rewind
         self._hold = HoldToContinue()
 
     def compose(self) -> ComposeResult:
@@ -77,6 +93,13 @@ class GameOverScreen(ModalScreen[None]):
             return
         # Everything else is left alone: ctrl+q still has to work.
 
+    def action_rewind(self) -> None:
+        """Take the ending back. Only offered when there is an hour to spend."""
+        if not self.can_rewind:
+            return
+        self.app.note_key("r")
+        self.dismiss(REWIND)
+
     def action_close(self) -> None:
         """The escape binding is a hold like any other, not an instant exit."""
         self.app.note_key("escape")
@@ -92,7 +115,10 @@ class GameOverScreen(ModalScreen[None]):
     def _hint(self) -> str:
         filled = round(self._hold.progress * BAR_CELLS)
         bar = self._hold.bar()
-        return (
+        hint = (
             "hold [bold]enter[/] to continue   "
             f"[{_FILLED}]{bar[:filled]}[/][#4a4a4a]{bar[filled:]}[/]"
         )
+        if self.can_rewind:
+            hint = "[bold]r[/]  take the hour back      " + hint
+        return hint

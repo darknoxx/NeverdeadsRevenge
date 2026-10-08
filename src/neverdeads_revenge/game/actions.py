@@ -9,6 +9,9 @@ the game without a terminal.
 
 from __future__ import annotations
 
+import copy
+from dataclasses import fields
+
 from dataclasses import dataclass
 from enum import Enum
 
@@ -25,6 +28,7 @@ from neverdeads_revenge.world.tiles import Tile
 from .actors import Actor, ActorKind, make_enemy, pick_enemy_template
 from .combat import apply_revenge, attack
 from .curses import TOUCH_CURSES, CURSES, curse_by_key
+from .gifts import gift_by_key
 from .levels import apply_gain, gains_between, level_for
 from .npcs import npc_by_key
 from .state import GameState, LogKind, RunState
@@ -94,6 +98,10 @@ class Action(Enum):
     #: rather than for the thing behind the lid. Never bound to a key, like
     #: OPEN_CHEST, because it is a third answer to the same question.
     TAKE_FAME = "take_fame"
+    #: Take back the last thing that happened. Only possible with THE BORROWED
+    #: HOUR, and the only verb in the game that may be used after the run is
+    #: over -- undoing a death is the whole of what it is for.
+    REWIND = "rewind"
     #: Wash a curse off in the spring. Like OPEN_CHEST, never bound to a key:
     #: it only happens after the player has been shown the price and said yes.
     CLEANSE = "cleanse"
@@ -342,13 +350,25 @@ def perform_action(state: GameState, action: Action) -> ActionResult:
     Returns whether the action consumed a turn, so the UI knows whether to run
     enemy turns.
     """
-    if state.over:
+    # The borrowed hour is allowed while the run is over, and it is the only
+    # thing that is. Everything else has stopped being possible, because there
+    # is nobody left to do it.
+    if state.over and action is not Action.REWIND:
         return _outcome(state, consumed_turn=False, acted=False)
 
     state.refresh_passives()
     # Everything struck from here on is this action's. Cleared here rather than
     # by the screen, so the flash cannot outlive the turn it belongs to.
     state.hits.clear()
+
+    if action is Action.REWIND:
+        return _rewind(state)
+
+    # The run as it is, taken before anything happens, so the hour has somewhere
+    # to go back to. Only while one is in hand: a deep copy of a floor is not
+    # free, and most runs never take one.
+    if state.rewind_ready:
+        state.snapshot = _snapshot(state)
 
     match action:
         case Action.INTERACT:
@@ -372,49 +392,109 @@ def perform_action(state: GameState, action: Action) -> ActionResult:
 
     if action is Action.WAIT:
         state.say("You wait.", LogKind.PLAIN)
-        acted = True
+        acted, spent = True, True
     else:
-        acted = _try_move(state, action.direction)
+        acted, spent = _try_move(state, action.direction)
 
     if state.over:
-        return _outcome(state, consumed_turn=acted, acted=acted)
+        return _outcome(state, consumed_turn=spent, acted=acted)
 
     # Only a real action advances the clock. Bumping a wall must not tick the
-    # turn counter, or the displayed turn number drifts away from the world.
-    if acted:
+    # turn counter, or the displayed turn number drifts away from the world --
+    # and a step taken for free must not either, which is why the two are not
+    # the same flag.
+    if spent:
         state.turn += 1
         state.total_turns += 1
         advance_world(state)
     state.refresh_vision()
-    return _outcome(state, consumed_turn=acted, acted=acted)
+    return _outcome(state, consumed_turn=spent, acted=acted)
 
 
-def _try_move(state: GameState, direction: Direction) -> bool:
-    """Move or attack in ``direction``. Returns True if a turn was spent."""
+def _try_move(state: GameState, direction: Direction) -> tuple[bool, bool]:
+    """Move or attack in ``direction``.
+
+    Returns ``(acted, spent)``: whether anything happened, and whether the world
+    gets to answer it. They are the same thing for every move but one -- THE STEP
+    BEHIND takes a step for free -- and the distinction has to exist before that
+    gift can: a step that reported "nothing happened" would leave the player
+    standing still on screen.
+    """
     target = direction.step(state.player.position)
     if not state.dungeon_map.in_bounds(target):
-        return False
+        return False, False
 
     blocker = state.actor_at(target)
     if blocker is not None:
         if blocker.is_player:  # cannot happen, but be explicit
-            return False
+            return False, False
         if blocker.kind is ActorKind.NPC:
             # Solid, and not a fight. Saying so beats refusing to move in
             # silence: the player pressed a direction and something has to
             # happen, even if the something is "no, and here is why".
             state.say(f"{blocker.name} is in the way. Press enter to speak.", LogKind.PLAIN)
-            return False
+            return False, False
         _resolve_player_attack(state, blocker)
-        return True
+        return True, True
+
+    # THE LONG REACH. A direction with something hostile one square beyond an
+    # empty square is a blow rather than a step -- and the empty square is the
+    # whole rule: the reach is a reach, not a bow, so stone stops it. Which
+    # makes the gift about corridors and doorways rather than about shooting.
+    #
+    # It costs nothing: the player already spends a turn on the blow, and making
+    # them walk into the monster first would make the reach a decoration.
+    if state.has_gift("long_reach") and state.dungeon_map.is_walkable(target):
+        beyond = direction.step(target)
+        if state.dungeon_map.in_bounds(beyond):
+            far = state.actor_at(beyond)
+            if far is not None and far.kind is ActorKind.ENEMY and far.alive:
+                _resolve_player_attack(state, far)
+                return True, True
 
     if not state.dungeon_map.is_walkable(target):
-        return False
+        # THE HOLLOW ROAD. Anything in bounds that nobody is standing on can be
+        # walked into at a price -- including the void, which is *drawn* as wall,
+        # so that what the player can see is what they can cross. A gift that
+        # only worked on the tiles the map calls wall would be a gift that
+        # visibly refused at every room's edge.
+        if state.has_gift("hollow_road"):
+            return _through_stone(state, target)
+        return False, False
 
     state.player.position = target
     state.player.steps += 1
     _bleed(state)
-    return True
+
+    # THE STEP BEHIND. Every fifth step costs no time at all, which is the one
+    # gift that touches the *score* -- turns are the score -- and therefore the
+    # exact answer to a floor that is going badly.
+    if state.has_gift("step_behind") and state.player.steps % STEP_BEHIND_EVERY == 0:
+        state.say("The step costs you nothing.", LogKind.GOOD)
+        return True, False
+
+    return True, True
+
+
+def _through_stone(state: GameState, target) -> tuple[bool, bool]:
+    """Take a step into something solid, and pay for it.
+
+    It can kill, like the bleed can, and for the same reason: a gift that cannot
+    finish you has no floor, and the whole point of the hollow road is that it
+    makes the wall a *decision*.
+    """
+    state.player.position = target
+    state.player.steps += 1
+    state.player.stats.hp = max(0, state.player.stats.hp - HOLLOW_ROAD_COST)
+    state.say(
+        f"You push through the stone. {HOLLOW_ROAD_COST} of you stays in it.",
+        LogKind.DAMAGE,
+    )
+    if state.player.hp <= 0:
+        state.die("The stone takes the rest of you.")
+        return True, True
+    _bleed(state)
+    return True, True
 
 
 def _bleed(state: GameState) -> None:
@@ -665,7 +745,12 @@ def _open_chest(state: GameState) -> ActionResult:
     elif curse is not None:
         state.add_curse(curse)
 
-    if chest.contents is not None:
+    if chest.gift is not None:
+        state.gifts.add(chest.gift)
+        gift = gift_by_key(chest.gift)
+        if gift is not None:
+            state.say(f"{gift.name}: {gift.blurb}.", LogKind.GOOD)
+    elif chest.contents is not None:
         _equip(state, chest.contents)
 
     # A turn, like a draught, and for the same reason: this is the moment the
@@ -677,6 +762,55 @@ def _open_chest(state: GameState) -> ActionResult:
     advance_world(state)
     state.refresh_vision()
     return _outcome(state, consumed_turn=True, acted=True)
+
+
+def _snapshot(state: GameState) -> dict:
+    """The run as it is, deeply, for the borrowed hour to give back.
+
+    A copy of every field rather than a reference to the state: the point is to
+    put the run back the way it *was*, and a reference to something mutable is a
+    record of where it went rather than of where it started.
+    """
+    return {
+        f.name: copy.deepcopy(getattr(state, f.name))
+        for f in fields(state)
+        if f.name != "snapshot"
+    }
+
+
+def _restore(state: GameState, snapshot: dict) -> None:
+    """Put the run back, in place.
+
+    In place because everything that holds a run holds *this* object -- the
+    screen, the save, the tests -- and handing back a different one would mean
+    every caller had to notice.
+    """
+    for name, value in snapshot.items():
+        setattr(state, name, copy.deepcopy(value))
+
+
+def _rewind(state: GameState) -> ActionResult:
+    """Take back the last thing that happened.
+
+    The one verb that works after the run is over, because undoing a death is
+    the whole of what the gift is for: the hour is borrowed against the mistake
+    there is no other way to unmake.
+
+    It costs no turn -- there is nothing left to give back but the action itself
+    -- and it is spent whether or not the action it undoes was a good one.
+    """
+    if not state.rewind_ready or state.snapshot is None:
+        return ActionResult(consumed_turn=False, acted=False)
+
+    _restore(state, state.snapshot)
+    # Set *after* the restore, which would otherwise put the old flags back.
+    state.rewind_ready = False
+    state.snapshot = None
+    state.say(
+        "The hour is given back. What you did, you did not do.",
+        LogKind.GOOD,
+    )
+    return _outcome(state, consumed_turn=False, acted=True)
 
 
 def _take_fame(state: GameState) -> ActionResult:
@@ -950,6 +1084,17 @@ def _try_descend(state: GameState) -> ActionResult:
 
     return _outcome(state, consumed_turn=False, acted=False)
 
+
+#: How far a blow reaches with THE LONG REACH, in squares. Two, because one is
+#: already every blow -- and the number is written down here rather than inlined
+#: so the gift's blurb and the rule cannot drift apart.
+LONG_REACH = 2
+
+#: Every how many steps THE STEP BEHIND gives away.
+STEP_BEHIND_EVERY = 5
+
+#: What THE HOLLOW ROAD charges for a square of stone.
+HOLLOW_ROAD_COST = 2
 
 #: Public wrapper so the UI can trigger a descent without importing internals.
 def descend(state: GameState) -> ActionResult:

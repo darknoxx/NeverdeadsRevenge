@@ -477,12 +477,26 @@ def make_coin(value: int) -> GroundItem:
     )
 
 
-def make_chest(curse_key: str, contents: ItemTemplate) -> GroundItem:
-    """A locked chest holding ``contents`` and owing ``curse_key``.
+#: How often a chest holds a rule instead of a thing.
+#:
+#: A third. Rarer and the gifts are a rumour; commoner and the loot stops
+#: mattering, which would be a shame -- the blade is half of what a chest is.
+GIFT_CHANCE = 1 / 3
+
+
+def make_chest(
+    curse_key: str,
+    contents: ItemTemplate | None,
+    gift: str | None = None,
+) -> GroundItem:
+    """A locked chest owing ``curse_key``, holding ``contents`` or ``gift``.
 
     Rolled when the floor is built rather than when the lid opens, so a seed
     still determines a whole run: what is in the chest is decided before the
     player has done anything to change the dice.
+
+    A gift and contents are mutually exclusive -- a chest that held both would be
+    two rewards for one price, and the price is the whole design.
     """
     return GroundItem(
         item_id="chest",
@@ -491,7 +505,8 @@ def make_chest(curse_key: str, contents: ItemTemplate) -> GroundItem:
         color=CHEST_COLOR,
         kind="chest",
         curse=curse_key,
-        contents=make_item(contents),
+        contents=make_item(contents) if contents is not None else None,
+        gift=gift,
     )
 
 

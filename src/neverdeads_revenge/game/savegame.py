@@ -196,6 +196,7 @@ def dump(state: GameState) -> dict:
         "shrouded": state.shrouded,
         "ward_ready": state.ward_ready,
         "wilds": _encode(state.wilds),
+        "gifts": _encode(state.gifts),
     }
 
 
@@ -255,7 +256,17 @@ def load(payload: dict) -> GameState:
         state.extra_lives = payload["extra_lives"]
         state.shrouded = payload["shrouded"]
         state.ward_ready = payload["ward_ready"]
-        state.wilds = _decode(payload["wilds"])
+        # ``set`` around both, because ``_decode`` hands back a list and these
+        # are declared as sets -- and ``gifts`` is *added to* when a chest is
+        # opened, so a run loaded from disk would have crashed on the first lid
+        # that held a rule. ``wilds`` only ever gets read, which is why the same
+        # mistake had been sitting there quietly.
+        state.wilds = set(_decode(payload["wilds"]))
+        # Same reasoning as ``fame``: a set that starts empty, so a run saved
+        # before there were gifts still resumes. The borrowed hour is *not*
+        # saved -- a run put down and picked up again has lost it, and that is
+        # the price of putting it down.
+        state.gifts = set(_decode(payload.get("gifts", [])))
     except SaveError:
         raise
     except Exception as exc:  # a corrupt file is a refusal, not a crash

@@ -18,6 +18,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Static
 
 from ...game.combat import chance_against
+from ...game.gifts import gift_by_key
 from ...game.levels import KILLS_PER_LEVEL, MAX_LEVEL
 from ...game.pace import MAX_ACTIONS_PER_SECOND, actions_per_second
 from ...game.shop import describe_item
@@ -123,6 +124,19 @@ class CharacterScreen(ModalScreen[None]):
 
         lines.append("")
         lines.append(_row("carried", _carried(state)))
+
+        if state.gifts:
+            # Given their own block, facing the curses: a gift and a price are
+            # the two halves of the same bargain, and the sheet is where the
+            # player works out what they traded.
+            lines.append("")
+            lines.append("[dim]gifts[/]")
+            for key in sorted(state.gifts):
+                gift = gift_by_key(key)
+                if gift is not None:
+                    lines.append(
+                        f"  [bold green]{gift.name}[/]  [dim]{gift.blurb}[/]"
+                    )
 
         if state.curses:
             # Given their own block rather than a column, because a price is a

@@ -35,6 +35,7 @@ from .actors import (
 from .combat import apply_revenge
 from .curses import CURSES, Curse
 from .difficulty import potency
+from .gifts import GIFTS
 from .npcs import NPCS, Npc, npc_by_key
 from .shop import META_UPGRADES, Loadout
 
@@ -216,6 +217,17 @@ class GameState:
     #: flags, because two of them have to stack. Everything else is a rule that
     #: is either on or off, and a set says that once instead of six booleans.
     wilds: set[str] = field(default_factory=set)
+    #: Which gifts the dungeon has handed over, by key. Run-long like the wilds,
+    #: and for the same reason: a rule that lapsed every floor would be a number.
+    gifts: set[str] = field(default_factory=set)
+    #: Whether the borrowed hour is still unspent on this floor. Set when a floor
+    #: is built, spent by a rewind.
+    rewind_ready: bool = False
+    #: The run as it was before the player's last action, held only while a
+    #: borrowed hour is in hand. Deliberately not saved: a run put down and
+    #: picked up again has simply lost the hour, which is the price of putting it
+    #: down.
+    snapshot: dict | None = None
 
     # -- curses -------------------------------------------------------------
     def add_curse(self, curse: Curse) -> None:
@@ -339,6 +351,21 @@ class GameState:
     def has_passive(self, key: str) -> bool:
         """Whether the worn amulet is this one."""
         return self.amulet == key
+
+    # -- what the dungeon gave back -----------------------------------------
+    def has_gift(self, key: str) -> bool:
+        """Whether the dungeon has handed this gift over."""
+        return key in self.gifts
+
+    @property
+    def unheld_gifts(self) -> tuple[str, ...]:
+        """Every gift this run has not been given, by key.
+
+        Handed to the floor generator the way the unpaid curses are, so a chest
+        can only ever offer something the player does not already have. Two of
+        the same rule is not twice the rule, it is a lid that lied.
+        """
+        return tuple(key for key in GIFTS if key not in self.gifts)
 
     # -- what a wild offer did to the run -----------------------------------
     def has_wild(self, key: str) -> bool:
@@ -492,6 +519,7 @@ class GameState:
             curse_keys=self.unpaid_curses,
             filled_slots=tuple(self.player.equipment) if self.player else (),
             npc_keys=tuple(NPCS),
+            gift_keys=self.unheld_gifts,
         )
         self.dungeon_map = floor.map
 
@@ -524,6 +552,23 @@ class GameState:
         apply_revenge(self.player, 0)
 
         self.arm_amulets()
+
+        # THE BORROWED HOUR. One per floor, and the floor is where it comes
+        # back: an hour that refilled on a timer would be a resource, and this
+        # is meant to be a single held breath.
+        self.rewind_ready = self.has_gift("borrowed_hour")
+        self.snapshot = None
+
+        # THE KIND DARK. One curse lifted on the way down, which is the exact
+        # answer to the price a chest charged -- a bargain with a refund in it.
+        # Skipped on floor one, where there is nothing to give back.
+        if self.depth > 1 and self.has_gift("kind_dark") and self.curses:
+            lifted = self.rng.pick(self.curses)
+            self.remove_curse(lifted)
+            self.say(
+                f"The dark gives one back: {lifted.name} is gone.",
+                LogKind.GOOD,
+            )
 
         self.say(f"You descend to floor {depth}.", LogKind.SYSTEM)
         if floor.is_final:

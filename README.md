@@ -588,6 +588,31 @@ same second curse a sentence on one run and a no-op on the next. Each chest on a
 floor gets a different one, and if you carry every curse there is, the floor has
 no chests at all: better an empty floor than a lid that charges nothing.
 
+**A chest can hold a rule instead of a blade**, and about a third of them do.
+The price is the same; what is behind the lid is a *gift* -- a rule that lasts
+the rest of the run, the way a curse does. A better sword is a bigger number and
+the player already has three slots of those; a gift changes what they can do.
+
+| gift | what it changes |
+| --- | --- |
+| THE LONG REACH | a direction with something hostile one square beyond an empty square is a blow, not a step |
+| THE STEP BEHIND | every fifth step costs no turn at all |
+| THE KIND DARK | every floor you descend lifts one curse |
+| THE HOLLOW ROAD | walk into stone, at two health a square |
+| THE BORROWED HOUR | once a floor, take back the last thing you did -- including a death |
+
+They are meant to be about as good as the curse is bad. Not better: a chest worth
+opening for free would make the price decoration. Not worse: nobody takes the
+bargain twice. The pair is a *trade of shape*, and the run afterwards is played
+differently rather than harder.
+
+The two worth explaining are the reach and the hour. **The reach** is why walking
+into a monster is still how you attack: the gift widens what "into" means rather
+than adding a key, and stone stops it, so it is about corridors and doorways
+rather than about shooting. **The hour** is the only verb in the game that works
+after the run is over, because undoing a death is the whole of what it is for --
+and it is spent whether or not the action it undoes was a good one.
+
 **Springs** (`{`) are the only tile that undoes something instead of doing it.
 Standing in one and pressing `enter` offers to take one curse off you, for coin.
 *Which* curse is the water's decision, not yours — and the water says so when you

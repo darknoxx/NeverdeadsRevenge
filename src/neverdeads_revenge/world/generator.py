@@ -18,6 +18,7 @@ from neverdeads_revenge.core.direction import Pos
 from neverdeads_revenge.core.rng import Rng
 
 from .items import (
+    GIFT_CHANCE,
     chest_count,
     equipment_count,
     loot_count,
@@ -258,6 +259,7 @@ def generate_floor(
     curse_keys: tuple[str, ...] = (),
     filled_slots: tuple[str, ...] = (),
     npc_keys: tuple[str, ...] = (),
+    gift_keys: tuple[str, ...] = (),
 ) -> GeneratedFloor:
     """Build one complete, validated dungeon floor.
 
@@ -328,7 +330,7 @@ def generate_floor(
     # Loot last, and on whatever is still plain floor. Placing it after the decor
     # means an item can never be swallowed by a patch of grass.
     items = _scatter_loot(
-        rng, dungeon_map, candidates, depth, curse_keys, filled_slots
+        rng, dungeon_map, candidates, depth, curse_keys, filled_slots, gift_keys
     )
 
     return GeneratedFloor(
@@ -411,6 +413,7 @@ def _scatter_loot(
     depth: int,
     curse_keys: tuple[str, ...] = (),
     filled_slots: tuple[str, ...] = (),
+    gift_keys: tuple[str, ...] = (),
 ) -> dict[Pos, GroundItem]:
     """Drop the floor's draughts, equipment and chests.
 
@@ -448,13 +451,21 @@ def _scatter_loot(
         # caller hands us ``unpaid`` curses to avoid. Drawing from a shuffled
         # copy keeps the choice random and the *set* distinct.
         keys = rng.shuffled(list(curse_keys))
-        to_place += [
-            make_chest(
-                key,
-                roll_chest_contents(rng, depth, filled_slots),
+        # Gifts are drawn from a separate shuffled pool so two chests on one
+        # floor cannot hand over the same rule -- two of the same rule is not
+        # twice the rule.
+        gifts = rng.shuffled(list(gift_keys))
+        for key in keys[: chest_count(depth)]:
+            holding_a_gift = bool(gifts) and rng.chance(GIFT_CHANCE)
+            to_place.append(
+                make_chest(
+                    key,
+                    None if holding_a_gift else roll_chest_contents(
+                        rng, depth, filled_slots
+                    ),
+                    gift=gifts.pop() if holding_a_gift else None,
+                )
             )
-            for key in keys[: chest_count(depth)]
-        ]
     # And, rarely, the strong tier lying in the open with nothing owed for it.
     # The same two questions are asked of it: what are you missing, and how deep
     # is this.

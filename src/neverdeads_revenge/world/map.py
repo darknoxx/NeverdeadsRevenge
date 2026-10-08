@@ -38,6 +38,9 @@ class GroundItem:
     curse: str | None = None
     #: What is inside a chest. ``None`` for everything else.
     contents: GroundItem | None = None
+    #: A gift a chest holds *instead* of contents, by key. Like ``curse``, a
+    #: string: the world places the bargain and ``game/`` knows what it means.
+    gift: str | None = None
     #: Coins in a pile. Zero for everything that is not a coin.
     gold: int = 0
     #: Which amulet ability this grants, by key. Like ``curse``, a string: the

@@ -173,6 +173,11 @@ class Hud(Static):
             # watch it move.
             out.append(f"  x{state.score_multiplier:.2f}", style="bold green")
         out.append("\n")
+        if state.rewind_ready:
+            # Only the one gift earns a line here: it is the only one with a key
+            # of its own, and a line the player cannot act on is a line that
+            # pushes the legend off the sidebar.
+            out.append("r take the hour back\n", style="bold green")
         if state.at_the_rift:
             out.append("The rift hums.\n", style="bold bright_cyan")
 
