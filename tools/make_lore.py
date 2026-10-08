@@ -3,7 +3,7 @@
 
 The lore is one long text and the game needs it in fragments: pages a player
 finds one at a time, anywhere, in any order, and which assemble into the whole
-book on a shelf in the menu. So the cutting is a program -- the same idea as
+book in the menu. So the cutting is a program -- the same idea as
 ``make_art.py`` and ``make_font.py``, and for the same reason: a split that can
 be re-run is a split that can be re-tuned, and the alternative is editing
 thirty-seven strings by hand whenever a sentence moves.
@@ -92,8 +92,8 @@ def write(title: str, pages: list[str]) -> Path:
     lines = [
         '"""The Chronicle of the Ancient Lords, in pages.',
         "",
-        "One text, cut into fragments a player finds one at a time -- anywhere, in any",
-        "order -- and which assemble into the whole book on a shelf in the menu. The",
+        "One text, cut into fragments a player finds one at a time -- anywhere, in",
+        "any order -- and which assemble into the whole book in the menu. The",
         "numbering is the point: a page found on floor two that belongs in the middle",
         "of the book goes into the middle of the book, and the gaps around it are",
         "what is still missing.",
@@ -106,7 +106,7 @@ def write(title: str, pages: list[str]) -> Path:
         "",
         '__all__ = ["TITLE", "PAGES", "PAGE_COUNT", "page", "numeral"]',
         "",
-        f"#: What the book is called, on the shelf and at the top of every page.",
+        "#: What the book is called, in the menu and at the top of every page.",
         f"TITLE = {title!r}",
         "",
         "#: Every page, in the order they belong in. The index is the number minus",

@@ -294,7 +294,7 @@ class NeverdeadsRevenge(App[None]):
         # through still used the draught it started with.
         loadout: Loadout = loadout_from(self.progress)
         self.save_progress()
-        # What is still out there, read off the shelf at the one moment the run
+        # What is still out there, read off the book at the one moment the run
         # is made. A page found in an earlier run is not scattered again.
         missing = tuple(
             number

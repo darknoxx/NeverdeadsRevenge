@@ -1,7 +1,7 @@
 """The Chronicle of the Ancient Lords, in pages.
 
-One text, cut into fragments a player finds one at a time -- anywhere, in any
-order -- and which assemble into the whole book in the menu. The
+One text, cut into fragments a player finds one at a time -- anywhere, in
+any order -- and which assemble into the whole book in the menu. The
 numbering is the point: a page found on floor two that belongs in the middle
 of the book goes into the middle of the book, and the gaps around it are
 what is still missing.
