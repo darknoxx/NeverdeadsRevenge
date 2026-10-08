@@ -41,6 +41,10 @@ class GroundItem:
     #: A gift a chest holds *instead* of contents, by key. Like ``curse``, a
     #: string: the world places the bargain and ``game/`` knows what it means.
     gift: str | None = None
+    #: Which page of the chronicle this is, for a page lying on the floor. The
+    #: number is the whole of what a page *is*: it is what decides the slot it
+    #: goes into, and a page without one cannot go back into the book.
+    page: int | None = None
     #: Coins in a pile. Zero for everything that is not a coin.
     gold: int = 0
     #: Which amulet ability this grants, by key. Like ``curse``, a string: the

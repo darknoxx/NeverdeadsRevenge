@@ -29,6 +29,7 @@ from .actors import Actor, ActorKind, make_enemy, pick_enemy_template
 from .combat import apply_revenge, attack
 from .curses import TOUCH_CURSES, CURSES, curse_by_key
 from .gifts import gift_by_key
+from .lore import numeral
 from .levels import apply_gain, gains_between, level_for
 from .npcs import npc_by_key
 from .state import GameState, LogKind, RunState
@@ -893,6 +894,18 @@ def _pick_up(state: GameState) -> ActionResult:
         return ActionResult(consumed_turn=False, acted=False)
 
     state.dungeon_map.remove_item(state.player.position)
+
+    if item.kind == "page":
+        # Off the floor and into the book. Free, like everything else that is
+        # picked up, and drawn down from what is still missing so the same page
+        # cannot turn up twice.
+        state.found_pages.append(item.page)
+        state.missing_pages.discard(item.page)
+        state.say(
+            f"A torn page: {numeral(item.page)} of the chronicle.",
+            LogKind.GOOD,
+        )
+        return ActionResult(consumed_turn=False, acted=False)
 
     if item.kind == "coin":
         state.gold += item.gold

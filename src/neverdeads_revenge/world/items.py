@@ -31,6 +31,9 @@ __all__ = [
     "loot_count",
     "equipment_count",
     "chest_count",
+    "page_count",
+    "make_page",
+    "PAGE_GLYPH",
     "rare_find_count",
     "RARE_FIND_CHANCE",
     "RARE_FIND_DEPTH",
@@ -84,6 +87,17 @@ class ItemTemplate:
 #: Glyph and colour per kind of thing. Weapons and armour follow the old
 #: roguelike convention -- ``)`` for a blade, ``[`` for something you wear --
 #: because it costs nothing to be legible to people who already know it.
+#: A page of the chronicle. A question mark because that is what it is until it
+#: is read, and because every other glyph on the map is a thing to take or a
+#: thing to avoid -- this one is a thing to *know*.
+PAGE_GLYPH = "?"
+
+#: The colour of a page: paper, which is nearly white and not quite. A hex
+#: rather than a name because "bone" is not a colour Rich has ever heard of, and
+#: the failure is a crash on the first frame a page is drawn on -- three tests
+#: away from anything that mentions a page.
+PAGE_COLOR = "#e8e8e0"
+
 WEAPON_GLYPH = ")"
 WEAPON_COLOR = "bright_white"
 ARMOUR_GLYPH = "["
@@ -482,6 +496,33 @@ def make_coin(value: int) -> GroundItem:
 #: A third. Rarer and the gifts are a rumour; commoner and the loot stops
 #: mattering, which would be a shame -- the blade is half of what a chest is.
 GIFT_CHANCE = 1 / 3
+
+
+def page_count(depth: int) -> int:
+    """How many pages a floor holds.
+
+    One. There are thirty-seven of them and a run sees seven to ten floors, so a
+    run is worth most of a chapter and the book is the work of four or five --
+    which is what a collection is for. Two on a floor would make it a formality
+    and one every other floor would make it a chore.
+    """
+    return 1
+
+
+def make_page(number: int) -> GroundItem:
+    """One page of the chronicle, lying on the floor.
+
+    Its ``item_id`` carries the number as well as the field, so a page that goes
+    through a save comes back as *that* page rather than as a generic one.
+    """
+    return GroundItem(
+        item_id=f"page:{number}",
+        name="torn page",
+        glyph=PAGE_GLYPH,
+        color=PAGE_COLOR,
+        kind="page",
+        page=number,
+    )
 
 
 def make_chest(

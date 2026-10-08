@@ -40,6 +40,7 @@ from .combat import apply_revenge
 from .curses import CURSES, Curse
 from .difficulty import potency
 from .gifts import GIFTS
+from .lore import PAGE_COUNT, numeral
 from .npcs import NPCS, Npc, npc_by_key
 from .shop import META_UPGRADES, Loadout
 
@@ -184,6 +185,17 @@ class GameState:
     #: which is why it is kept apart from the score: one is a record of the run,
     #: the other is what the run was worth to you afterwards.
     gold: int = 0
+    #: The page numbers still to be found, from the book's point of view.
+    #:
+    #: Handed in when the run starts and drawn down as pages turn up, so a page
+    #: never appears twice -- not on two floors of one run and not in two runs
+    #: either. It is the *book* that decides, and the book is the only thing
+    #: that outlives the run.
+    missing_pages: set[int] = field(default_factory=set)
+    #: What this run has found, in the order it found them. The app folds these
+    #: into the book the moment they are picked up, and this is how it knows
+    #: there is something to fold.
+    found_pages: list[int] = field(default_factory=list)
     #: Promises of fame taken at chests. Each one is a curse paid for a bigger
     #: score rather than for the loot behind the lid, and each one raises what
     #: the whole run is worth. Kept as a count rather than as a multiplier so the
@@ -592,6 +604,7 @@ class GameState:
             filled_slots=tuple(self.player.equipment) if self.player else (),
             npc_keys=tuple(NPCS),
             gift_keys=self.unheld_gifts,
+            page_keys=tuple(sorted(self.missing_pages)),
             # COMPANY. Passed as a budget rather than applied afterwards so the
             # generator can still refuse: a floor with nowhere to put them hands
             # back the floor it has, which is better than monsters in the walls.
@@ -868,6 +881,7 @@ def start_run(
     seed: int,
     loadout: Loadout | None = None,
     upgrades: dict[str, int] | None = None,
+    pages: tuple[int, ...] | None = None,
 ) -> GameState:
     """Begin a fresh run with ``hero``.
 
@@ -878,9 +892,15 @@ def start_run(
         upgrades: Permanent meta upgrades, as ``{key: stacks}``. Kept as a
             shorthand for callers that have no loadout; ``loadout.upgrades``
             wins when both are given.
+        pages: The chronicle pages still to be found, from the book. Left out,
+            every page is still out there -- which is right for a new book and
+            for every test that is not about the collection.
     """
     loadout = loadout or Loadout()
     state = GameState(hero=hero, rng=Rng(seed), seed=seed)
+    state.missing_pages = (
+        set(pages) if pages is not None else set(range(1, PAGE_COUNT + 1))
+    )
 
     # The floor first, because the hero does not exist until it is built and
     # everything below changes the hero.

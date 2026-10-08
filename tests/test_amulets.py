@@ -636,20 +636,33 @@ def test_the_borrowed_face_shrouds_you_for_the_turn_after_a_kill():
 
 
 def test_without_it_the_answer_to_a_kill_lands():
+    """A kill is answered by whatever was waiting for it.
+
+    Repeated until a blow lands, because the hit chance is capped at 97% and a
+    monster that missed is not "nothing answered" -- it is the dice. The test
+    assumed the first answer connects and failed about once in thirty runs of
+    the suite, which is the kind of failure that gets blamed on whatever was
+    edited most recently.
+    """
     state = wearing()
     player = state.player
-    weak = make_enemy(ENEMIES["ghoul"], (player.position[0] + 1, player.position[1]))
-    weak.stats.hp = 1
     brute = _a_brute_beside(player)
     brute.stats.damage = (6, 6)
-    state.enemies = [weak, brute]
-    state.turn_queue = type(state.turn_queue)([weak, brute, player])
-    state.refresh_vision()
     before = player.hp
 
-    kill_it(state, weak)
+    for _ in range(60):
+        weak = make_enemy(
+            ENEMIES["ghoul"], (player.position[0] + 1, player.position[1])
+        )
+        weak.stats.hp = 1
+        state.enemies = [weak, brute]
+        state.turn_queue = type(state.turn_queue)([weak, brute, player])
+        state.refresh_vision()
+        kill_it(state, weak)
+        if player.hp < before:
+            return
 
-    assert player.hp < before, "nothing ever got to answer"
+    pytest.fail("nothing ever got to answer")
 
 
 # -- the sidebar and the sheet ----------------------------------------------

@@ -112,6 +112,7 @@ class GameScreen(Screen[None]):
         seed: int | None = None,
         loadout: Loadout | None = None,
         state: GameState | None = None,
+        pages: tuple[int, ...] | None = None,
     ) -> None:
         super().__init__()
         # Loud on an unknown key rather than falling back to the first hero. The
@@ -126,6 +127,10 @@ class GameScreen(Screen[None]):
         #: ready-made, because the whole point of a save is that the floor is the
         #: floor you left.
         self.state: GameState | None = state
+        #: Which pages of the chronicle are still out there. Handed in from the
+        #: book rather than read off it here, so the screen has no opinion
+        #: about what has been found -- it only says what to scatter.
+        self.pages = pages
 
     # -- composition --------------------------------------------------------
     def compose(self) -> ComposeResult:
@@ -145,7 +150,9 @@ class GameScreen(Screen[None]):
     def _start_run(self) -> None:
         if self.state is None:
             seed = self.seed if self.seed is not None else _fresh_seed()
-            self.state = start_run(self.hero, seed=seed, loadout=self.loadout)
+            self.state = start_run(
+                self.hero, seed=seed, loadout=self.loadout, pages=self.pages
+            )
         map_view = self.query_one(MapView)
         map_view.state = self.state
         self.query_one(Hud).state = self.state
@@ -239,6 +246,7 @@ class GameScreen(Screen[None]):
 
         result = perform_action(self.state, action)
         self._refresh_all()
+        self._file_pages()
         self._sound_after(before_log, before_depth, before_level)
 
         if result.prompt is not None:
@@ -298,6 +306,23 @@ class GameScreen(Screen[None]):
     def _play(self, name: str | None) -> None:
         if name:
             self.app.sfx.play(name)
+
+    def _file_pages(self) -> None:
+        """Put whatever the run has found into the book, at once.
+
+        At once rather than at the end of the run, and that is a decision worth
+        writing down: gold is banked when a run ends because gold is a *price*,
+        and a run that dies still spent it. A page is knowledge -- a player who
+        dies on the next step should not have to find the same page again.
+
+        ``record_page`` answers whether the page was new, so this is safe to run
+        over the whole list every time; it is a handful of numbers.
+        """
+        assert self.state is not None
+        for number in self.state.found_pages:
+            if self.app.progress.record_page(number):
+                self._play("item")
+                self.app.save_progress()
 
     def _chest_answer(self, answer: str | None) -> None:
         """Act on the answer. Walking away costs nothing at all.

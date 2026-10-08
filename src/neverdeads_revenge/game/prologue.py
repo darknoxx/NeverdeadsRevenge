@@ -126,6 +126,15 @@ def item_legend() -> list[tuple[str, str]]:
     )
     rows.append((worn, "weapon, armour, amulet"))
     rows.append((CHEST_GLYPH, "a chest, and a price"))
+    # The chronicle is deliberately *not* here, and the reason is what this
+    # panel is for: everything else on it is a thing to avoid or a thing to
+    # take, and a page is neither. It is also the one mark on the map that has
+    # nothing to do with the run -- a player who picks one up finds out what it
+    # is from the message, and the curiosity of a `?` that the legend does not
+    # explain is the right feeling to meet a collectible with.
+    #
+    # The honest reason is also the plain one: the panel is clipped, and it had
+    # exactly thirteen rows to give.
     rows.append((COIN_GLYPH, "coins, for the shop"))
     # The spring is terrain, but it is the one tile with a rule attached, so it
     # earns a row here rather than living only in the help screen.

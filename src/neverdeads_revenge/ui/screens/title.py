@@ -58,6 +58,7 @@ class TitleScreen(Screen[None]):
     BINDINGS = [
         Binding("s", "shop", "Shop"),
         Binding("h", "scores", "Scores"),
+        Binding("l", "lore", "Chronicle"),
         Binding("escape", "quit", "Quit"),
         Binding("q", "quit", "Quit"),
     ]
@@ -124,6 +125,13 @@ class TitleScreen(Screen[None]):
         self.app.arm_repeat_filter()
         self.app.push_screen(ScoreboardScreen(self.app.progress))
 
+    def action_lore(self) -> None:
+        """``l`` reads the chronicle instead of starting a run."""
+        from .lore import LoreScreen
+
+        self.app.arm_repeat_filter()
+        self.app.push_screen(LoreScreen(self.app.progress))
+
     def action_shop(self) -> None:
         """``s`` spends coin instead of starting a run."""
         self.app.arm_repeat_filter()
@@ -137,7 +145,7 @@ class TitleScreen(Screen[None]):
         screen before this one -- holding enter to leave the summary would
         otherwise start a run on the way past.
         """
-        if event.key in ("s", "h", "escape", "q"):
+        if event.key in ("s", "h", "l", "escape", "q"):
             return  # a binding has it
         if event.key == "c" and self._has_saved_run():
             # Only swallowed when there is something to pick up; otherwise "c"
@@ -162,7 +170,8 @@ def _centered():
         yield Static(id="title-best")
         yield Static(id="title-saved")
         yield Static(
-            "\npress any key   ·   [bold]s[/] shop   ·   [bold]h[/] scores",
+            "\npress any key   ·   [bold]s[/] shop   ·   [bold]h[/] scores"
+            "   ·   [bold]l[/] chronicle",
             id="title-hint",
         )
 

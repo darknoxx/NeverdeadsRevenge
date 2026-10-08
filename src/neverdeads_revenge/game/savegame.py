@@ -31,6 +31,7 @@ from ..core.rng import Rng
 from ..core.turn_queue import TurnQueue
 from ..world.map import DungeonMap, GroundItem
 from ..world.modifiers import Modifiers
+from .lore import PAGE_COUNT
 from .actors import Actor, ActorKind, HEROES, Stats, Trait
 from .curses import Curse
 from .npcs import NPCS
@@ -197,6 +198,11 @@ def dump(state: GameState) -> dict:
         "ward_ready": state.ward_ready,
         "wilds": _encode(state.wilds),
         "gifts": _encode(state.gifts),
+        # Sorted lists rather than sets: the save is JSON. ``missing_pages`` is
+        # the one the *generator* reads, so it has to come back exactly as it
+        # went in or a run would scatter pages it had already found.
+        "found_pages": list(state.found_pages),
+        "missing_pages": sorted(state.missing_pages),
     }
 
 
@@ -267,6 +273,12 @@ def load(payload: dict) -> GameState:
         # saved -- a run put down and picked up again has lost it, and that is
         # the price of putting it down.
         state.gifts = set(_decode(payload.get("gifts", [])))
+        state.found_pages = [int(n) for n in payload.get("found_pages", [])]
+        # Every page still out there, for a run saved before there was a
+        # chronicle: it had found none, so all of them are missing.
+        state.missing_pages = set(
+            payload.get("missing_pages", range(1, PAGE_COUNT + 1))
+        )
     except SaveError:
         raise
     except Exception as exc:  # a corrupt file is a refusal, not a crash

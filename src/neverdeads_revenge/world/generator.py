@@ -20,6 +20,8 @@ from neverdeads_revenge.core.rng import Rng
 from .items import (
     GIFT_CHANCE,
     chest_count,
+    make_page,
+    page_count,
     equipment_count,
     loot_count,
     make_chest,
@@ -264,6 +266,7 @@ def generate_floor(
     filled_slots: tuple[str, ...] = (),
     npc_keys: tuple[str, ...] = (),
     gift_keys: tuple[str, ...] = (),
+    page_keys: tuple[int, ...] = (),
 ) -> GeneratedFloor:
     """Build one complete, validated dungeon floor.
 
@@ -334,7 +337,14 @@ def generate_floor(
     # Loot last, and on whatever is still plain floor. Placing it after the decor
     # means an item can never be swallowed by a patch of grass.
     items = _scatter_loot(
-        rng, dungeon_map, candidates, depth, curse_keys, filled_slots, gift_keys
+        rng,
+        dungeon_map,
+        candidates,
+        depth,
+        curse_keys,
+        filled_slots,
+        gift_keys,
+        page_keys,
     )
 
     return GeneratedFloor(
@@ -418,6 +428,7 @@ def _scatter_loot(
     curse_keys: tuple[str, ...] = (),
     filled_slots: tuple[str, ...] = (),
     gift_keys: tuple[str, ...] = (),
+    page_keys: tuple[int, ...] = (),
 ) -> dict[Pos, GroundItem]:
     """Drop the floor's draughts, equipment and chests.
 
@@ -470,6 +481,14 @@ def _scatter_loot(
                     gift=gifts.pop() if holding_a_gift else None,
                 )
             )
+    # The chronicle, torn up and scattered. Drawn without replacement from what
+    # the player has *not* found, so a page never turns up twice -- finding one
+    # already in the book would be a find that gives nothing.
+    if page_keys:
+        to_place += [
+            make_page(number)
+            for number in rng.shuffled(list(page_keys))[: page_count(depth)]
+        ]
     # And, rarely, the strong tier lying in the open with nothing owed for it.
     # The same two questions are asked of it: what are you missing, and how deep
     # is this.

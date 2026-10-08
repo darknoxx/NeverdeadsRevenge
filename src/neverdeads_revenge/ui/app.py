@@ -22,6 +22,7 @@ from textual.app import App
 from ..core.rng import Rng
 from ..game.pace import action_gap
 from ..game.savegame import SaveError, dump, load
+from ..game.lore import PAGE_COUNT
 from ..game.shop import Loadout, loadout_from
 from ..game.state import GameState, RunState
 from ..persistence import (
@@ -293,7 +294,21 @@ class NeverdeadsRevenge(App[None]):
         # through still used the draught it started with.
         loadout: Loadout = loadout_from(self.progress)
         self.save_progress()
-        self.push_screen(GameScreen(hero_key, seed=self.run_seed, loadout=loadout))
+        # What is still out there, read off the shelf at the one moment the run
+        # is made. A page found in an earlier run is not scattered again.
+        missing = tuple(
+            number
+            for number in range(1, PAGE_COUNT + 1)
+            if number not in self.progress.pages
+        )
+        self.push_screen(
+            GameScreen(
+                hero_key,
+                seed=self.run_seed,
+                loadout=loadout,
+                pages=missing,
+            )
+        )
 
     def open_shop(self) -> None:
         """Spend coin, then come back here.

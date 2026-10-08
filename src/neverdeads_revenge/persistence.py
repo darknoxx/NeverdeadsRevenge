@@ -81,12 +81,32 @@ class MetaProgress:
     wilds: list[str] = field(default_factory=list)
     #: The two wild offers currently on the shelf. Re-rolled after every run.
     wild_stock: list[str] = field(default_factory=list)
+    #: Which pages of the chronicle have been found, by number.
+    #:
+    #: A list rather than a set, because the save is JSON and a set is not --
+    #: and kept sorted so the file reads in the order the book does. It is the
+    #: one thing here that is a *collection* rather than a currency: gold buys,
+    #: scores rank, and a page is simply known.
+    pages: list[int] = field(default_factory=list)
     #: Lifetime run statistics.
     runs_started: int = 0
     runs_won: int = 0
     best_depth: int = 0
     best_score: int = 0
     total_kills: int = 0
+
+    def record_page(self, number: int) -> bool:
+        """File a page. Returns whether it was new.
+
+        Returns the answer rather than assuming it, because the caller has a
+        sound to make and a line to write, and neither is wanted for a page
+        already in the book.
+        """
+        if number in self.pages:
+            return False
+        self.pages.append(number)
+        self.pages.sort()
+        return True
 
     def record_run(
         self,
@@ -235,6 +255,7 @@ def load_meta(path: Path | None = None) -> MetaProgress:
             pending=[str(key) for key in raw.get("pending", [])],
             wilds=[str(key) for key in raw.get("wilds", [])],
             wild_stock=[str(key) for key in raw.get("wild_stock", [])],
+            pages=[int(number) for number in raw.get("pages", [])],
             runs_started=int(raw.get("runs_started", 0)),
             runs_won=int(raw.get("runs_won", 0)),
             best_depth=int(raw.get("best_depth", 0)),

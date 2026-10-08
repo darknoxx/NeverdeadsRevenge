@@ -305,9 +305,9 @@ mistake rather than a style.
 | `?` | Controls and the terrain reference |
 | `Esc` | Menu: `r` resume, `s` save and quit, `m` sound on/off, `q` quit to title |
 
-On the **title screen**: any key starts a run, `s` opens the shop and `h` opens
-the scoreboard. In the **shop**: up/down choose, `enter` buys, `s` or `Esc`
-leaves.
+On the **title screen**: any key starts a run, `s` opens the shop, `h` opens the
+scoreboard and `l` opens the chronicle. In the **shop**: up/down choose, `enter`
+buys, `s` or `Esc` leaves.
 
 **Holding a direction walks, and fights, at six steps a second** -- and it scales
 with the hero's speed, so Noxx rattles along at nine and Yeti plods at four and a
@@ -337,10 +337,10 @@ good reason; the flash ends because the next action clears it, which is what the
 throttle above makes long enough to see.
 
 The prologue and the run summary close on a **held enter**, not a single press.
-They are the only prose in the game and the only place a run is added up, and a
-stray key should not throw either away. The arrows scroll the prologue, and the
-bar under the hint fills as you hold. Terminals that do not repeat a held key
-are covered too: three presses do the same thing.
+They are the only prose a *run* shows, and the summary is the only place a run is
+added up, and a stray key should not throw either away. The arrows scroll the
+prologue, and the bar under the hint fills as you hold. Terminals that do not
+repeat a held key are covered too: three presses do the same thing.
 
 The repeats a held key keeps sending are ignored by whatever screen comes next,
 so holding enter to start does not walk you around the first room printing
@@ -529,9 +529,48 @@ alike, because both collected points. The best ten runs are kept and `h` opens
 the scoreboard from the title.
 
 Everything is saved in `~/.local/share/neverdeads_revenge/meta.json` (or
-`$XDG_DATA_HOME`): the scoreboard, the best score, the coin, the upgrades and the
-shelf. No run survives being closed. Saves from older builds are read field by
-field, so adding a field never costs you a high score.
+`$XDG_DATA_HOME`): the scoreboard, the best score, the coin, the upgrades, the
+shop's rotating shelf and the pages of the chronicle. No run survives being
+closed. Saves from older builds are read field by field, so adding a field never
+costs you a high score.
+
+## The chronicle
+
+**A page is a collectible, and the collection is a book.** The dungeon is full of
+lore if you go looking for it, and none of it is a stat. It is a chronicle of the
+four Ancient Lords and of the thing that came back wearing one of their ashes,
+torn into **thirty-seven** pages and scattered one to a floor. `l` from the title
+opens what you have of it.
+
+The whole design is the numbering. The pages are torn up and dropped at random, so
+a run can find the fifteenth before the second — and the book does not care. A
+page goes into the slot its number says, found or not, and the slots you have not
+found still show their number and say *torn out*. What you are looking at is not
+a list of what you have; it is the book with its holes in it, which is the only
+shape that makes finding the next page mean anything.
+
+**A page is kept the moment it is picked up.** That is the one place the
+chronicle breaks the game's own rule, and the rule is worth stating to see why:
+gold is banked when a run *ends*, because gold is a price and a run that dies
+still spent it. A page is knowledge, and a player who dies on the next step
+should not have to find the same page twice. So the save is written as the page
+is read, mid-run, and a page never appears again — not on the next floor and not
+in the next run either. The generator draws from what is still missing.
+
+The `?` on the map is the one mark in the game that is not about the run at all.
+It is deliberately **not in the legend**: the panel is clipped and it is for what
+can kill you and what can keep you alive, and a page is neither. It is also the
+right way to meet a collectible — a player walks over to a `?` the legend does
+not explain, out of curiosity, and the message tells them what it is.
+
+The text is one file, `docs/lore.txt`, and the cutting is a program:
+`tools/make_lore.py`. It breaks the prose into pages at paragraph ends where one
+is close enough and inside a long paragraph when it is not, which is why the
+pages are 37 to 97 words rather than all the same length — pages torn out of a
+book do not end where a thought does. Re-run it and the module is rebuilt; the
+tool checks that the pages put back together are the source text exactly, because
+the one thing that went wrong on the first attempt was a space lost in the
+wrapping (`Lord ofDarkness`), and a check is cheaper than reading 37 pages.
 
 ## Loot and equipment
 
@@ -686,9 +725,9 @@ slot, music as opposed to sound effects, and hero unlocks. Two roster slots are
 shown locked and are not playable yet. The people have nothing to trade and
 nothing to ask of you yet: quests are the next thing they need.
 
-The prologue is the only prose in the game, and it is shown once per session
-rather than once per run — told every run it stops being a premise and becomes a
-toll.
+The prologue is shown once per session rather than once per run — told every run
+it stops being a premise and becomes a toll. The chronicle is the other prose in
+the game, and it is the one you have to go and find.
 
 ## Layout
 
@@ -696,7 +735,7 @@ toll.
 src/neverdeads_revenge/
 ├── core/     seeded rng, directions, energy-based turn queue
 ├── world/    tiles, dungeon map, generator, items, field of view
-├── game/     actors, combat, game state, actions, curses, amulets, the shop
+├── game/     actors, combat, game state, actions, curses, amulets, the shop, the chronicle
 └── ui/       Textual app, screens, widgets
 ```
 
