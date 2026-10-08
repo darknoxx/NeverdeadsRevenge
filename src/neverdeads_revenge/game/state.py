@@ -17,7 +17,11 @@ from neverdeads_revenge.core.direction import Pos, chebyshev
 from neverdeads_revenge.core.rng import Rng
 from neverdeads_revenge.core.turn_queue import TurnQueue
 from neverdeads_revenge.world.fov import compute_fov_full
-from neverdeads_revenge.world.generator import GeneratedFloor, generate_floor
+from neverdeads_revenge.world.generator import (
+    GeneratedFloor,
+    enemy_count,
+    generate_floor,
+)
 from neverdeads_revenge.world.items import ITEMS, make_item
 from neverdeads_revenge.world.map import DungeonMap, GroundItem
 from neverdeads_revenge.world.modifiers import Modifiers
@@ -254,6 +258,13 @@ class GameState:
             # moment and recomputing it later would give a different number.
             self.curses[-1] = replace(curse, wither_taken=lost)
 
+        if curse.empties_pack and self.inventory:
+            self.inventory.clear()
+            self.say(
+                "The pack is empty. Whatever you were saving is not yours.",
+                LogKind.BAD,
+            )
+
         self.say(f"{curse.name}: {curse.price}.", LogKind.BAD)
 
     def remove_curse(self, curse: Curse) -> None:
@@ -321,6 +332,58 @@ class GameState:
             (curse.bleed_every for curse in self.curses if curse.bleed_every),
             default=0,
         )
+
+    @property
+    def kill_cost(self) -> int:
+        """Health every kill takes, from the curses. Zero for most runs.
+
+        The one price that argues with the score, which now pays for killing:
+        a run with the tithe has to decide whether the points are worth the
+        blood, and that is the decision the curse exists to create.
+        """
+        return sum(curse.kill_cost for curse in self.curses)
+
+    @property
+    def extra_enemies(self) -> int:
+        """How many monsters the curses add to every floor."""
+        return sum(curse.extra_enemies for curse in self.curses)
+
+    @property
+    def step_cost_every(self) -> int:
+        """Every how many steps the curses take one away, or 0 for none.
+
+        The tightest curse wins, like the sight: two things slowing the same
+        clock should not add up to a hero who cannot move.
+        """
+        return min(
+            (
+                curse.step_cost_every
+                for curse in self.curses
+                if curse.step_cost_every
+            ),
+            default=0,
+        )
+
+    @property
+    def damage_spread(self) -> float:
+        """How much wider the player's damage roll swings.
+
+        Multiplied, unlike the others: a fever is a *shape* of uncertainty, and
+        two of them should be twice as uncertain rather than merely present.
+        """
+        spread = 1.0
+        for curse in self.curses:
+            spread *= curse.damage_spread
+        return spread
+
+    @property
+    def follows(self) -> int:
+        """How many survivors follow the player down.
+
+        The largest rather than the sum: two curses that each drag things along
+        would be a swarm, and a swarm is not a price.
+        """
+        return max((curse.follows for curse in self.curses), default=0)
 
     @property
     def heal_scale(self) -> float:
@@ -416,6 +479,8 @@ class GameState:
         factor = self.coin_multiplier
         if self.has_passive("coin_hand"):
             factor *= 1.25
+        for curse in self.curses:
+            factor *= curse.coin_scale
         return factor
 
     def refresh_passives(self) -> None:
@@ -509,6 +574,13 @@ class GameState:
     # -- floors -------------------------------------------------------------
     def build_floor(self, depth: int) -> GeneratedFloor:
         """Generate the next floor and move everyone onto it."""
+        # Captured before the floor is replaced, because these are the ones that
+        # follow: the survivors of the floor being left behind.
+        following = (
+            [enemy for enemy in self.enemies if enemy.alive][: self.follows]
+            if self.follows
+            else []
+        )
         self.depth = depth
         # What the player is already carrying goes into the floor's own dice.
         # A chest that hands out a third coat is a chest nobody opens twice, and
@@ -520,6 +592,10 @@ class GameState:
             filled_slots=tuple(self.player.equipment) if self.player else (),
             npc_keys=tuple(NPCS),
             gift_keys=self.unheld_gifts,
+            # COMPANY. Passed as a budget rather than applied afterwards so the
+            # generator can still refuse: a floor with nowhere to put them hands
+            # back the floor it has, which is better than monsters in the walls.
+            enemy_budget=enemy_count(depth) + self.extra_enemies,
         )
         self.dungeon_map = floor.map
 
@@ -539,6 +615,27 @@ class GameState:
         ]
         self.toughen_enemies()
         self.npcs = [make_npc(NPCS[key], pos) for pos, key in floor.npcs]
+        if following:
+            # THE CRAWL. They arrive at this floor's own free ground rather than
+            # at their old coordinates, because the old coordinates belong to a
+            # floor that no longer exists.
+            free = [
+                pos
+                for pos in floor.spawn_points
+                if self.dungeon_map.is_walkable(pos)
+            ]
+            for enemy in following:
+                if not free:
+                    break
+                enemy.position = free.pop(self.rng.below(len(free)))
+                enemy.struck = False
+                self.enemies.append(enemy)
+            if following:
+                self.say(
+                    f"{len(following)} of them came down with you.",
+                    LogKind.BAD,
+                )
+
         self.turn_queue = TurnQueue([self.player, *self.enemies])
         self.refresh_vision()
         # The per-floor clock restarts; total_turns keeps counting so the run

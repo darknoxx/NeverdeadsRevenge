@@ -108,22 +108,24 @@ def attack(
     *,
     force_crit: bool = False,
     damage_scale: float = 1.0,
+    spread: float = 1.0,
 ) -> AttackOutcome:
     """Resolve one attack from ``attacker`` against adjacent ``defender``.
 
     Mutates ``defender``'s health and the ``alive`` flag when it lands a killing
     blow. The caller is responsible for cleaning up the body.
 
-    ``force_crit`` and ``damage_scale`` exist for the two amulets that reach into
-    the dice: the patient knife makes a first blow a crit, and the grave ward
-    takes half of one. Both are passed in rather than read from the actors,
-    because the rules behind them live in ``game/`` and this function deliberately
-    knows nothing about amulets.
+    ``force_crit``, ``damage_scale`` and ``spread`` all exist for rules that
+    reach into the dice: the patient knife makes a first blow a crit, the grave
+    ward takes half of one, and THE FEVER widens the roll. All three are passed
+    in rather than read from the actors, because the rules behind them live in
+    ``game/`` and this function deliberately knows nothing about amulets or
+    curses.
     """
     if not rng.chance(hit_chance(attacker, defender)):
         return AttackOutcome(hit=False, crit=False, damage=0, killed=False, dodged=True)
 
-    base = attacker.damage_roll(rng)
+    base = attacker.damage_roll(rng, spread)
     crit = force_crit or rng.chance(attacker.crit_chance)
     damage = int(round(base * attacker.crit_multiplier)) if crit else base
     if damage_scale != 1.0:

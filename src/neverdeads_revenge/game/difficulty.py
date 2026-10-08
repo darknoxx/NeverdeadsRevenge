@@ -44,13 +44,21 @@ __all__ = [
 #: run should be.
 #:
 #: Measured, not chosen: see the escape rates in the README.
-POTENCY_PER_FLOOR = 0.14
+#:
+#: Raised from 0.14 on the experimental branch, because a human plays this a
+#: great deal better than the bot does and reported reaching the end almost
+#: every time. The bot is the *floor* -- if it is still escaping sometimes at
+#: this slope, a person is still fine.
+POTENCY_PER_FLOOR = 0.18
 
 #: Ceiling on potency. Without it a floor-40 monster would be unplayable and any
-#: formula mistake would silently become exponential. Just over twice floor 1 is
-#: enough once floor 1 is already dangerous, and the hero's own levels are what
-#: the rest of the growth is for.
-MAX_POTENCY = 2.2
+#: formula mistake would silently become exponential. Just over two and a half
+#: times floor 1 is enough once floor 1 is already dangerous, and the hero's own
+#: levels are what the rest of the growth is for.
+#:
+#: Raised with the slope, so that the two arrive together: the last floor is now
+#: exactly where the ceiling is reached.
+MAX_POTENCY = 2.6
 
 #: No monster may act this fast.
 #:

@@ -1122,20 +1122,24 @@ def test_every_curse_states_a_price():
 
 
 def test_every_curse_actually_does_something():
-    """A curse with no effect is a chest that costs nothing."""
-    from dataclasses import fields
+    """A curse with no effect is a chest that costs nothing.
+
+    Checked against the *declared defaults* rather than against a list of field
+    names, because the list is a thing that goes stale: eight curses were added
+    to this game in one afternoon and this test went on passing for none of
+    them. A curse does something if any field differs from what it is born with.
+    """
+    from dataclasses import MISSING, fields
 
     from neverdeads_revenge.game.curses import CURSES
 
     for key, curse in CURSES.items():
-        active = not curse.modifiers.is_empty
-        active = active or any(
-            getattr(curse, field.name)
+        changed = any(
+            getattr(curse, field.name) != field.default
             for field in fields(curse)
-            if field.name in ("wither", "bleed_every", "sight")
+            if field.default is not MISSING
         )
-        active = active or curse.heal_scale != 1.0
-        assert active, f"{key} does nothing"
+        assert changed, f"{key} does nothing"
 
 
 def test_wither_takes_a_quarter_of_your_health_for_good():

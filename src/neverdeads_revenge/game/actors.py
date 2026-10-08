@@ -295,13 +295,22 @@ class Actor:
         bonus = self.damage_bonus + self.modifiers.damage + self.passive_damage
         return (low + bonus, high + bonus)
 
-    def damage_roll(self, rng) -> int:
+    def damage_roll(self, rng, spread: float = 1.0) -> int:
         """A damage value in this actor's range, plus every flat bonus.
 
         Flat, not a multiplier: the bonus is added once to the roll, so it reads
         on screen as the same number every hit and a player can count it.
+
+        ``spread`` widens the range around its own middle, which is what THE
+        FEVER does -- not less damage, less *predictable* damage. Widening
+        around the middle rather than raising the top is the whole point: a
+        curse that made the hero stronger on average would not be a curse.
         """
         low, high = self.damage_range
+        if spread != 1.0:
+            middle = (low + high) / 2
+            low = max(1, round(middle - (middle - low) * spread))
+            high = round(middle + (high - middle) * spread)
         return rng.between(low, high)
 
     def hurt(self, amount: int) -> int:

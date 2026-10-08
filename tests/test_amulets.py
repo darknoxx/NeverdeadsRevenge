@@ -507,19 +507,30 @@ def test_the_patient_knife_crits_the_first_blow_and_only_that_one():
     state.player.stats.accuracy = 99
     state.player.stats.damage = (10, 10)
     state.player.stats.crit_multiplier = 3.0
+    # No crits of the hero's own, or "every blow was a crit" is a coin toss:
+    # Noxx crits a quarter of the time, so the second blow had a one in four
+    # chance of looking like the knife had done it.
+    state.player.stats.crit_chance = 0.0
     brute.stats.evasion = 0
 
-    before = brute.stats.hp
-    perform_action(state, Action.MOVE_EAST)
-    first = before - brute.stats.hp
+    # Waits for two blows that *land*, rather than assuming the first two swings
+    # both connect. The hit chance is capped at 97%, so a miss is possible and
+    # this test failed about once in thirty runs of the suite -- and a miss is
+    # exactly what the knife is supposed to ignore, so waiting for a landing
+    # blow is the honest version of the question anyway.
+    dealt: list[int] = []
+    for _ in range(40):
+        brute.stats.hp = 400
+        perform_action(state, Action.MOVE_EAST)
+        if brute.stats.hp < 400:
+            dealt.append(400 - brute.stats.hp)
+        if len(dealt) == 2:
+            break
 
-    before = brute.stats.hp
-    perform_action(state, Action.MOVE_EAST)
-    second = before - brute.stats.hp
-
+    assert len(dealt) == 2, "never landed two blows"
     # Through the skeleton's armour, which is one point off every blow.
-    assert first == 30 - brute.stats.armor, "the first blow was not a crit"
-    assert second == 10 - brute.stats.armor, "every blow was a crit"
+    assert dealt[0] == 30 - brute.stats.armor, "the first blow was not a crit"
+    assert dealt[1] == 10 - brute.stats.armor, "every blow was a crit"
 
 
 def test_the_patient_knife_is_ready_again_for_a_new_monster():
@@ -527,20 +538,25 @@ def test_the_patient_knife_is_ready_again_for_a_new_monster():
     state.player.stats.accuracy = 99
     state.player.stats.damage = (10, 10)
     state.player.stats.crit_multiplier = 3.0
+    state.player.stats.crit_chance = 0.0
     brute.stats.evasion = 0
     perform_action(state, Action.MOVE_EAST)
 
     fresh = make_enemy(ENEMIES["bone"], brute.position)
-    fresh.stats.hp = 400
     fresh.stats.evasion = 0
     state.enemies = [fresh]
     state.turn_queue = type(state.turn_queue)([state.player, fresh])
     state.refresh_vision()
-    before = fresh.stats.hp
 
-    perform_action(state, Action.MOVE_EAST)
+    # Again, waits for a blow that lands: a swing can miss, and a missed swing
+    # is not the question this test is asking.
+    for _ in range(40):
+        fresh.stats.hp = 400
+        perform_action(state, Action.MOVE_EAST)
+        if fresh.stats.hp < 400:
+            break
 
-    assert before - fresh.stats.hp == 30 - fresh.stats.armor, (
+    assert 400 - fresh.stats.hp == 30 - fresh.stats.armor, (
         "the knife was spent on the last one"
     )
 

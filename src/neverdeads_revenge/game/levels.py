@@ -50,15 +50,15 @@ KILLS_PER_LEVEL = 4
 #: The level a run stops teaching at.
 #:
 #: Set at the ceiling rather than near it. A perfect clear is every monster on
-#: all ten floors, and there are ``sum(7 + depth for depth in 1..10)`` = 125 of
-#: them, which at :data:`KILLS_PER_LEVEL` is level 32. Thirty-one is the last
+#: all ten floors, and there are ``sum(8 + depth for depth in 1..10)`` = 135 of
+#: them, which at :data:`KILLS_PER_LEVEL` is level 34. Thirty-three is the last
 #: level a run can be *working toward*: the last two kills of a perfect clear
 #: have nothing left to teach, and they are only reachable by clearing every
 #: floor completely, which no measured run has ever come close to.
 #:
 #: It used to be twenty, which was a wall a thorough run could feel without ever
 #: being told it was there.
-MAX_LEVEL = 31
+MAX_LEVEL = 33
 
 
 @dataclass(frozen=True, slots=True)

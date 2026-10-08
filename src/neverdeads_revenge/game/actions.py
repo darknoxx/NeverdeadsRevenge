@@ -188,6 +188,16 @@ def _on_death(state: GameState, enemy: Actor) -> None:
     _drop_coins(state, enemy)
     _learn(state)
 
+    # THE TITHE. The one price that argues with the score, which now pays for
+    # killing: it can finish the hero, and a price that cannot is not a price.
+    cost = state.kill_cost
+    if cost:
+        state.player.stats.hp = max(0, state.player.stats.hp - cost)
+        if state.player.hp <= 0:
+            state.die("The tithe takes the last of you.")
+            return
+        state.say(f"The tithe takes {cost}.", LogKind.DAMAGE)
+
     player = state.player
 
     heal = (EMBER_HEAL if state.has_passive("ember") else 0) + state.kill_heal
@@ -452,6 +462,19 @@ def _try_move(state: GameState, direction: Direction) -> tuple[bool, bool]:
                 _resolve_player_attack(state, far)
                 return True, True
 
+    # THE HESITATION. Every so many turns the hero does not take the step, and
+    # the turn is spent anyway -- a price paid in *time*, which is half the
+    # score.
+    #
+    # Cadenced on the turn count rather than on the step count, and that is not
+    # a detail: a stumble does not advance ``player.steps``, so a cadence taken
+    # from it would fire on the same number forever and the hero would never
+    # move again. The turn counter is the one clock a stumble does advance.
+    every = state.step_cost_every
+    if every and (state.total_turns + 1) % every == 0:
+        state.say("You hesitate, and the moment is gone.", LogKind.PLAIN)
+        return True, True
+
     if not state.dungeon_map.is_walkable(target):
         # THE HOLLOW ROAD. Anything in bounds that nobody is standing on can be
         # walked into at a price -- including the void, which is *drawn* as wall,
@@ -529,6 +552,7 @@ def _resolve_player_attack(state: GameState, target: Actor) -> None:
         target,
         state.rng,
         force_crit=first and state.has_passive("patient_knife"),
+        spread=state.damage_spread,
     )
 
     if not outcome.hit:

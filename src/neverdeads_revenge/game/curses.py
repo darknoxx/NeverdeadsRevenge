@@ -46,6 +46,29 @@ class Curse:
     sight: int | None = None
     #: Multiplier on what a draught restores.
     heal_scale: float = 1.0
+    #: Health lost per kill. The price of killing things, which is the one thing
+    #: the score now rewards -- so it is the one price that argues with it.
+    kill_cost: int = 0
+    #: Extra monsters on every floor. More bodies is a different kind of hard
+    #: from bigger numbers: it costs turns, and turns are the score.
+    extra_enemies: int = 0
+    #: Multiplier on what a coin is worth. Below one is the ashen hand.
+    coin_scale: float = 1.0
+    #: Every this many turns, a step is not taken and the turn is spent anyway.
+    #: Zero for none. A price paid in *time*, which is half the score -- and
+    #: cadenced on turns rather than on steps because a stumble does not advance
+    #: the step count, so a cadence taken from it would never move again.
+    step_cost_every: int = 0
+    #: How much wider the damage roll swings. Above one is the fever: not less
+    #: damage, less *predictable* damage.
+    damage_spread: float = 1.0
+    #: Whether taking this empties the pack, the way wither takes health. The
+    #: run's reserve, gone in one sentence.
+    empties_pack: bool = False
+    #: How many of the monsters left alive follow the player down. Capped, and
+    #: the price says so: "what you leave alive" uncapped is a swarm, and a
+    #: swarm is not a price, it is the end of the run.
+    follows: int = 0
 
 
 #: Every curse a chest can hold.
@@ -94,6 +117,59 @@ CURSES: dict[str, Curse] = {
         name="FAMINE",
         price="half of what every draught is worth",
         heal_scale=0.5,
+    ),
+    # -- the ones that argue with the other half of the score ----------------
+    # The score is distance and speed, and it now pays for killing. These are
+    # the prices that take it back: in blood, in turns, and in the coin that is
+    # the other currency entirely.
+    "tithe": Curse(
+        key="tithe",
+        name="TITHE",
+        price="a drop of blood for every thing you kill",
+        kill_cost=1,
+    ),
+    "company": Curse(
+        key="company",
+        name="COMPANY",
+        price="two more shapes on every floor",
+        extra_enemies=2,
+    ),
+    "hesitation": Curse(
+        key="hesitation",
+        name="HESITATION",
+        price="every fifth turn, the step is not yours",
+        step_cost_every=5,
+    ),
+    "ashen_hand": Curse(
+        key="ashen_hand",
+        name="ASHEN HAND",
+        price="half of what every coin is worth",
+        coin_scale=0.5,
+    ),
+    # -- the ones that change what the dungeon is ----------------------------
+    "long_dark": Curse(
+        key="long_dark",
+        name="LONG DARK",
+        price="your sight, cut to one pace",
+        sight=1,
+    ),
+    "fever": Curse(
+        key="fever",
+        name="FEVER",
+        price="your blows swing twice as wide",
+        damage_spread=2.0,
+    ),
+    "hollow": Curse(
+        key="hollow",
+        name="HOLLOW",
+        price="everything you are carrying, gone",
+        empties_pack=True,
+    ),
+    "crawl": Curse(
+        key="crawl",
+        name="CRAWL",
+        price="three of what you leave alive follows you down",
+        follows=3,
     ),
 }
 

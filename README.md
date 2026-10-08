@@ -56,9 +56,18 @@ dials are for.
 
 | | Noxx | Yeti | Walkyrion |
 | --- | --- | --- | --- |
-| nothing bought | 23% | 5% | 5% |
-| every permanent upgrade, a bought blade, a bought coat and a bought amulet | 63% | 50% | 43% |
+| nothing bought | 8% | 0% | 0% |
+| every permanent upgrade, a bought blade, a bought coat and a bought amulet | 50% | 15% | 20% |
 | nothing bought, and every chest paid for fame | 0% | 0% | 0% |
+
+**The first two rows are half what they were.** They were measured at 11% and
+52% across all three heroes before the experimental branch raised the slope from
+14% a floor to 18%, the ceiling from 2.2x to 2.6x, and the monsters a floor from
+``7 + depth`` to ``8 + depth``. The reason was a player rather than a number:
+somebody who reaches the end almost every time is playing a game whose floor is
+too low, and the bot is the floor. It is now much closer to a wall than it was,
+which is either exactly right or a step too far -- that is what playing it is
+for.
 
 Sixty seeds a hero, so a hundred and eighty runs a row. Of the runs with nothing
 bought, thirty-five reached floor 10 and eighteen never got past floor 3. That is
@@ -85,8 +94,9 @@ bought, which is what his speed and his crit are for; Yeti and Walkyrion close t
 gap once there is gear to close it with.
 
 The dials are the enemy templates (floor one is a fight, not a formality),
-`POTENCY_PER_FLOOR` (14% harder per floor, capped at 2.2x on floor 9), the enemy
-count (`7 + depth`) and how fast wraiths grow more common (1.25x per floor). The
+`POTENCY_PER_FLOOR` (18% harder per floor, capped at 2.6x on the last floor), the
+enemy count (`8 + depth`) and how fast wraiths grow more common (1.25x per
+floor). The
 slope is *shallower* than it has ever been, and that is the point: a steep curve
 over a soft floor made the early game a formality and the late game a cliff. A
 shallow curve over a hard floor makes every floor of the run tense.
@@ -645,6 +655,21 @@ behind do not stack, so the second dose would read as a bug.
 | HEAVY | a quarter of your speed |
 | DIM | your sight, cut to five paces |
 | FAMINE | half of what every draught is worth |
+| TITHE | a drop of blood for every thing you kill |
+| COMPANY | two more shapes on every floor |
+| HESITATION | every fifth turn, the step is not yours |
+| ASHEN HAND | half of what every coin is worth |
+| LONG DARK | your sight, cut to one pace |
+| FEVER | your blows swing twice as wide |
+| HOLLOW | everything you are carrying, gone |
+| CRAWL | three of what you leave alive follows you down |
+
+The second half of that table is the experimental branch, and the four in the
+middle are all the same idea from four directions: the score is distance and
+speed and it now pays for killing, so TITHE, COMPANY, HESITATION and ASHEN HAND
+are the prices that take it back -- in blood, in bodies, in turns and in the
+coin that is the other currency entirely. A run that takes two of them is
+playing a different game with the same rules.
 
 Every curse can be lifted at a spring, and lifting one gives back *exactly* what
 it took. WITHER is why that is worth saying: "a quarter of your health" is a
