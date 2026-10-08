@@ -16,6 +16,7 @@ import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from .game.lore import PAGE_COUNT
 from .game.shop import META_UPGRADES, MetaUpgrade
 
 __all__ = [
@@ -32,6 +33,8 @@ __all__ = [
     "clear_run",
     "load_meta",
     "save_meta",
+    "grant_test_save",
+    "TEST_GOLD",
 ]
 
 SAVE_VERSION = 1
@@ -269,6 +272,41 @@ def load_meta(path: Path | None = None) -> MetaProgress:
 def save_meta(progress: MetaProgress, path: Path | None = None) -> None:
     """Write progress to disk atomically."""
     _write_json(path or save_path(), asdict(progress), indent=2)
+
+
+#: What ``--testrun`` puts in the purse. The shop's dearest line is in the
+#: hundreds, so this is more coin than a run can spend -- which is the point of a
+#: test save: not to be a large number but to stop being a constraint.
+TEST_GOLD = 9999
+
+
+def grant_test_save(path: Path | None = None) -> tuple[Path, Path | None]:
+    """Fill the save for testing: every page of the chronicle, and a purse.
+
+    A developer's flag, and it behaves like one. It *merges* rather than
+    replaces, so the scoreboard, the heroes and the upgrades are whatever they
+    were; the only thing it does to the old file is keep a copy of it. The copy
+    is written once -- running the flag twice does not overwrite the original
+    with the first test state -- so there is always exactly one file to go back
+    to, and it is the one from before the first time you asked.
+
+    Returns the save's path and the backup's, or ``None`` for the backup if
+    there was nothing to back up.
+    """
+    target = path or save_path()
+    progress = load_meta(target)
+
+    backup: Path | None = None
+    if target.exists():
+        candidate = target.with_name(target.name + ".bak")
+        if not candidate.exists():
+            candidate.write_text(target.read_text(encoding="utf-8"), encoding="utf-8")
+            backup = candidate
+
+    progress.gold = TEST_GOLD
+    progress.pages = list(range(1, PAGE_COUNT + 1))
+    save_meta(progress, target)
+    return target, backup
 
 
 def _write_json(target: Path, payload, indent: int | None = None) -> None:

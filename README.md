@@ -183,6 +183,13 @@ Or pick it from the applications menu. The game is a terminal program, so the
 menu entry opens a terminal — size it to roughly 100×34 if you can, because the
 sidebar gets cramped below about 30 rows.
 
+**For testing**, `./ndr --testrun` starts with every page of the chronicle and
+9999 coin. It merges into the save rather than replacing it — the scoreboard, the
+heroes and the name are left alone — and copies the file to `meta.json.bak` once,
+before the first time you ask, so there is always exactly one file to go back to
+and it is the one from before you ever asked. Copy it back over `meta.json` to
+undo.
+
 ## Scoring
 
 A run is scored on four things, and walking is not one of them:

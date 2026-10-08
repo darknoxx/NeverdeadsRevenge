@@ -171,3 +171,63 @@ def test_an_old_save_without_the_setting_means_the_sound_is_on(tmp_path: Path):
     path.write_text(json.dumps({"version": 1, "unlocked_heroes": ["noxx"]}))
 
     assert load_meta(path).muted is False
+
+
+# -- the test save -----------------------------------------------------------
+def test_a_test_save_fills_the_book_and_the_purse(tmp_path: Path):
+    from neverdeads_revenge.game.lore import PAGE_COUNT
+    from neverdeads_revenge.persistence import TEST_GOLD, grant_test_save
+
+    path = tmp_path / "meta.json"
+    save_meta(MetaProgress(gold=3), path)
+
+    grant_test_save(path)
+
+    loaded = load_meta(path)
+    assert loaded.gold == TEST_GOLD
+    assert loaded.pages == list(range(1, PAGE_COUNT + 1))
+
+
+def test_a_test_save_merges_rather_than_replaces(tmp_path: Path):
+    """A cheat should cost you nothing but the thing it cheats at. The
+    scoreboard, the heroes and the name are not what it came for."""
+    from neverdeads_revenge.persistence import grant_test_save
+
+    path = tmp_path / "meta.json"
+    progress = MetaProgress(last_name="Noxx", unlocked_heroes=["noxx", "yeti"])
+    progress.record_run(depth=7, score=1234, kills=55, name="Noxx", hero="noxx")
+    save_meta(progress, path)
+
+    grant_test_save(path)
+
+    loaded = load_meta(path)
+    assert [entry.score for entry in loaded.scores] == [1234]
+    assert loaded.unlocked_heroes == ["noxx", "yeti"]
+    assert loaded.last_name == "Noxx"
+    assert loaded.runs_started == 1
+
+
+def test_a_test_save_keeps_the_file_from_before_the_first_time(tmp_path: Path):
+    """Run the flag twice and the second run must not overwrite the original
+    with the first test state -- there has to be one file to go back to, and it
+    has to be the one from before you ever asked."""
+    from neverdeads_revenge.persistence import grant_test_save
+
+    path = tmp_path / "meta.json"
+    save_meta(MetaProgress(gold=42), path)
+
+    _, first_backup = grant_test_save(path)
+    _, second_backup = grant_test_save(path)
+
+    assert first_backup is not None
+    assert second_backup is None, "the backup was overwritten by a test state"
+    assert load_meta(first_backup).gold == 42
+
+
+def test_a_test_save_on_a_machine_with_nothing_saved_has_nothing_to_keep(tmp_path: Path):
+    from neverdeads_revenge.persistence import grant_test_save
+
+    _, backup = grant_test_save(tmp_path / "meta.json")
+
+    assert backup is None
+    assert not (tmp_path / "meta.json.bak").exists()

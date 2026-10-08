@@ -26,7 +26,26 @@ def main(argv: list[str] | None = None) -> int:
             "what played, what was dropped, and how far behind the device was"
         ),
     )
+    parser.add_argument(
+        "--testrun",
+        action="store_true",
+        help=(
+            "start with every page of the chronicle and 9999 coin, for testing. "
+            "The save file is copied to meta.json.bak first, once"
+        ),
+    )
     args = parser.parse_args(argv)
+
+    if args.testrun:
+        from neverdeads_revenge.game.lore import PAGE_COUNT
+        from neverdeads_revenge.persistence import TEST_GOLD, grant_test_save
+
+        path, backup = grant_test_save()
+        print(f"test save: {PAGE_COUNT} pages and {TEST_GOLD} coin -> {path}")
+        if backup is not None:
+            print(f"the save from before is kept at {backup}")
+        else:
+            print("there was no save to keep")
 
     if args.sound_log:
         # The audio layer reads this itself, so the flag is only a friendlier
