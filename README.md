@@ -497,6 +497,10 @@ conversation you have to walk past twice.
 | **Cinder** | keeps a fire that does not warm anything |
 | **the Lamplighter** | has never lit one on the way back up |
 | **the Sexton** | digs, because there is nobody to bury |
+| **the Listener** | waits for a thunderclap with no lightning under it |
+| **the Vessel** | says the ground under him is warm |
+| **the Wright** | builds small things that do nothing |
+| **the Copyist** | writes down a book that is in pieces |
 
 Each of them has several lines and says one per meeting, at random: hearing the
 same sentence twice from the same person is the moment a person becomes
@@ -504,6 +508,24 @@ furniture. **They carry no mechanics at all** -- no quest, no trade, no reward -
 and that is deliberate. A line of lore is the cheapest thing in the game to add
 and the most expensive to get wrong, so the first version is one sentence and no
 promise. A quest is a promise, and a promise needs a system behind it.
+
+**They are unreliable narrators, and that is the point of them.** The chronicle —
+the pages you collect — is the official history. These are what is left of the
+world it happened to, and each of them needs something to be true in order to
+keep going, so their version of the old stories is bent to fit it. The Tally
+trusts a ledger over the floor. Vesper names a different promiser every time she
+tells it. The Ninth has three tenth floors, one per reason he gives for turning
+back. Cinder needs a place in the great story and is only the ash that did not
+stand up. The Lamplighter lights the way for followers who are not there. The
+Sexton digs up the erased names and writes them back wrong -- *the wrong ones hold
+better* -- which is the key to all of it: a history written back wrong is why the
+rest of them disagree. The Listener needs the thunder to mean Shocker is alive.
+The Vessel reads an illness as having been chosen. The Wright cannot bear that
+the machine might not be understood. And the Copyist fills the gaps in the
+chronicle with what he invents, and says so: *that is not lying, that is repair*.
+
+None of them recognises the hero. They talk about the Lords as absent legends,
+and whether the hero is one of them is the player's to notice, not theirs.
 
 ## Saving a run
 
