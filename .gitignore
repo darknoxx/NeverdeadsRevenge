@@ -21,3 +21,10 @@ dist/
 
 # Generated previews of the icon (tools/make_icon.py --png)
 assets/*.png
+
+# Save data. It lives in ~/.local/share/neverdeads_revenge/ and is not in here --
+# this is a belt for the braces, in case NEVERDEADS_REVENGE_HOME is ever pointed
+# at the working tree. A clone must start with nothing.
+meta.json
+meta.json.bak
+run.json
