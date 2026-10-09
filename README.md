@@ -56,25 +56,34 @@ dials are for.
 
 | | Noxx | Yeti | Walkyrion |
 | --- | --- | --- | --- |
-| nothing bought | 2% | 0% | 0% |
-| every permanent upgrade, a bought blade, a bought coat and a bought amulet | 20% | 0% | 2% |
+| nothing bought | 0% | 0% | 0% |
+| every permanent upgrade, a bought blade, a bought coat and a bought amulet | 12% | 0% | 0% |
 | nothing bought, and every chest paid for fame | 0% | 0% | 0% |
 
-**Both rows are down again, and the second one hard.** It was 8% and 50%
-(Noxx) before the slope went from 18% a floor to 22.5% and the ceiling from
-2.6x to 3.0x. The report that prompted it was not "this is too easy" but a
-sharper thing: *a run with good equipment gets easier as it goes.* That is a
-slope problem as much as a ceiling one — the hero levels on every floor, so the
-dungeon has to be climbing at least as fast just to stand still, and a ceiling
-that is reached early means every floor after it is the same floor. The two
-dials are kept in step by a test that insists the ceiling is reached exactly on
-the last floor and not before.
+**Both rows are down hard, and the second one is the story.** It was 8% and 50%
+(Noxx) before this branch. Three things moved it, and they are worth separating
+because they are not the same kind of hard:
 
-The full-loadout row is the one that moved: 28% to 7.5% across all three
-heroes. The bot is the *floor*, not the ceiling — it is deliberately
-unimaginative, and it is still escaping one run in thirteen with everything
-bought, which is a wall a person can still climb. Whether it is a wall a person
-*wants* to climb is the thing playing it answers.
+* **the slope**, from 18% a floor to 22.5%, and the ceiling from 2.6x to 3.0x.
+  The report that prompted it was not "this is too easy" but something sharper:
+  *a run with good equipment gets easier as it goes.* That is a slope problem as
+  much as a ceiling one — the hero levels on every floor, so the dungeon has to
+  be climbing at least as fast just to stand still, and a ceiling reached early
+  makes every floor after it the same floor. The two dials are kept in step by a
+  test that insists the ceiling is reached exactly on the last floor.
+* **the hunter**, one floor in ten from the second down. A floor that has one is
+  a floor with a decision on it, and the bot makes that decision badly: it
+  fights things it should walk away from, which is the exact judgement it is
+  documented not to have.
+* **the tanky monsters**, which cost turns rather than blood. Turns are the
+  score, so they do not show up in the escape rate the way they show up in a
+  run.
+
+**Nothing bought is now zero for all three heroes.** That is the number to look
+at hardest, and it is the one most likely to be wrong: the bot is the *floor*,
+not a good player, and a floor that never escapes may be a floor a person still
+climbs — or it may be a floor that has stopped being fun. The dial is
+`POTENCY_PER_FLOOR` in `game/difficulty.py`, and it is one number.
 
 **Six kinds of thing to meet, and one that meets you.**
 

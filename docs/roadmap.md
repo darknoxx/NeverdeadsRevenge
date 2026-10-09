@@ -10,7 +10,7 @@ a preference: the status effects come before the weapons that use them, and the
 balance pass comes after everything that moves a number.
 
 
-## Step 1 — The marks panel, as columns
+## Step 1 — The marks panel, as columns — **done**
 
 `| ...log... | curses | gifts |`, names only. The descriptions move out of the
 panel and stay on the character sheet (`c`), which is where a player goes when
@@ -23,7 +23,7 @@ they want to read rather than to glance.
 * Truncation stays: a column that cannot show everything says `+N`.
 
 
-## Step 2 — Status effects, and the weapons that inflict them
+## Step 2 — Status effects, and the weapons that inflict them — **done**
 
 The foundation for bleed and poison, and for anything else that acts after the
 blow rather than with it.
@@ -37,7 +37,7 @@ blow rather than with it.
   that leaves thorns in whatever touches it.
 
 
-## Step 3 — More weapons, more armour
+## Step 3 — More weapons, more armour — **done**
 
 Hyperbole in the item table, where the game has the most room for it. The brief
 is *character*: an item whose stats make you play differently, not an item with a
@@ -51,7 +51,7 @@ the thing with no depth.
   nothing new has to be invented to hand them out.
 
 
-## Step 4 — More monsters, and monsters that scale
+## Step 4 — More monsters, and monsters that scale — **done**
 
 Two problems in one: too few kinds of thing to meet, and a run that gets *easier*
 as it goes because a good weapon outgrows the floor.
@@ -63,7 +63,7 @@ as it goes because a good weapon outgrows the floor.
 * Re-measure with `tools/balance.py` and put the numbers in the README.
 
 
-## Step 5 — The hunter
+## Step 5 — The hunter — **done**
 
 One floor in ten, something that is looking for you.
 
@@ -74,7 +74,7 @@ One floor in ten, something that is looking for you.
   the stairs. Killing it should be worth something.
 
 
-## Step 6 — More gifts
+## Step 6 — More gifts — **done**
 
 The chest's other half. A gift is a *rule*, so the bar is that it changes what
 the player can do rather than what they hit for.
@@ -84,7 +84,7 @@ the player can do rather than what they hit for.
 * Each one has to be as good as the curse beside it is bad.
 
 
-## Step 7 — The balance pass
+## Step 7 — The balance pass — **done**
 
 After all of the above, the dials are wrong somewhere.
 
@@ -100,3 +100,18 @@ The five meta curses (FORGOTTEN RUN, SECOND SELF, TAB, UNNAMED, NEXT ONE) are
 still planned and still need the meta/persistence plumbing. They are deliberately
 not mixed into this list -- they are a different kind of work and would make the
 balance pass meaningless.
+
+---
+
+## Where it got to
+
+All seven steps are done and pushed on `experimental`. The numbers each one was
+measured against are in the README, and the one worth arguing with is the escape
+rate: nothing bought is now **0%** for all three heroes, and everything bought
+is **12%** for Noxx and 0% for the other two. That is the dial to turn first if
+it turns out to be too much -- `POTENCY_PER_FLOOR` in `game/difficulty.py`, and
+it is one number.
+
+The five meta curses (FORGOTTEN RUN, SECOND SELF, TAB, UNNAMED, NEXT ONE) are
+still not done. They are the next list, and they still need the meta/persistence
+plumbing they needed before any of this started.
