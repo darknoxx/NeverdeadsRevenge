@@ -745,6 +745,9 @@ the player already has three slots of those; a gift changes what they can do.
 | THE KIND DARK | every floor you descend lifts one curse |
 | THE HOLLOW ROAD | walk into stone, at two health a square |
 | THE BORROWED HOUR | once a floor, take back the last thing you did -- including a death |
+| THE ASH MARK | every blow you land leaves it burning |
+| THE OPEN WOUND | your first blow on each thing leaves it bleeding |
+| THE SLOW KNITTING | every twentieth step puts one health back |
 
 They are meant to be about as good as the curse is bad. Not better: a chest worth
 opening for free would make the price decoration. Not worse: nobody takes the

@@ -63,6 +63,21 @@ GIFTS: dict[str, Gift] = {
         name="THE BORROWED HOUR",
         blurb="once a floor, take back the last thing you did",
     ),
+    "ash_mark": Gift(
+        key="ash_mark",
+        name="THE ASH MARK",
+        blurb="every blow you land leaves it burning",
+    ),
+    "open_wound": Gift(
+        key="open_wound",
+        name="THE OPEN WOUND",
+        blurb="your first blow on each thing leaves it bleeding",
+    ),
+    "slow_knitting": Gift(
+        key="slow_knitting",
+        name="THE SLOW KNITTING",
+        blurb="every twentieth step puts one health back",
+    ),
 }
 
 

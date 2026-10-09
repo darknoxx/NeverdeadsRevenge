@@ -592,6 +592,7 @@ def _try_move(state: GameState, direction: Direction) -> tuple[bool, bool]:
     state.player.position = target
     state.player.steps += 1
     _bleed(state)
+    _knit(state)
 
     # THE STEP BEHIND. Every fifth step costs no time at all, which is the one
     # gift that touches the *score* -- turns are the score -- and therefore the
@@ -621,7 +622,23 @@ def _through_stone(state: GameState, target) -> tuple[bool, bool]:
         state.die("The stone takes the rest of you.")
         return True, True
     _bleed(state)
+    _knit(state)
     return True, True
+
+
+def _knit(state: GameState) -> None:
+    """THE SLOW KNITTING. Walking, and only walking, closes a little.
+
+    Called from the two places a step can land -- ordinary floor and stone --
+    because a gift that only worked on one of them would be a gift with a
+    footnote.
+    """
+    if not state.has_gift("slow_knitting"):
+        return
+    if state.player.steps % SLOW_KNITTING_EVERY:
+        return
+    if state.player.stats.heal(1):
+        state.say("Something closes over. One back.", LogKind.GOOD)
 
 
 def _bleed(state: GameState) -> None:
@@ -674,7 +691,16 @@ def _resolve_player_attack(state: GameState, target: Actor) -> None:
 
     _enemy_takes_damage(state, target, outcome)
     if not outcome.killed:
-        _inflict(state, target, _inflicts_of(state.player))
+        # The blade's own statuses, plus the two gifts that add one. Built here
+        # rather than on the weapon because a gift is a *rule about the player*,
+        # not a property of the thing in their hand -- and the wound only opens
+        # on the first blow, which is the same "first" the patient knife reads.
+        opening: tuple[str, ...] = _inflicts_of(state.player)
+        if state.has_gift("ash_mark"):
+            opening += ("burn",)
+        if first and state.has_gift("open_wound"):
+            opening += ("bleed",)
+        _inflict(state, target, opening)
     if outcome.killed:
         _remove_corpse(state, target)
         return
@@ -1234,6 +1260,15 @@ LONG_REACH = 2
 
 #: Every how many steps THE STEP BEHIND gives away.
 STEP_BEHIND_EVERY = 5
+
+#: Every how many steps THE SLOW KNITTING closes one point of.
+#:
+#: Twenty rather than five. It is not a heal, it is a floor you can afford to
+#: walk: a hundred steps of it is five health, which is a potion, and the price
+#: is the turns -- the same currency the score is in. A gift that healed faster
+#: than that would make the draughts pointless and the run patient instead of
+#: careful.
+SLOW_KNITTING_EVERY = 20
 
 #: What THE HOLLOW ROAD charges for a square of stone.
 HOLLOW_ROAD_COST = 2
