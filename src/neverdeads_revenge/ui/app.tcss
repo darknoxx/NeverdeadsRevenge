@@ -130,6 +130,14 @@ Screen {
     height: 1fr;
 }
 
+/* The map and the effects panel that floats over it. Its own container so the
+   panel docks to the map's edge rather than to the row's -- the row's right
+   edge is the sidebar. */
+#map-area {
+    width: 1fr;
+    height: 1fr;
+}
+
 #map-view {
     width: 1fr;
     height: 1fr;

@@ -303,12 +303,11 @@ mistake rather than a style.
 | `w` `a` `s` `d` / `h` `j` `k` `l` / arrows | Move (walk into an enemy to attack) |
 | `.` or `space` | Wait a turn |
 | `enter` | Interact: pick up what you are standing on, take the stairs, or use the spring |
-| `c` | Character sheet: every stat, all three slots, and what has been done to you |
 | `>` | Descend, when you already know that is what you want |
 | `q` | Drink a potion |
-| `c` | Character sheet: every stat, and what each piece is contributing |
 | `i` | What you are carrying and wearing, and what each of them does |
-| `i` | Show what you are carrying |
+| `c` | Character sheet: every stat, all three slots, and what has been done to you |
+| `p` | Show or hide what is on you: curses, gifts and effects |
 | `?` | Controls and the terrain reference |
 | `Esc` | Menu: `r` resume, `s` save and quit, `m` sound on/off, `q` quit to title |
 
@@ -753,6 +752,20 @@ written down when it lands rather than recomputed on the way out.
 
 `c` opens the full sheet: every stat, what each piece is contributing, and what
 has been done to you.
+
+**`p` shows the same three things on the map**, in the corner of the field:
+curses in red, gifts in green, and everything else in force in cyan — the wild
+offers with their catches, and the borrowed hour and face while they are live.
+It is there because the sheet is a keypress away and it *closes*, and a player
+deciding whether to open a chest is not going to open a modal to remember what
+they are already carrying. `p` again puts it away for a player who wants the map
+and nothing else.
+
+It floats over the map rather than taking a column from it — the sidebar is full
+to the row — so it **counts what it can show and says so when it cannot show
+everything**: a long run ends the panel with `... and N more`, and `c` is still
+the whole sheet. A panel whose purpose is that you can see what is on you is not
+allowed to be the thing that quietly hides the fifth curse.
 
 ## Not implemented yet
 
