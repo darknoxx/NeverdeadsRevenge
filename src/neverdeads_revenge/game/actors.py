@@ -605,6 +605,55 @@ ENEMIES: dict[str, EnemyTemplate] = {
         # things hitting him, and this is the dial that changes it.
         weight_growth=1.25,
     ),
+    "ooze": EnemyTemplate(
+        key="ooze",
+        name="ooze",
+        glyph="o",
+        color="cyan",
+        # The wall. More health than anything else in the game and almost no
+        # damage: it will not kill a careful player and it will not die to one
+        # either. What it does is *cost* -- turns, which are the score, and the
+        # potions that would have carried the hero through the next floor.
+        # Every other monster asks a question; this one is a bill.
+        stats=Stats(max_hp=45, hp=45, speed=0.5, damage=(2, 4), armor=2),
+        gold=(9, 15),
+        weight=1.2,
+        # Grows more common with depth, like the wraith: a slow floor that is
+        # merely long is a floor that is merely long on floor two, and a real
+        # problem by floor eight, when the turns it eats are the turns the run
+        # needed.
+        weight_growth=1.18,
+    ),
+    "viper": EnemyTemplate(
+        key="viper",
+        name="viper",
+        glyph="v",
+        color="bright_green",
+        # The other end of the same idea: almost no health, quick, and it leaves
+        # poison behind. Killing it is easy and killing it *second* is the
+        # mistake -- the eight turns of poison outlive the viper by a long way,
+        # and that is the fight it is trying to pick.
+        stats=Stats(max_hp=12, hp=12, speed=1.2, damage=(3, 5), evasion=1),
+        gold=(5, 9),
+        inflicts=("poison",),
+        weight=1.5,
+        weight_growth=1.10,
+    ),
+    "mound": EnemyTemplate(
+        key="mound",
+        name="mound",
+        glyph="m",
+        color="blue",
+        # Tanky in the other direction: not a wall, a *weight*. It hits hard
+        # enough to be worth avoiding and has enough health that avoiding it is
+        # often the right answer, which is the decision the floor was missing.
+        # Cautious, so it does not chase -- it waits in the room it was put in.
+        behaviour="cautious",
+        stats=Stats(max_hp=34, hp=34, speed=0.6, damage=(6, 9), accuracy=1, armor=1),
+        gold=(10, 16),
+        weight=1.0,
+        weight_growth=1.20,
+    ),
 }
 
 

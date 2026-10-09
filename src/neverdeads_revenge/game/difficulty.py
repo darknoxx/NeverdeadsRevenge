@@ -49,16 +49,26 @@ __all__ = [
 #: great deal better than the bot does and reported reaching the end almost
 #: every time. The bot is the *floor* -- if it is still escaping sometimes at
 #: this slope, a person is still fine.
-POTENCY_PER_FLOOR = 0.18
+#:
+#: Raised again from 0.18, on the report that a run with good equipment gets
+#: *easier* as it goes. That is a slope problem as much as a ceiling one: the
+#: hero levels on every floor, so the dungeon has to be climbing at least as
+#: fast just to stand still. The two dials are kept in step by a test, which
+#: insists the ceiling is reached exactly on the last floor and not before.
+POTENCY_PER_FLOOR = 0.225
 
 #: Ceiling on potency. Without it a floor-40 monster would be unplayable and any
 #: formula mistake would silently become exponential. Just over two and a half
 #: times floor 1 is enough once floor 1 is already dangerous, and the hero's own
 #: levels are what the rest of the growth is for.
 #:
-#: Raised with the slope, so that the two arrive together: the last floor is now
-#: exactly where the ceiling is reached.
-MAX_POTENCY = 2.6
+#: Raised again on the experimental branch, from 2.6 to 3.0, and for a
+#: *different* reason than the last time. The report was that a run with good
+#: equipment gets easier as it goes -- which is what a ceiling does: once a floor
+#: is at 2.6x, every floor after it is at 2.6x, and the hero keeps levelling.
+#: Raising the ceiling moves where that flattening starts without touching floor
+#: one, which is the floor a new player actually meets.
+MAX_POTENCY = 3.0
 
 #: No monster may act this fast.
 #:

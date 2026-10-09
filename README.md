@@ -56,18 +56,25 @@ dials are for.
 
 | | Noxx | Yeti | Walkyrion |
 | --- | --- | --- | --- |
-| nothing bought | 8% | 0% | 0% |
-| every permanent upgrade, a bought blade, a bought coat and a bought amulet | 50% | 15% | 20% |
+| nothing bought | 2% | 0% | 0% |
+| every permanent upgrade, a bought blade, a bought coat and a bought amulet | 20% | 0% | 2% |
 | nothing bought, and every chest paid for fame | 0% | 0% | 0% |
 
-**The first two rows are half what they were.** They were measured at 11% and
-52% across all three heroes before the experimental branch raised the slope from
-14% a floor to 18%, the ceiling from 2.2x to 2.6x, and the monsters a floor from
-``7 + depth`` to ``8 + depth``. The reason was a player rather than a number:
-somebody who reaches the end almost every time is playing a game whose floor is
-too low, and the bot is the floor. It is now much closer to a wall than it was,
-which is either exactly right or a step too far -- that is what playing it is
-for.
+**Both rows are down again, and the second one hard.** It was 8% and 50%
+(Noxx) before the slope went from 18% a floor to 22.5% and the ceiling from
+2.6x to 3.0x. The report that prompted it was not "this is too easy" but a
+sharper thing: *a run with good equipment gets easier as it goes.* That is a
+slope problem as much as a ceiling one — the hero levels on every floor, so the
+dungeon has to be climbing at least as fast just to stand still, and a ceiling
+that is reached early means every floor after it is the same floor. The two
+dials are kept in step by a test that insists the ceiling is reached exactly on
+the last floor and not before.
+
+The full-loadout row is the one that moved: 28% to 7.5% across all three
+heroes. The bot is the *floor*, not the ceiling — it is deliberately
+unimaginative, and it is still escaping one run in thirteen with everything
+bought, which is a wall a person can still climb. Whether it is a wall a person
+*wants* to climb is the thing playing it answers.
 
 Sixty seeds a hero, so a hundred and eighty runs a row. Of the runs with nothing
 bought, thirty-five reached floor 10 and eighteen never got past floor 3. That is
