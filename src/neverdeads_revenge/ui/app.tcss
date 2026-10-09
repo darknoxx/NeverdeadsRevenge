@@ -162,7 +162,19 @@ Screen {
    the log needs the width -- a message is a sentence, and the log was printing
    them into half a screen of nothing. */
 #bottom {
-    height: 10;
+    height: 9;
+}
+
+/* The curses and the gifts, beside the log. Names only, so the columns are
+   narrow and the log keeps the rest. The widths are mirrored by ``CURSES_WIDTH``
+   and ``MARKS_WIDTH`` in ``widgets/marks.py``, where the reason for each is
+   written down. */
+#curses {
+    width: 16;
+}
+
+#marks {
+    width: 22;
 }
 
 #message-log {

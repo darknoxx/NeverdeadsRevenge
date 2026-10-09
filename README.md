@@ -752,23 +752,28 @@ written down when it lands rather than recomputed on the way out.
 `c` opens the full sheet: every stat, what each piece is contributing, and what
 has been done to you.
 
-**What is on you is on the screen the whole time**, in the box beside the
-message log: curses in red, gifts in green, and everything else in force in cyan
-— the wild offers with their catches, and the borrowed hour and face while they
-are live. No keypress to see it, because the character sheet is a keypress away
-and it *closes*, and a player deciding whether to open a chest is not going to
-open a modal to remember what they are already carrying.
+**What is on you is on the screen the whole time**, in two columns beside the
+message log: the curses in red, and the gifts in green with everything else in
+force in cyan — the wild offers, and the borrowed hour and face while they are
+live. No keypress to see it, because the character sheet is a keypress away and
+it *closes*, and a player deciding whether to open a chest is not going to open a
+modal to remember what they are already carrying.
 
-The box has a fixed height, so it **counts what it can show and says so when it
-cannot show everything**: a long run ends the list with `... and N more`, and `c`
-is still the whole sheet. A panel whose purpose is that you can see what is on
-you is not allowed to be the thing that quietly hides the fifth curse.
+**Names only.** The sentence that says what each one does stays on the sheet,
+where a player goes to read rather than to glance. That is not a compromise but
+the point: a full sentence costs two lines, which meant five curses could be
+shown three of them and a note, while a name is one line and the column can hold
+the list — which is what "what is on me" actually means.
 
-That box is also why the sidebar runs the **full height of the screen**, beside
-the log as well as the map. While it stopped at the log it shared its height with
-the bottom row, and every row the panel took was a row the legend lost — which is
-what pushed the draughts off the end of it. Now the panel only competes with the
-map, and the legend has room to spare.
+A column that still cannot show everything ends with `+N`, and `c` is the whole
+sheet. A column whose purpose is that you can see what is on you is not allowed
+to be the thing that quietly hides the fifth curse.
+
+Those columns are also why the sidebar runs the **full height of the screen**,
+beside the log as well as the map. While it stopped at the log it shared its
+height with the bottom row, and every row the columns took was a row the legend
+lost — which is what pushed the draughts off the end of it. Now the columns only
+compete with the map, and the legend has room to spare.
 
 ## Not implemented yet
 

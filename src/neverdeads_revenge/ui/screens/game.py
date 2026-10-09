@@ -28,9 +28,9 @@ from ...game.shop import Loadout
 from ...game.prologue import GOAL_HINT, terrain_help
 from ...game.state import GameState, start_run
 from ..audio import loudest_kind, sound_for_kind
-from ..widgets.effects import Effects
 from ..widgets.hud import Hud
 from ..widgets.legend import Legend
+from ..widgets.marks import Marks
 from ..widgets.map_view import MapView
 from ..widgets.message_log import MessageLog
 from .character import CharacterScreen
@@ -141,14 +141,13 @@ class GameScreen(Screen[None]):
             # The map column: the map, and the log and the marks beneath it.
             with Vertical(id="main"):
                 yield MapView(id="map-view")
-                # The log and the marks share this row. The log is a tail view
-                # whose lines are short, so half its width was always empty --
-                # and the panel that says what is on you needs a home that is
-                # not the map's corner. Side by side, neither has to be hidden
-                # to see the other.
+                # The log and the marks share this row: the log, then the
+                # curses, then the gifts. Names only, so the columns are narrow
+                # and the whole of what is on you fits in the glance.
                 with Horizontal(id="bottom"):
                     yield MessageLog(id="message-log")
-                    yield Effects(id="effects")
+                    yield Marks(("curses",), id="curses")
+                    yield Marks(("gifts", "effects"), id="marks")
             # The sidebar runs the full height, beside the log as well as the
             # map. Not decoration: the legend needs thirteen rows, and while the
             # sidebar stopped at the log it could not give them -- which is what
@@ -171,7 +170,8 @@ class GameScreen(Screen[None]):
         map_view = self.query_one(MapView)
         map_view.state = self.state
         self.query_one(Hud).state = self.state
-        self.query_one(Effects).state = self.state
+        for column in self.query(Marks):
+            column.state = self.state
         legend = self.query_one(Legend)
         # Who is playing, before the first redraw: the "you" row is the hero's
         # glyph, and the panel would otherwise show the roster's first entry.
@@ -192,12 +192,13 @@ class GameScreen(Screen[None]):
         assert self.state is not None
         self.query_one(MapView).refresh()
         self.query_one(Hud).redraw()
-        # The panel is redrawn by call rather than by assignment: the run is
+        # The columns are redrawn by call rather than by assignment: the run is
         # mutated in place, so setting the same object back would not fire the
         # reactive. A curse and a gift arrive at the same moment, and a descent
         # lifts one and changes what the borrowed hour is worth, so this is one
         # call for all of it.
-        self.query_one(Effects).redraw()
+        for column in self.query(Marks):
+            column.redraw()
         self.query_one(MessageLog).show_new(self.state)
         # The legend quotes monster stats, which get worse every floor, and the
         # hero's own glyph, which depends on who is playing. Reactive, so this
