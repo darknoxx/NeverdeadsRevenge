@@ -123,19 +123,14 @@ Screen {
 /* -- game screen ------------------------------------------------------- */
 
 #game-screen {
-    layout: vertical;
+    layout: horizontal;
 }
 
-#game-body {
-    height: 1fr;
-}
-
-/* The map and the effects panel that floats over it. Its own container so the
-   panel docks to the map's edge rather than to the row's -- the row's right
-   edge is the sidebar. */
-#map-area {
+/* The map column: the map, then the row the log and the marks share. */
+#main {
     width: 1fr;
     height: 1fr;
+    layout: vertical;
 }
 
 #map-view {
@@ -162,9 +157,17 @@ Screen {
    Six, not seven: the legend gained the chest row and the sidebar needed the
    line back. The log still shows the last four messages, which is what a fight
    needs. */
+/* The log and the panel that says what is on you, side by side. The row is
+   taller than the log alone was, because the panel needs the height more than
+   the log needs the width -- a message is a sentence, and the log was printing
+   them into half a screen of nothing. */
+#bottom {
+    height: 10;
+}
+
 #message-log {
     width: 1fr;
-    height: 6;
+    height: 1fr;
     min-height: 4;
     border: round $panel;
     padding: 0 1;

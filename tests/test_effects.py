@@ -5,7 +5,7 @@ its own lines instead of letting the widget do it:
 
 * that it shows a curse in red and a gift in green, each with the sentence that
   says what it does -- the same sentences the character sheet prints;
-* that it **never grows taller than the map it floats over**, and says how many
+* that it **never grows taller than the box it was given**, and says how many
   entries it had to leave out when it runs short.
 
 A panel whose whole purpose is that the player can see what is on them cannot be
@@ -97,7 +97,7 @@ def test_it_never_shows_more_lines_than_it_was_given():
     for key in EVERY_CURSE:
         state.add_curse(CURSES[key])
 
-    for budget in (6, 10, 16, 30):
+    for budget in (1, 2, 3, 6, 10, 16, 30):
         text = effects_text(state, budget=budget)
         assert len(str(text).splitlines()) <= budget, budget
 
@@ -137,6 +137,17 @@ def _game(app):
     return app.screen
 
 
+def _fill(screen) -> None:
+    """Put a little of everything on the run."""
+    for key in EVERY_CURSE:
+        screen.state.add_curse(CURSES[key])
+    screen.state.gifts.update(GIFTS)
+    screen.state.wilds.update(("greed", "pact", "grave_goods"))
+    screen.state.rewind_ready = True
+    screen.state.shrouded = 3
+    screen._refresh_all()
+
+
 async def test_a_curse_taken_mid_run_shows_up_at_once():
     """The run is mutated in place, so a reactive holding the same object never
     fires. The screen calls ``redraw`` for exactly this reason."""
@@ -157,7 +168,9 @@ async def test_a_curse_taken_mid_run_shows_up_at_once():
         assert "WITHER" in str(panel.render()), "the panel did not notice"
 
 
-async def test_p_puts_the_panel_away_and_puts_it_back():
+async def test_the_panel_is_always_on_screen():
+    """No keypress to see what is on you: that was the whole complaint about the
+    character sheet."""
     from neverdeads_revenge.ui.app import NeverdeadsRevenge
     from neverdeads_revenge.ui.widgets.effects import Effects
 
@@ -166,20 +179,33 @@ async def test_p_puts_the_panel_away_and_puts_it_back():
         screen = _game(app)
         await pilot.pause()
         panel = screen.query_one(Effects)
-        assert panel.display is True, "the panel starts hidden"
 
-        await pilot.press("p")
-        await pilot.pause()
-        assert panel.display is False
-
-        await pilot.press("p")
-        await pilot.pause()
         assert panel.display is True
+        assert panel.region.width > 0 and panel.region.height > 0
 
 
-async def test_the_panel_never_grows_taller_than_the_map():
-    """The one that matters. It floats over the map on a fixed height, so a run
-    with everything on it must still fit -- or say what it left out."""
+async def test_the_panel_and_the_log_share_the_bottom_row():
+    from neverdeads_revenge.ui.app import NeverdeadsRevenge
+    from neverdeads_revenge.ui.widgets.effects import Effects
+    from neverdeads_revenge.ui.widgets.message_log import MessageLog
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=(100, 34)) as pilot:
+        screen = _game(app)
+        await pilot.pause()
+
+        row = screen.query_one("#bottom")
+        panel = screen.query_one(Effects)
+        log = screen.query_one(MessageLog)
+
+        assert panel.parent is row and log.parent is row
+        assert log.region.right <= panel.region.x, "the two overlap"
+        assert log.region.y == panel.region.y
+
+
+async def test_the_panel_never_grows_taller_than_the_box_it_was_given():
+    """The one that matters. The box has a fixed height, so a run with
+    everything on it must still fit -- or say what it left out."""
     from neverdeads_revenge.ui.app import NeverdeadsRevenge
     from neverdeads_revenge.ui.widgets.effects import Effects
 
@@ -187,36 +213,50 @@ async def test_the_panel_never_grows_taller_than_the_map():
     async with app.run_test(size=(100, 34)) as pilot:
         screen = _game(app)
         await pilot.pause()
-
-        for key in EVERY_CURSE:
-            screen.state.add_curse(CURSES[key])
-        screen.state.gifts.update(GIFTS)
-        screen.state.wilds.update(("greed", "pact", "grave_goods"))
-        screen.state.rewind_ready = True
-        screen.state.shrouded = 3
-        screen._refresh_all()
+        _fill(screen)
         await pilot.pause()
 
         panel = screen.query_one(Effects)
-        area = screen.query_one("#map-area")
+        shown = len(str(panel.render()).splitlines())
 
-        assert panel.region.height <= area.region.height, "the panel ran off the map"
+        assert shown <= panel.size.height, "the panel ran out of its own box"
         assert "more" in str(panel.render()), "it truncated without saying so"
 
 
-async def test_the_panel_floats_over_the_map_rather_than_shrinking_it():
-    """It is an overlay: the map keeps every column it had."""
+async def test_the_panel_leaves_the_legend_its_rows():
+    """Why the sidebar runs the full height. While it stopped at log it shared
+    its height with the bottom row, and the draughts fell off the end of the
+    legend -- which is the one thing the panel must not cost."""
     from neverdeads_revenge.ui.app import NeverdeadsRevenge
-    from neverdeads_revenge.ui.widgets.effects import Effects
+    from neverdeads_revenge.ui.widgets.legend import Legend
 
     app = NeverdeadsRevenge()
     async with app.run_test(size=(100, 34)) as pilot:
         screen = _game(app)
         await pilot.pause()
 
-        map_view = screen.query_one("#map-view")
-        panel = screen.query_one(Effects)
-        area = screen.query_one("#map-area")
+        legend = screen.query_one(Legend)
+        lines = str(legend.render()).splitlines()
 
-        assert map_view.region.width == area.region.width, "the map gave up width"
-        assert panel.region.x > 0, "the panel is not on the map"
+        assert len(lines) <= legend.size.height, "the legend is clipped"
+        assert any("!" in line for line in lines), "the potion row is gone"
+        assert any("*" in line for line in lines), "the elixir row is gone"
+
+
+async def test_the_panel_survives_a_short_terminal():
+    """A short window must not push the panel out of its own box."""
+    from neverdeads_revenge.ui.app import NeverdeadsRevenge
+    from neverdeads_revenge.ui.widgets.effects import Effects
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=(100, 24)) as pilot:
+        screen = _game(app)
+        await pilot.pause()
+        _fill(screen)
+        await pilot.pause()
+
+        panel = screen.query_one(Effects)
+        shown = len(str(panel.render()).splitlines())
+
+        assert panel.size.height > 0, "the panel was squeezed out entirely"
+        assert shown <= panel.size.height

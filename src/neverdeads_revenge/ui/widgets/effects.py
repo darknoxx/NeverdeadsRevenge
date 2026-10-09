@@ -1,4 +1,4 @@
-"""What is on you, in the corner of the map.
+"""What is on you, beside the log.
 
 The character sheet has shown this since the first curse -- gifts in green,
 curses in red, each next to the sentence that says what it does. The trouble is
@@ -6,23 +6,24 @@ that the sheet is a keypress away and it *closes*: a player deciding whether to
 open a chest, or whether to cross a room, is not going to open a modal to
 remember what they are already carrying.
 
-So the same blocks sit on the map instead, in the corner of the field, and stay
-there: curses in red, gifts in green, and everything else in force in cyan. ``p``
-puts the panel away for a player who wants the map and nothing else.
+So the same blocks sit on the screen instead, all the time: curses in red, gifts
+in green, and everything else in force in cyan. It shares the bottom row with the
+message log, which is a tail view of short lines and was printing them into half
+a screen of nothing.
 
-It is an overlay -- docked to the right of the map area on its own layer --
-rather than a fourth column in the sidebar. That is not a style choice: the
-sidebar is full to the row (the legend needs every one of its fourteen) and the
-map will not give up width. The cost is the one corner of the map behind it,
-which is exactly what the keypress is for.
+It went through two worse shapes first. As an overlay on the map it was docked to
+a layer that never painted, so it was invisible and ``p`` looked broken. As a
+fourth column in the sidebar it could not be done at all: the sidebar is full to
+the row (the legend needs every one of its fourteen) and the map will not give up
+width. Side by side with the log, nothing has to be hidden to see anything else.
 
 **It counts what it can show and says so when it cannot show everything.** The
-panel is an overlay on a fixed height, so a long run -- six curses, three gifts,
-a couple of offers -- would run off the bottom of the map and stop mid-list,
-silently. A panel whose whole purpose is that the player can see what is on them
-cannot be the thing that quietly hides the fifth curse. So it wraps the entries
-itself, measures them against the height of the map it floats over, and ends with
-``... and N more`` when it has to stop. ``c`` is still the whole sheet.
+box has a fixed height, so a long run -- six curses, three gifts, a couple of
+offers -- would run off the bottom and stop mid-list, silently. A panel whose
+whole purpose is that the player can see what is on them cannot be the thing that
+quietly hides the fifth curse. So it wraps the entries itself, measures them
+against the height it was given, and ends with ``... and N more`` when it has to
+stop. ``c`` is still the whole sheet.
 
 The three blocks are the same three the sheet prints, and the sentences are the
 same sentences: a curse's ``price``, a gift's ``blurb``, an offer's ``pitch`` and
@@ -44,33 +45,22 @@ from ...game.state import GameState
 
 __all__ = ["Effects", "PANEL_WIDTH", "effects_text"]
 
-#: Width of the overlay, in cells. The same as the sidebar, so the two panels on
-#: screen share a measure instead of each inventing its own.
-PANEL_WIDTH = 34
+#: Width of the box, in cells. It shares the row under the map with the log, so
+#: this is also what decides how much width the log keeps.
+PANEL_WIDTH = 42
 
-#: Columns the panel's own border (2) and padding (2) spend. A line that fits in
+#: Columns the box's own border (2) and padding (2) spend. A line that fits in
 #: ``PANEL_WIDTH - CHROME`` fits the panel.
 CHROME = 4
 
-#: Most of the map's height the panel may cover. The rest is so the player can
-#: still see the room they are standing in.
-MAX_FRACTION = 0.9
-
-#: Fewest lines the panel will show, however short the terminal. Below this it
-#: stops being a summary and becomes a teaser.
-MIN_LINES = 6
-
 
 class Effects(Static):
-    """The curses, gifts and effects in force, over the map's top corner."""
+    """The curses, gifts and effects in force, beside the log."""
 
     DEFAULT_CSS = f"""
     Effects {{
-        dock: right;
-        layer: overlay;
         width: {PANEL_WIDTH};
-        height: auto;
-        max-height: 90%;
+        height: 1fr;
         border: round $panel;
         background: $surface;
         padding: 0 1;
@@ -92,6 +82,15 @@ class Effects(Static):
     def on_mount(self) -> None:
         self.redraw()
 
+    def on_resize(self) -> None:
+        """Re-measure on a resize.
+
+        How much the panel can show is a function of how tall it is, so a window
+        that gets shorter has to rebuild rather than leave a truncated list
+        claiming to be the whole of it.
+        """
+        self.redraw()
+
     def watch_state(self, state: GameState | None) -> None:
         self.redraw()
 
@@ -109,26 +108,20 @@ class Effects(Static):
     def _width(self) -> int:
         """The columns one line may use.
 
-        Falls back to the panel's nominal width before the first layout pass,
-        which is also the width it will have afterwards -- the two agree, so the
-        first frame is not a different shape from the second.
+        Falls back to the nominal width before the first layout pass, which is
+        also the width it will have afterwards -- the two agree, so the first
+        frame is not a different shape from the second.
         """
         return self.size.width or PANEL_WIDTH - CHROME
 
     def _budget(self) -> int | None:
-        """How many lines the panel may use, from the height of the map.
+        """How many lines the panel may use: the box it was given.
 
-        Read off the parent rather than off this widget, because this widget's
-        height is the thing being decided: asking it would be asking the answer.
-        ``None`` before there is anything to measure, which means "do not
-        truncate" -- the first frame is allowed to be wrong for one pass.
+        ``None`` before the first layout pass, which means "do not truncate" --
+        one frame is allowed to be wrong, and the resize that follows corrects
+        it.
         """
-        parent = self.parent
-        height = parent.size.height if parent is not None else 0
-        if height <= 0:
-            return None
-        # Minus the border, which is not a line of content.
-        return max(MIN_LINES, int(height * MAX_FRACTION) - 2)
+        return self.size.height or None
 
 
 def effects_text(
@@ -139,25 +132,37 @@ def effects_text(
     """The whole panel as one Rich ``Text``.
 
     ``budget`` is the total number of lines the panel may occupy, title and
-    notice included -- the whole shape of the thing, not just the entries. A
-    function rather than a method so a test can build the panel from a run
+    notice included -- the whole shape of the thing, not just the entries. It is
+    applied at the end, to the finished list, so that no combination of a small
+    budget and a long run can produce a panel taller than it was allowed to be.
+    A function rather than a method so a test can build the panel from a run
     without a terminal, the way ``legend_rows`` is a function and not a widget.
     """
-    out = Text()
-    out.append("ON YOU\n", style="bold")
+    lines: list[Text] = [Text("ON YOU", style="bold")]
 
     blocks = _blocks(state, width)
     if not blocks:
-        out.append("nothing on you", style="dim")
-        return out
+        lines.append(Text("nothing on you", style="dim"))
+    else:
+        # Two lines are not the entries': the title above them and the notice
+        # below them. ``_fit`` is handed what is left.
+        fitted, dropped = _fit(blocks, None if budget is None else budget - 2)
+        lines.extend(fitted)
+        if dropped:
+            lines.append(
+                Text(f"... and {dropped} more -- c for the whole sheet", style="dim")
+            )
 
-    # The title is one of the budgeted lines, so the entries get what is left.
-    lines, dropped = _fit(blocks, None if budget is None else budget - 1)
-    for line in lines:
+    if budget is not None:
+        # ``max(1, ...)`` so that the title -- the one line that says what the
+        # panel *is* -- survives a budget too small for anything else.
+        lines = lines[: max(1, budget)]
+
+    out = Text()
+    for index, line in enumerate(lines):
+        if index:
+            out.append("\n")
         out.append_text(line)
-        out.append("\n")
-    if dropped:
-        out.append(f"... and {dropped} more -- c for the whole sheet", style="dim")
     return out
 
 
@@ -254,7 +259,7 @@ def _entry(name: str, blurb: str, style: str, width: int) -> list[Text]:
 
 
 def _gift_rows(state: GameState) -> list[tuple[str, str]]:
-    rows = []
+    rows: list[tuple[str, str]] = []
     for key in sorted(state.gifts):
         gift = gift_by_key(key)
         if gift is not None:

@@ -91,7 +91,6 @@ HELP_TEXT = f"""\
 [bold]interact   [/]enter      pick up what you are standing on, or take the stairs
 [bold]descend    [/]>          the same, when you already know you want to go down
 [bold]drink      [/]q          [bold]character [/]c          [bold]carried [/]i
-[bold]effects    [/]p          show or hide what is on you: curses, gifts, effects
 [bold]the way out[/]  {GOAL_HINT}; step into it to win
 [bold]help       [/]?          [bold]menu[/]  escape
 
@@ -107,7 +106,6 @@ class GameScreen(Screen[None]):
         Binding("question_mark", "help", "Help"),
         Binding("f1", "help", "Help"),
         Binding("c", "character", "Character"),
-        Binding("p", "toggle_effects", "Effects"),
         Binding("escape", "menu", "Menu"),
     ]
 
@@ -139,19 +137,25 @@ class GameScreen(Screen[None]):
 
     # -- composition --------------------------------------------------------
     def compose(self) -> ComposeResult:
-        with Vertical(id="game-screen"):
-            with Horizontal(id="game-body"):
-                # The map area is its own container so the effects panel can
-                # dock to *the map's* right edge and float over it. Docked to the
-                # row it would sit over the sidebar instead, which is not where
-                # the player is looking.
-                with Horizontal(id="map-area"):
-                    yield MapView(id="map-view")
+        with Horizontal(id="game-screen"):
+            # The map column: the map, and the log and the marks beneath it.
+            with Vertical(id="main"):
+                yield MapView(id="map-view")
+                # The log and the marks share this row. The log is a tail view
+                # whose lines are short, so half its width was always empty --
+                # and the panel that says what is on you needs a home that is
+                # not the map's corner. Side by side, neither has to be hidden
+                # to see the other.
+                with Horizontal(id="bottom"):
+                    yield MessageLog(id="message-log")
                     yield Effects(id="effects")
-                with Vertical(id="sidebar"):
-                    yield Hud(id="hud")
-                    yield Legend(id="legend")
-            yield MessageLog(id="message-log")
+            # The sidebar runs the full height, beside the log as well as the
+            # map. Not decoration: the legend needs thirteen rows, and while the
+            # sidebar stopped at the log it could not give them -- which is what
+            # quietly pushed the draughts off the bottom of the panel.
+            with Vertical(id="sidebar"):
+                yield Hud(id="hud")
+                yield Legend(id="legend")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -467,18 +471,6 @@ class GameScreen(Screen[None]):
         assert self.state is not None
         self.app.arm_repeat_filter()
         self.app.push_screen(CharacterScreen(self.state))
-
-    def action_toggle_effects(self) -> None:
-        """``p`` puts the panel away, and puts it back.
-
-        The panel sits over the map's top corner, so there is a part of the map
-        behind it that a player may want to see -- an exit in the north-east, a
-        monster they are kiting. One keypress is the whole answer to that, and
-        the state is on the screen rather than on the panel so that ``p`` means
-        the same thing before the run has anything to show.
-        """
-        panel = self.query_one(Effects)
-        panel.display = not panel.display
 
     def action_menu(self) -> None:
         # An instance rather than a name, so the menu can be told whether the
