@@ -421,8 +421,13 @@ def test_only_the_wraith_becomes_more_common():
 def test_spawn_weights_at_a_depth_are_still_valid():
     """Every floor has to be able to spawn something."""
     for depth in DEPTHS:
+        # Never-rolled templates are out of the table on purpose: the hunter is
+        # placed by the floor rather than drawn from it, and it carries a weight
+        # of zero so that nothing can draw it by accident.
         weights = [
-            weight_at_depth(t.weight, t.weight_growth, depth) for t in ENEMIES.values()
+            weight_at_depth(t.weight, t.weight_growth, depth)
+            for t in ENEMIES.values()
+            if t.weight > 0
         ]
         assert all(w > 0 for w in weights)
         assert sum(weights) > 0

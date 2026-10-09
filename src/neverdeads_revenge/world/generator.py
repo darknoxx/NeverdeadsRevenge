@@ -40,6 +40,7 @@ __all__ = [
     "npc_count",
     "ESCAPE_DEPTH",
     "NPC_CHANCE",
+    "HUNTER_CHANCE",
 ]
 
 
@@ -63,6 +64,15 @@ def enemy_count(depth: int) -> int:
 #: floors is somebody you remember walking into, which is the whole point of
 #: them -- they are the only thing down here that is not trying to kill you.
 NPC_CHANCE = 0.25
+
+#: How likely a floor is to have the hunter on it.
+#:
+#: One floor in ten, from the second down. Not the first: floor one is where a
+#: player learns what a monster looks like, and the first thing they learn
+#: should not be something they cannot kill. Ten per cent is a floor that is
+#: usually ordinary and occasionally a decision -- flee it, fight it, or feed it
+#: the turns it costs to go around.
+HUNTER_CHANCE = 0.10
 
 
 def npc_count(rng: Rng, depth: int) -> int:
@@ -144,6 +154,10 @@ class GeneratedFloor:
     stairs_down: Pos
     spawn_points: list[Pos]
     depth: int
+    #: Where the hunter starts, or ``None`` for a floor that has none. Its own
+    #: field rather than another entry in ``spawn_points`` because the game rolls
+    #: a template per spawn point, and this one has exactly one template.
+    hunter: Pos | None = None
     #: Which tile marks the exit. ``STAIRS_DOWN`` everywhere but the last floor,
     #: where it is ``RIFT`` and taking it wins the run instead of continuing it.
     exit_tile: Tile = Tile.STAIRS_DOWN
@@ -324,6 +338,15 @@ def generate_floor(
         enemy_budget = min(enemy_count(depth), len(candidates))
     spawn_points = rng.shuffled(candidates)[:enemy_budget]
 
+    # The hunter, sometimes, on ground nothing else is standing on. Placed
+    # before the loot so its cell is kept clear the same way the spring's is.
+    hunter = None
+    if depth >= 2 and rng.chance(HUNTER_CHANCE):
+        taken = set(spawn_points) | {exit_pos}
+        free = [pos for pos in candidates if pos not in taken]
+        if free:
+            hunter = rng.pick(free)
+
     _scatter_decor(rng, dungeon_map, rooms, count=len(dungeon_map.walkable_positions()) // 18)
 
     # The spring before the loot, so that the loot's "plain floor only" rule
@@ -352,6 +375,7 @@ def generate_floor(
         player_start=player_start,
         stairs_down=exit_pos,
         spawn_points=spawn_points,
+        hunter=hunter,
         depth=depth,
         exit_tile=exit_tile,
         items=items,

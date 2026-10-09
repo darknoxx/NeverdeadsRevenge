@@ -28,6 +28,7 @@ from neverdeads_revenge.world.modifiers import Modifiers
 from neverdeads_revenge.world.tiles import Tile
 
 from .actors import (
+    ENEMIES,
     Actor,
     ActorKind,
     Hero,
@@ -35,6 +36,7 @@ from .actors import (
     make_hero,
     make_npc,
     pick_enemy_template,
+    scale_template,
 )
 from .combat import apply_revenge
 from .curses import CURSES, Curse
@@ -626,6 +628,13 @@ class GameState:
             make_enemy(pick_enemy_template(self.rng, depth), pos)
             for pos in floor.spawn_points
         ]
+        if floor.hunter is not None:
+            # Scaled by hand, because it is not drawn from the table: the
+            # potency curve lives in ``pick_enemy_template``, and a hunter that
+            # skipped it would be a floor-one monster on floor nine.
+            self.enemies.append(
+                make_enemy(scale_template(ENEMIES["hunter"], depth), floor.hunter)
+            )
         self.toughen_enemies()
         self.npcs = [make_npc(NPCS[key], pos) for pos, key in floor.npcs]
         if following:

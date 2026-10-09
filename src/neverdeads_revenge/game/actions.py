@@ -10,6 +10,7 @@ the game without a terminal.
 from __future__ import annotations
 
 import copy
+from collections import deque
 from dataclasses import fields
 
 from dataclasses import dataclass
@@ -1250,8 +1251,14 @@ def take_turn(state: GameState, actor: Actor) -> bool:
     """Let one enemy act. Returns whether it actually spent a turn."""
     if not actor.alive or state.over:
         return False
-    if not state.dungeon_map.is_visible(actor.position):
-        return False  # only act when the player can see you; keeps the game fair
+    if actor.behaviour != "hunter" and not state.dungeon_map.is_visible(
+        actor.position
+    ):
+        # Only act when the player can see you; keeps the game fair. The hunter
+        # is the exception and the whole of what it is: it knows where the
+        # player is from the moment the floor is built, so "fair" for it would
+        # be a monster that stands still in the dark.
+        return False
 
     player = state.player
     distance = chebyshev(actor.position, player.position)
@@ -1326,6 +1333,19 @@ def _move_towards_player(
     monsters close in rather than jitter. Sideways options let them slide around
     a blocked approach instead of pressing uselessly into a wall.
     """
+    if actor.behaviour == "hunter":
+        # The hunter takes the first step of the *shortest path*, not the
+        # straightest line. A greedy step is what everything else uses, and for
+        # a monster that only ever fights in the room it was placed in that is
+        # plenty -- but a greedy stepper walks into the first wall between it
+        # and the player and stays there, which is a hunter that looks broken
+        # rather than dangerous.
+        target = _hunter_step(state, actor, player)
+        if target is None:
+            return False
+        actor.position = target
+        return True
+
     forward = direction_towards(actor.position, player.position)
 
     if actor.behaviour == "cautious" and distance > 5:
@@ -1347,6 +1367,44 @@ def _move_towards_player(
         actor.position = target
         return True
     return False
+
+
+def _hunter_step(state: GameState, actor: Actor, player: Actor) -> Pos | None:
+    """The first cell of the shortest walkable path from ``actor`` to ``player``.
+
+    Breadth-first over the floor, which is about fifteen hundred cells on the
+    largest map and runs once per hunter turn. The path is rebuilt every turn
+    rather than stored: the player moves, the floor does not change, and a
+    cached path that outlives the thing it was planned around is how a monster
+    ends up walking confidently into a wall.
+    """
+    start, goal = actor.position, player.position
+    came_from: dict[Pos, Pos | None] = {start: None}
+    queue = deque([start])
+
+    while queue:
+        here = queue.popleft()
+        if here == goal:
+            break
+        for direction in DIRECTIONS:
+            step = direction.step(here)
+            if step in came_from:
+                continue
+            if step != goal and not state.dungeon_map.is_walkable(step):
+                continue
+            if step != goal and state.actor_at(step) is not None:
+                continue
+            came_from[step] = here
+            queue.append(step)
+
+    if goal not in came_from:
+        return None
+
+    # Walk the path back to the cell just after the start.
+    here = goal
+    while came_from.get(here) is not None and came_from[here] != start:
+        here = came_from[here]
+    return None if here == start else here
 
 
 #: Safety net so a pathological queue can never hang the game loop.

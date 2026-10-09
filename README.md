@@ -76,6 +76,31 @@ unimaginative, and it is still escaping one run in thirteen with everything
 bought, which is a wall a person can still climb. Whether it is a wall a person
 *wants* to climb is the thing playing it answers.
 
+**Six kinds of thing to meet, and one that meets you.**
+
+| | | |
+| --- | --- | --- |
+| `g` **ghoul** | slow, ordinary | the floor-one baseline |
+| `s` **skeleton** | even, armoured, cautious | waits in its room |
+| `w` **wraith** | fast, evasive, and its touch can leave a curse | gets commoner with depth |
+| `o` **ooze** | a wall: the most health in the game and almost no damage | costs turns, not blood |
+| `v` **viper** | almost no health, quick, and it leaves **poison** | kill it first, not second |
+| `m` **mound** | hits hard, armoured, enough health that going around is often right | cautious, so it waits |
+| `X` **hunter** | one floor in ten from the second down | it comes looking |
+
+The **hunter** is the only thing down here that hunts. Everything else waits to
+be walked into, or drifts at the player once it can see them; the hunter knows
+where they are from the moment the floor is built and walks there by the
+shortest path — not by the straightest line, because a monster that presses into
+the first wall between it and the player looks broken rather than dangerous. It
+is a decision rather than a wall: it can be outrun (1.4 against Noxx's 1.50, the
+one constraint in the whole balance) and left behind on the stairs, and killing
+it pays a great deal and is not the answer a floor is asking for.
+
+It never stands on floor one. Floor one is where a player learns what a monster
+looks like, and the first thing they learn should not be something they cannot
+kill.
+
 Sixty seeds a hero, so a hundred and eighty runs a row. Of the runs with nothing
 bought, thirty-five reached floor 10 and eighteen never got past floor 3. That is
 the shape the wall is meant to have: **floor one is a real fight**, the run climbs

@@ -654,6 +654,35 @@ ENEMIES: dict[str, EnemyTemplate] = {
         weight=1.0,
         weight_growth=1.20,
     ),
+    "hunter": EnemyTemplate(
+        key="hunter",
+        # Not "the hunter": every line that names a monster already says "The
+        # {name}", so the article here would be read out as "The the hunter
+        # strikes you". Every other monster is one lowercase word for the same
+        # reason, and it also keeps the legend row inside the sidebar.
+        name="hunter",
+        glyph="X",
+        # Its own red. ``bright_red`` is the draughts', and a monster that is
+        # the same colour as a potion is a monster the eye reads as loot.
+        color="#ff5555",
+        # The only thing down here that comes *looking*. Everything else waits
+        # to be walked into or drifts at the player once it can see them; this
+        # one knows where they are from the moment the floor is built and walks
+        # there, however far away that is.
+        #
+        # It is a decision rather than a wall: it can be outrun (speed 1.4
+        # against Noxx's 1.50, which is the one constraint in the whole balance)
+        # and it can be left behind on the stairs. Killing it is worth a great
+        # deal, and is not the answer a floor is asking for.
+        behaviour="hunter",
+        stats=Stats(
+            max_hp=55, hp=55, speed=1.4, damage=(7, 11), accuracy=2, armor=2
+        ),
+        gold=(30, 45),
+        # Never rolled: the floor spawns it deliberately, or not at all. See
+        # ``world/generator.py``.
+        weight=0.0,
+    ),
 }
 
 
@@ -742,5 +771,9 @@ def pick_enemy_template(rng: Rng, depth: int = 1) -> EnemyTemplate:
     weights = [
         (t, weight_at_depth(t.weight, t.weight_growth, depth))
         for t in ENEMIES.values()
+        # A weight of zero is "never rolled". The hunter is placed by the floor
+        # rather than drawn from the table, and leaving it in with a zero would
+        # be a trap for whatever ``choice_weighted`` does with one.
+        if t.weight > 0
     ]
     return scale_template(rng.choice_weighted(weights), depth)
