@@ -50,6 +50,15 @@ class GroundItem:
     #: Which amulet ability this grants, by key. Like ``curse``, a string: the
     #: rule belongs to ``game/``, and ``world/`` only carries the name of it.
     amulet: str | None = None
+    #: Statuses a blow from this weapon leaves running, by key. Like ``curse``
+    #: and ``amulet``, names rather than rules: the table is in
+    #: :mod:`game.statuses` and the world has no business knowing what a bleed
+    #: does.
+    inflicts: tuple[str, ...] = ()
+    #: Damage dealt back to whatever lands a blow on the wearer. Only
+    #: coats have it, and it is the one property that acts when the player
+    #: is *hit* rather than when they swing.
+    thorns: int = 0
 
 
 @dataclass(slots=True)

@@ -141,12 +141,13 @@ class GameScreen(Screen[None]):
             # The map column: the map, and the log and the marks beneath it.
             with Vertical(id="main"):
                 yield MapView(id="map-view")
-                # The log and the marks share this row: the log, then the
-                # curses, then the gifts. Names only, so the columns are narrow
-                # and the whole of what is on you fits in the glance.
+                # The log and the marks share this row: the log, then what is
+                # being done to you (curses, statuses), then what you have been
+                # given (gifts, effects). Names only, so the columns are narrow
+                # and the whole of it fits in the glance.
                 with Horizontal(id="bottom"):
                     yield MessageLog(id="message-log")
-                    yield Marks(("curses",), id="curses")
+                    yield Marks(("curses", "statuses"), id="curses")
                     yield Marks(("gifts", "effects"), id="marks")
             # The sidebar runs the full height, beside the log as well as the
             # map. Not decoration: the legend needs thirteen rows, and while the

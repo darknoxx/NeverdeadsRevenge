@@ -17,6 +17,7 @@ from neverdeads_revenge.world.modifiers import Modifiers
 
 from .difficulty import enemy_speed, potency, weight_at_depth
 from .npcs import NPC_COLOR, NPC_GLYPH, Npc
+from .statuses import status_by_key
 
 __all__ = [
     "Stats",
@@ -188,6 +189,9 @@ class Actor:
     gold: tuple[int, int] = (0, 0)
     #: Chance per landed blow that this actor's touch leaves a curse behind.
     curse_chance: float = 0.0
+    #: Statuses this actor's blows leave running, by key. Copied from the
+    #: template for a monster; the player's is read off the blade in hand.
+    inflicts: tuple[str, ...] = ()
     #: Which NPC this is, by key. ``None`` for everything that is not a person.
     npc: str | None = None
     #: Cells entered since the run started. A run total, like ``total_turns``,
@@ -208,6 +212,10 @@ class Actor:
     #: sheet can say which is which -- "you are wearing this" and "this was done
     #: to you" are different sentences.
     curse_modifiers: Modifiers = Modifiers()
+    #: What a blow left running on this actor, by key, with the turns left on
+    #: each. Empty for almost everything: only something a weapon or a monster
+    #: inflicted lives here, and it empties itself as it runs out.
+    statuses: dict[str, int] = field(default_factory=dict)
     #: Which of the three REVENGE grants this actor collects. Copied from the
     #: hero so the game layer never has to look the hero up mid-fight.
     trait: Trait = Trait.SPEED
@@ -259,7 +267,13 @@ class Actor:
         This is what the turn queue divides by, so a bonus granted by a kill
         immediately makes the holder act more often.
         """
-        return self.stats.speed + self.speed_bonus + self.modifiers.speed
+        base = self.stats.speed + self.speed_bonus + self.modifiers.speed
+        factor = 1.0
+        for key in self.statuses:
+            status = status_by_key(key)
+            if status is not None:
+                factor *= status.speed_factor
+        return base * factor
 
     @property
     def armor(self) -> int:
@@ -533,6 +547,9 @@ class EnemyTemplate:
     #: Chance per landed blow that this monster's touch leaves a curse behind.
     #: Zero for everything that is not the wraith.
     curse_chance: float = 0.0
+    #: Statuses this monster's blows leave running, by key. The other way a
+    #: monster can be a problem without hitting harder.
+    inflicts: tuple[str, ...] = ()
     #: Relative chance of being picked when populating a floor.
     weight: float = 1.0
     #: How much ``weight`` grows per floor descended. ``1.0`` keeps the monster
@@ -604,6 +621,7 @@ def make_enemy(template: EnemyTemplate, position: Pos) -> Actor:
         behaviour=template.behaviour,
         gold=template.gold,
         curse_chance=template.curse_chance,
+        inflicts=template.inflicts,
     )
 
 

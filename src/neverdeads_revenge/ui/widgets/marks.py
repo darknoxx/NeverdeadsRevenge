@@ -29,6 +29,7 @@ from textual.widgets import Static
 from ...game.gifts import gift_by_key
 from ...game.shop import WILD_OFFERS
 from ...game.state import GameState
+from ...game.statuses import status_by_key
 
 __all__ = ["Marks", "CURSES_WIDTH", "MARKS_WIDTH", "marks_text"]
 
@@ -42,7 +43,10 @@ MARKS_WIDTH = 22
 
 #: The groups each panel may show, and the colour each is drawn in. The same
 #: colours the character sheet uses for the same three things.
-STYLE = {"curses": "red", "gifts": "green", "effects": "cyan"}
+#: A status is yellow rather than red: a curse is a price the player agreed to
+#: and lasts the run, and a bleed is something that is happening to them right
+#: now and will stop. Two red things would say they are the same kind of thing.
+STYLE = {"curses": "red", "gifts": "green", "effects": "cyan", "statuses": "yellow"}
 
 
 class Marks(Static):
@@ -161,6 +165,16 @@ def _names(state: GameState | None, kind: str) -> list[str]:
             gift = gift_by_key(key)
             if gift is not None:
                 names.append(gift.name)
+        return names
+
+    if kind == "statuses":
+        # With the turns left on each, because a status is the one thing here
+        # that is going to end: "bleeding 3" is a number the player can wait out.
+        names = []
+        for key, turns in state.player.statuses.items():
+            status = status_by_key(key)
+            if status is not None:
+                names.append(f"{status.name} {turns}")
         return names
 
     if kind == "effects":

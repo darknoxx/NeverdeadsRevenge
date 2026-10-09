@@ -22,6 +22,7 @@ from ...game.gifts import gift_by_key
 from ...game.levels import KILLS_PER_LEVEL, MAX_LEVEL
 from ...game.pace import MAX_ACTIONS_PER_SECOND, actions_per_second
 from ...game.shop import describe_item
+from ...game.statuses import status_by_key
 from ...world.items import ITEMS
 
 from ...game.state import GameState
@@ -136,6 +137,19 @@ class CharacterScreen(ModalScreen[None]):
                 if gift is not None:
                     lines.append(
                         f"  [bold green]{gift.name}[/]  [dim]{gift.blurb}[/]"
+                    )
+
+        if player.statuses:
+            # Above the curses, because a status is the thing that is happening
+            # *now* -- a curse is a price and can wait, a bleed cannot.
+            lines.append("")
+            lines.append("[dim]statuses[/]")
+            for key, turns in player.statuses.items():
+                status = status_by_key(key)
+                if status is not None:
+                    lines.append(
+                        f"  [bold yellow]{status.name}[/]  "
+                        f"[dim]{turns} of your turns left[/]"
                     )
 
         if state.curses:

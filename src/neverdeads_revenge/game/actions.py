@@ -30,6 +30,7 @@ from .combat import apply_revenge, attack
 from .curses import TOUCH_CURSES, CURSES, curse_by_key
 from .gifts import gift_by_key
 from .lore import numeral
+from .statuses import status_by_key
 from .levels import apply_gain, gains_between, level_for
 from .npcs import npc_by_key
 from .state import GameState, LogKind, RunState
@@ -159,6 +160,107 @@ def _the(name: str) -> str:
     sort of thing that makes a whole screen look unfinished.
     """
     return name if name.startswith("the ") else f"the {name}"
+
+
+def _tick_statuses(state: GameState, actor: Actor) -> None:
+    """Run whatever a blow left behind, at the start of the actor's own turn.
+
+    Counted in the *victim's* turns, which is what makes a poison mean different
+    things to different monsters: eight turns is a long time for a ghoul and not
+    very long at all for something quick. The decrement comes first so that the
+    last turn still hurts -- a status that expires before it bites is a status
+    that lied about its length.
+    """
+    if not actor.statuses:
+        return
+
+    for key in list(actor.statuses):
+        status = status_by_key(key)
+        if status is None:
+            del actor.statuses[key]
+            continue
+
+        actor.statuses[key] -= 1
+        if actor.statuses[key] <= 0:
+            del actor.statuses[key]
+
+        if not status.damage:
+            continue
+
+        actor.stats.hp = max(0, actor.stats.hp - status.damage)
+        state.hits.append(actor.position)
+        if actor.is_player:
+            state.say(
+                f"You are {status.name}. {status.damage}.", LogKind.DAMAGE
+            )
+        else:
+            state.say(
+                f"The {actor.name} is {status.name}. {status.damage}.",
+                LogKind.GOOD,
+            )
+
+        if actor.stats.hp <= 0:
+            if actor.is_player:
+                state.die(f"The {status.name} finishes you.")
+            else:
+                state.say(f"The {actor.name} dies of it.", LogKind.GOOD)
+                # A kill is a kill, however it was finished: the coins, the
+                # level and the REVENGE all still belong to the player.
+                _on_death(state, actor)
+                _remove_corpse(state, actor)
+            return
+
+
+def _inflict(state: GameState, target: Actor, keys: tuple[str, ...]) -> None:
+    """Leave something running on whoever was just hit.
+
+    Refreshed rather than stacked. A second wound on a bleeding thing makes the
+    bleeding *last longer*; it does not make it bleed twice as hard. Stacking
+    would turn a fast cheap blade into a damage multiplier, which is the one
+    thing the cheap blades are not allowed to become.
+    """
+    if not keys or not target.stats.alive:
+        return
+
+    for key in keys:
+        status = status_by_key(key)
+        if status is None:
+            continue
+        fresh = key not in target.statuses
+        target.statuses[key] = max(target.statuses.get(key, 0), status.turns)
+        if not fresh:
+            continue
+        if target.is_player:
+            state.say(f"You are {status.name}.", LogKind.BAD)
+        else:
+            state.say(f"The {target.name} is {status.name}.", LogKind.GOOD)
+
+
+def _thorns_of(actor: Actor) -> int:
+    """What the wearer gives back to whatever lands a blow on them.
+
+    Read off the coat, at the moment it matters, for the same reason the blade's
+    statuses are read at the moment of the swing: a coat swapped mid-floor has to
+    start working on the next blow rather than the next run.
+    """
+    if not actor.is_player:
+        return 0
+    coat = actor.equipment.get("armour")
+    return coat.thorns if coat is not None else 0
+
+
+def _inflicts_of(actor: Actor) -> tuple[str, ...]:
+    """What this actor's blows leave behind.
+
+    For the player that is the blade in hand, read at the moment of the swing: a
+    weapon swapped mid-floor has to start working on the next blow, not the next
+    run. A monster carries it on its template, because a monster does not change
+    weapons.
+    """
+    if not actor.is_player:
+        return actor.inflicts
+    weapon = actor.equipment.get("weapon")
+    return weapon.inflicts if weapon is not None else ()
 
 
 def _remove_corpse(state: GameState, enemy: Actor) -> None:
@@ -570,6 +672,8 @@ def _resolve_player_attack(state: GameState, target: Actor) -> None:
         state.say("It has been waiting for this one.", LogKind.GOOD)
 
     _enemy_takes_damage(state, target, outcome)
+    if not outcome.killed:
+        _inflict(state, target, _inflicts_of(state.player))
     if outcome.killed:
         _remove_corpse(state, target)
         return
@@ -1173,6 +1277,23 @@ def _resolve_enemy_attack(state: GameState, attacker: Actor, player: Actor) -> N
     outcome = attack(attacker, player, state.rng, damage_scale=0.5 if warded else 1.0)
 
     _player_takes_damage(state, attacker, outcome)
+    if outcome.hit and not outcome.killed:
+        _inflict(state, player, attacker.inflicts)
+        thorns = _thorns_of(player)
+        if thorns:
+            back = attacker.stats.reflect(thorns)
+            if back:
+                state.hits.append(attacker.position)
+                state.say(
+                    f"Whatever is growing on you gives {back} of it back.",
+                    LogKind.GOOD,
+                )
+            if not attacker.stats.alive:
+                state.say(
+                    f"The {attacker.name} comes apart on you.", LogKind.GOOD
+                )
+                _on_death(state, attacker)
+                _remove_corpse(state, attacker)
 
     if warded and outcome.hit:
         # Spent by a blow that landed, not by a swing. "The first blow of each
@@ -1247,9 +1368,14 @@ def advance_world(state: GameState) -> None:
         if actor is None:
             break
         if actor.is_player:
-            break  # back to the player
+            # The player's own statuses run on the player's own turn, like
+            # everybody else's.
+            _tick_statuses(state, actor)
+            break
         if actor.alive:
-            take_turn(state, actor)
+            _tick_statuses(state, actor)
+            if actor.alive and not state.over:
+                take_turn(state, actor)
 
     # Counted down here rather than once per turn, so the borrowed face covers
     # exactly the monsters that answer the kill and not the ones after them.

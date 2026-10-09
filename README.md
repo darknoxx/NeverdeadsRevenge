@@ -624,12 +624,42 @@ The name grows with the thing, and the ladder is ordered by how rare it is:
 | | weapon | coat |
 | --- | --- | --- |
 | common | the rusted tooth, +1 damage | the thin hide, +1 armour |
-| | the grey bite, +2 damage, +5% crit | the grey shroud, +1 evasion |
-| | the long hunger, +2 damage, +10% crit | the swift step, +0.15 speed, +1 evasion |
+| | the thin wound, +1 damage, **bleeding** | the grey shroud, +1 evasion |
+| | the grey bite, +2 damage, +5% crit | the swift step, +0.15 speed, +1 evasion |
+| | the long hunger, +2 damage, +10% crit | the thorn coat, +1 armour, **thorns 2** |
 | rare | the heavy sorrow, +3 damage, -0.15 speed | the rune plate, +2 armour |
+| rare | the slow rot, +2 damage, **poisoned** | |
+| rare | the winter's tooth, +2 damage, **chilled** | |
 | chest | the runed edge, +4 damage, +10% crit | warden plate, +3 armour |
 | chest | the last argument, +5 damage, +1 armour | shade cloak, +3 evasion |
 | chest | grave iron, +6 damage, -0.20 speed | the burial shroud, +2 armour, +2 evasion, -0.10 speed |
+| chest | the ash kiss, +4 damage, **burning** | the ashfall cloak, +1 armour, +2 evasion, **thorns 3** |
+| chest | the thunderclap, +4 damage, +15% crit, +0.10 speed, **chilled** | the deep plate, +4 armour, -0.15 speed |
+| chest | the depthless, +4 damage, -0.10 speed, **bleeding and poisoned** | |
+
+**Four things a blade can leave behind**, and they are the one kind of damage
+that does not need a second swing — they run on the *victim's* own turn, so a
+slow monster does not bleed at the player's rate:
+
+| | what it does |
+| --- | --- |
+| bleeding | 2 a turn, for 3 of the victim's turns |
+| poisoned | 1 a turn, for 8 of them |
+| burning | 3 a turn, for 2 |
+| chilled | nothing at all — the victim moves at 0.6 speed for 4 turns |
+
+Bleed and poison are the same shape and deliberately different sizes: a wound is
+fast and shallow and is for a fight you are standing in, a poison is slow and
+long and is for a fight you are leaving. Re-applying one **refreshes** it rather
+than stacking — a second wound makes the bleeding last longer, it does not make
+it bleed twice as hard, because stacking would turn a fast cheap blade into a
+damage multiplier. A monster that dies of one still counts as killed, and pays
+out its coins, its level and its REVENGE like any other.
+
+**Thorns** are the other half of the same idea: damage given back to whatever
+lands a blow on you, and the only property in the game that acts when you are hit
+rather than when you swing. They go on the coat, and they are for the hero who
+would rather not be swung at at all.
 
 **Amulets** (`"`) are the third slot and the only one that grants an ability
 rather than a number. There are fourteen, four of them lying about and the rest

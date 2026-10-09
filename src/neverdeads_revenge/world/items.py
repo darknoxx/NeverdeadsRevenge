@@ -82,6 +82,13 @@ class ItemTemplate:
     #: not an amulet. The rule lives in :mod:`game.amulets`; this is only the
     #: name of it, the same way a chest carries a curse key.
     amulet: str | None = None
+    #: Statuses a blow from this weapon leaves running, by key. Same idea: names,
+    #: not rules. See :mod:`game.statuses`.
+    inflicts: tuple[str, ...] = ()
+    #: Damage dealt back to whatever lands a blow on the wearer. Only
+    #: coats have it, and it is the one property that acts when the player
+    #: is *hit* rather than when they swing.
+    thorns: int = 0
 
 
 #: Glyph and colour per kind of thing. Weapons and armour follow the old
@@ -180,7 +187,70 @@ ITEMS: dict[str, ItemTemplate] = {
         weight_growth=1.15,
     ),
 
+    "wound": ItemTemplate(
+        key="wound",
+        name="the thin wound",
+        glyph=WEAPON_GLYPH,
+        color=WEAPON_COLOR,
+        kind="weapon",
+        slot="weapon",
+        # The weakest blade in the game and the only cheap one that keeps working
+        # after the swing: one point now and six more over the next three of the
+        # monster's turns. Against a ghoul that makes it the best cheap weapon
+        # there is, and against a wraith -- which takes those three turns quickly
+        # -- it is better still.
+        modifiers=Modifiers(damage=1),
+        inflicts=("bleed",),
+        weight=4.0,
+    ),
+    "rot": ItemTemplate(
+        key="rot",
+        name="the slow rot",
+        glyph=WEAPON_GLYPH,
+        color=WEAPON_COLOR,
+        kind="weapon",
+        slot="weapon",
+        # Eight turns of one. Against a crowd it is nothing at all; against the
+        # one thing that will not die it is the entire plan, which is why a
+        # patient player wants this over a heavier blade.
+        modifiers=Modifiers(damage=2),
+        inflicts=("poison",),
+        weight=2.0,
+        weight_growth=1.12,
+    ),
+    "winter": ItemTemplate(
+        key="winter",
+        name="the winter's tooth",
+        glyph=WEAPON_GLYPH,
+        color=WEAPON_COLOR,
+        kind="weapon",
+        slot="weapon",
+        # Yeti's ice in a blade: it cuts for two and makes whatever it touches
+        # slow. Against the one thing that can outrun a careful player the slow
+        # is worth more than the two points ever will be.
+        modifiers=Modifiers(damage=2),
+        inflicts=("chill",),
+        weight=1.8,
+        weight_growth=1.15,
+    ),
+
     # -- armour ------------------------------------------------------------
+    "thorn_coat": ItemTemplate(
+        key="thorn_coat",
+        name="the thorn coat",
+        glyph=ARMOUR_GLYPH,
+        color=ARMOUR_COLOR,
+        kind="armour",
+        slot="armour",
+        # The Lord of Plants, who survives in the game only as a name in the
+        # spoil. What grows out of this is not armour, it is a bad idea to touch:
+        # the only coat that does something when the player is hit rather than
+        # when they are not.
+        modifiers=Modifiers(armor=1),
+        thorns=2,
+        weight=2.0,
+        weight_growth=1.15,
+    ),
     "hide": ItemTemplate(
         key="hide",
         name="the thin hide",
@@ -430,6 +500,51 @@ ITEMS: dict[str, ItemTemplate] = {
         chest_only=True,
         weight_growth=1.2
     ),
+    "kiss": ItemTemplate(
+        key="kiss",
+        name="the ash kiss",
+        glyph=WEAPON_GLYPH,
+        color=WEAPON_COLOR,
+        kind="weapon",
+        slot="weapon",
+        # Fireking's ash in a blade. Three a turn for two turns on top of the
+        # blow: the shortest and sharpest of the three, and the one that cares
+        # least how long the fight is. Four raw, because a chest has to beat
+        # everything that lies on a floor even before the burn is counted.
+        modifiers=Modifiers(damage=4),
+        inflicts=("burn",),
+        chest_only=True,
+        weight_growth=1.0,
+    ),
+    "thunder": ItemTemplate(
+        key="thunder",
+        name="the thunderclap",
+        glyph=WEAPON_GLYPH,
+        color=WEAPON_COLOR,
+        kind="weapon",
+        slot="weapon",
+        # Shocker's, out of the machine he walked into: a fast blade that leaves
+        # what it hits slow, and the crit is the lightning finding the seam.
+        modifiers=Modifiers(damage=4, crit_chance=0.15, speed=0.10),
+        inflicts=("chill",),
+        chest_only=True,
+        weight_growth=1.05,
+    ),
+    "depthless": ItemTemplate(
+        key="depthless",
+        name="the depthless",
+        glyph=WEAPON_GLYPH,
+        color=WEAPON_COLOR,
+        kind="weapon",
+        slot="weapon",
+        # The thing with no depth, in a blade. The only weapon in the game that
+        # inflicts two things at once, and it costs speed, because carrying a
+        # piece of that is not free.
+        modifiers=Modifiers(damage=4, speed=-0.10),
+        inflicts=("bleed", "poison"),
+        chest_only=True,
+        weight_growth=1.2,
+    ),
     "warden": ItemTemplate(
         key="warden",
         name="warden plate",
@@ -451,6 +566,35 @@ ITEMS: dict[str, ItemTemplate] = {
         modifiers=Modifiers(evasion=3),
         chest_only=True,
         weight_growth=1.05
+    ),
+    "ashfall": ItemTemplate(
+        key="ashfall",
+        name="the ashfall cloak",
+        glyph=ARMOUR_GLYPH,
+        color=ARMOUR_COLOR,
+        kind="armour",
+        slot="armour",
+        # It is made of what the plain was covered in. Hard to hit and unpleasant
+        # to touch -- the coat for a hero who would rather not be swung at at
+        # all. One point of armour as well, because evasion two alone is level
+        # with the best coat that lies on a floor, and a chest has to beat that.
+        modifiers=Modifiers(evasion=2, armor=1),
+        thorns=3,
+        chest_only=True,
+        weight_growth=1.1,
+    ),
+    "deep_plate": ItemTemplate(
+        key="deep_plate",
+        name="the deep plate",
+        glyph=ARMOUR_GLYPH,
+        color=ARMOUR_COLOR,
+        kind="armour",
+        slot="armour",
+        # Four points of armour is the most anything in the game offers, and it
+        # is paid for in speed: a hero who wears this has decided to be hit.
+        modifiers=Modifiers(armor=4, speed=-0.15),
+        chest_only=True,
+        weight_growth=1.15,
     ),
     "burial": ItemTemplate(
         key="burial",
@@ -563,6 +707,8 @@ def make_item(template: ItemTemplate) -> GroundItem:
         slot=template.slot,
         modifiers=template.modifiers,
         amulet=template.amulet,
+        inflicts=template.inflicts,
+        thorns=template.thorns,
     )
 
 
