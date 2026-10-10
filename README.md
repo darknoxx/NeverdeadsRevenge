@@ -423,27 +423,28 @@ are named events and get their own.
 **It is never late.** Spawning a player per sound measured at 190ms on the
 machine this was written on, of which the sound itself was fifty: a fight is
 faster than that, so the first blow made no noise and the next four arrived in a
-heap. The fix is to keep one player open and write raw samples into its standard
-input -- ten microseconds a sound instead of a hundred and ninety milliseconds --
-and to drop a sound whose moment has passed rather than queueing it behind the
-one playing. Levels, descents, chests and the two endings are never dropped:
-a hit that arrives late is about a moment that has gone, and a level arriving
-late is still the level.
+heap. And the attempt after that — one persistent `aplay` fed raw samples from a
+pipe — fixed the *spawn* cost and made the noise worse: the code scheduled by its
+own clock and dropped by its own estimate of how far behind the device was, and
+neither was measured. Thirteen sounds in a third of a second, seven of them
+drowned, which is exactly the erratic noise a fight used to be.
+
+**A fight is a mixer, not a playlist.** So the playback is a library that owns
+its own audio thread and *asks* the code for what to play: a callback stream, one
+mixing buffer, and the one piece of state the game was guessing at — where the
+device is — read straight off that buffer. A sound is mixed in *on top of*
+whatever the device has not played yet, at the point the device is about to play
+it, so the length of the buffer is bounded by the longest clip rather than by how
+many blows landed, and the drop rule becomes a net over a bug rather than a
+policy over a busy device. Levels, descents, chests and the two endings are never
+dropped at all: a hit that arrives late is about a moment that has gone, and a
+level arriving late is still the level.
 
 **And it is silent when it has to be.** A terminal game has no business assuming
-it can make a noise, so the player looks for `aplay` or `ffplay` (which can be
-kept open) and falls back to `pw-play`, `paplay` or `afplay` (which take a
-filename), or the standard library on Windows -- and does nothing at all if it
-finds none. No error, no delay, no missing feature. If the audio server goes away
-mid-run the game goes quiet and carries on.
-
-**And a sound is not thrown away for being a fifth of a second late.** The old
-rule dropped one the moment the device was busy with any of the previous one,
-which meant a kill -- a hundred and ninety milliseconds -- ate the blow that
-landed on top of it, and a fight came out with holes in it. The device may now
-fall a quarter of a second behind before anything is dropped; a sound shorter than
-that can never push it past the threshold on its own, and a test holds every sound
-to it.
+it can make a noise, so the playback library (`miniaudio`) is imported lazily and
+does nothing at all if it cannot be found, if there is no audio device, or if a
+build shipped without it. No error, no delay, no missing feature. If the audio
+server goes away mid-run the game goes quiet and carries on.
 
 **And it does not go quiet by accident.** The device is opened before the first
 blow rather than on it -- opening it costs about a hundred and forty milliseconds,

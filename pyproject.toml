@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Games/Entertainment :: Role-Playing",
 ]
 
-dependencies = ["textual>=8.0"]
+dependencies = ["textual>=8.0", "miniaudio>=1.71"]
 
 [project.optional-dependencies]
 dev = ["pytest>=9.0", "pytest-asyncio>=1.0"]
