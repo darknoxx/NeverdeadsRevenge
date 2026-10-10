@@ -2698,11 +2698,15 @@ def test_every_item_name_fits_the_inventory_column():
 
 def test_every_description_fits_beside_the_name():
     from neverdeads_revenge.game.shop import describe_item
-    from neverdeads_revenge.ui.screens.inventory import NAME_WIDTH, SLOT_WIDTH
+    from neverdeads_revenge.ui.screens.inventory import (
+        NAME_WIDTH,
+        PANEL_WIDTH,
+        SLOT_WIDTH,
+    )
     from neverdeads_revenge.world.items import ITEMS
 
     # Three columns, the indent, and the panel's border and padding.
-    width = 80 - 6
+    width = PANEL_WIDTH - 6
     for template in ITEMS.values():
         line = 2 + SLOT_WIDTH + NAME_WIDTH + len(describe_item(template))
         assert line <= width, f"{template.key}: the row is {line} wide, the box {width}"

@@ -446,8 +446,10 @@ InventoryScreen {
 #inventory {
     /* Wide enough for the longest description beside the longest name: an
        amulet's ability is a sentence, and a wrapped sentence in a column reads
-       as a mistake. It is a modal, so width is the cheap dimension. */
-    width: 80;
+       as a mistake. It is a modal, so width is the cheap dimension. Raised
+       from 80 when weapons started carrying statuses -- "the depthless" has
+       two of them and three numbers. Mirrored by ``PANEL_WIDTH``. */
+    width: 86;
     height: auto;
     max-height: 90%;
     padding: 1 2;

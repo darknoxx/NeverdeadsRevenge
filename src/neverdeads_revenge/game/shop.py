@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 
 from neverdeads_revenge.core.rng import Rng
 from neverdeads_revenge.game.amulets import AMULETS, blurb_for
+from neverdeads_revenge.game.statuses import status_by_key
 from neverdeads_revenge.world.items import ITEMS, ItemTemplate
 
 __all__ = [
@@ -333,14 +334,28 @@ def describe_item(template: ItemTemplate) -> str:
     """A short line for what an item does, as the shop says it.
 
     An amulet's ability is a sentence rather than a list of numbers, so it comes
-    from the amulet table; everything else is its modifiers. The dead weight has
-    both, and the sentence is the part worth reading.
+    from the amulet table; everything else is its modifiers, plus the two things
+    that are not modifiers at all. The dead weight has both, and the sentence is
+    the part worth reading.
+
+    Statuses and thorns are said here rather than on the sheet, because this one
+    function is what the sheet, the pack *and* the shop all read -- a blade that
+    opens a wound and does not say so is a blade the player has to find out
+    about by watching a monster lose health it was not being hit for.
     """
     if template.amulet is not None:
         return blurb_for(template.amulet)
     if template.heal:
         return f"heals {template.heal}"
+
     described = template.modifiers.describe()
+    for key in template.inflicts:
+        status = status_by_key(key)
+        if status is not None:
+            described.append(status.name)
+    if template.thorns:
+        described.append(f"thorns {template.thorns}")
+
     return ", ".join(described) if described else "does nothing in particular"
 
 

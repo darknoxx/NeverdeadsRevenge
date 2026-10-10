@@ -154,3 +154,39 @@ def test_a_status_shows_up_in_the_column_while_it_lasts():
     plain = str(marks_text(state, ("curses", "statuses")))
 
     assert "bleeding 3" in plain, plain
+
+
+# -- and it is said where the player looks -----------------------------------
+def test_a_blade_says_what_it_leaves_behind():
+    """The sheet, the pack and the shop all read ``describe_item``, so this one
+    function is the only place a status can be mentioned -- and a blade that
+    opens a wound without saying so is a blade the player has to work out by
+    watching a monster lose health it was not being hit for."""
+    from neverdeads_revenge.game.shop import describe_item
+    from neverdeads_revenge.world.items import ITEMS
+
+    assert "bleeding" in describe_item(ITEMS["wound"])
+    assert "poisoned" in describe_item(ITEMS["rot"])
+    assert "burning" in describe_item(ITEMS["kiss"])
+    assert "chilled" in describe_item(ITEMS["winter"])
+
+    # The one that does two.
+    both = describe_item(ITEMS["depthless"])
+    assert "bleeding" in both and "poisoned" in both
+
+
+def test_a_coat_says_what_it_gives_back():
+    from neverdeads_revenge.game.shop import describe_item
+    from neverdeads_revenge.world.items import ITEMS
+
+    assert "thorns 2" in describe_item(ITEMS["thorn_coat"])
+    assert "thorns 3" in describe_item(ITEMS["ashfall"])
+
+
+def test_a_plain_blade_is_described_exactly_as_it_was_before():
+    """Nothing gained a word it did not need."""
+    from neverdeads_revenge.game.shop import describe_item
+    from neverdeads_revenge.world.items import ITEMS
+
+    assert describe_item(ITEMS["tooth"]) == "+1 damage"
+    assert describe_item(ITEMS["edge"]) == "+4 damage, +10% crit"

@@ -32,6 +32,13 @@ SLOTS: tuple[str, ...] = ("weapon", "armour", "amulet")
 #: the game can hand you is "the revenant's patience" at twenty-three -- both
 #: measured against the real items by a test rather than trusted to stay that
 #: way.
+#: Width of the panel, in cells. Set in ``app.tcss`` and named here so the
+#: fitting test has something to check against instead of a magic number.
+#: Raised from 80 when weapons started carrying statuses: "+4 damage, +15%
+#: crit, +0.10 speed, chilled" is a real description now, and a wrapped
+#: description in a column reads as a mistake.
+PANEL_WIDTH = 86
+
 SLOT_WIDTH = 8
 NAME_WIDTH = 24
 
