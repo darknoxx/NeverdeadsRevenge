@@ -85,4 +85,27 @@ class PauseScreen(ModalScreen[str]):
         self.dismiss("save")
 
     def action_quit_game(self) -> None:
-        self.dismiss("quit")
+        """``q`` asks first, because the run does not come back.
+
+        The pause menu's ``q`` throws the run away without writing it down --
+        ``s`` is the one that saves -- so it gets the same question the title
+        gets before it closes the game, and for the same reason: it is not
+        something another keypress can undo.
+        """
+        from .confirm import ConfirmScreen
+
+        # Armed first: ``q`` is still down, and a dialog that answers its own
+        # opening keypress answers a question nobody read.
+        self.app.arm_repeat_filter()
+        self.app.push_screen(
+            ConfirmScreen(
+                "QUIT TO THE TITLE?",
+                "The run is not written down. Everything you are carrying "
+                "goes with it.",
+            ),
+            self._quit_confirmed,
+        )
+
+    def _quit_confirmed(self, answer: bool | None) -> None:
+        if answer:
+            self.dismiss("quit")

@@ -353,7 +353,7 @@ mistake rather than a style.
 | `i` | What you are carrying and wearing, and what each of them does |
 | `c` | Character sheet: every stat, all three slots, and what has been done to you |
 | `?` | Controls and the terrain reference |
-| `Esc` | Menu: `r` resume, `s` save and quit, `m` sound on/off, `q` quit to title |
+| `Esc` | Menu: `r` resume, `s` save and quit, `m` sound on/off, `q` quit to title (asks first) |
 
 On the **title screen**: any key starts a run, `s` opens the shop, `h` opens the
 scoreboard, `l` opens the chronicle, and `esc` (or `q`) asks before it closes the

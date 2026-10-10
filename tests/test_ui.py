@@ -796,6 +796,8 @@ async def test_prologue_appears_on_the_first_run_only():
         await pilot.pause()
         await pilot.press("q")
         await pilot.pause()
+        await pilot.press("y")
+        await pilot.pause()
         assert isinstance(app.screen, TitleScreen)
 
         await pilot.press("x")
@@ -1018,6 +1020,9 @@ async def test_quit_from_pause_returns_to_title():
 
         await pilot.press("q")
         await pilot.pause()
+        # ``q`` throws the run away, so it asks first.
+        await pilot.press("y")
+        await pilot.pause()
         assert isinstance(app.screen, TitleScreen)
         assert len(app.screen_stack) == 2, "the run's screens should be gone"
 
@@ -1029,6 +1034,8 @@ async def test_a_second_run_can_be_started_after_quitting():
         await pilot.press("escape")
         await pilot.pause()
         await pilot.press("q")
+        await pilot.pause()
+        await pilot.press("y")
         await pilot.pause()
 
         await drive_to_game(app, pilot)
@@ -2841,6 +2848,8 @@ async def test_quitting_without_saving_writes_nothing():
         await pilot.press("escape")
         await pilot.pause()
         await pilot.press("q")
+        await pilot.pause()
+        await pilot.press("y")
         await pilot.pause()
 
         assert isinstance(app.screen, TitleScreen)
