@@ -55,6 +55,13 @@ class SpringScreen(ModalScreen[bool]):
                 id="spring-hint",
             )
 
+    # A key still repeating from the screen before this one must not answer this
+    # one on the way in. See App.note_key. Only the repeats are stopped:
+    # everything else has to reach the bindings, which is where the answer is.
+    def on_key(self, event) -> None:
+        if self.app.note_key(event.key):
+            event.stop()
+
     def action_wash_it(self) -> None:
         if self.app.note_key("enter"):
             return

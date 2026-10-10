@@ -660,6 +660,9 @@ async def test_saying_yes_opens_the_chest():
         await pilot.pause()
         assert isinstance(app.screen, ChestScreen)
 
+        # A real player has read the price by now, and the gap is what tells
+        # the app that the key came up.
+        await asyncio.sleep(0.3)
         await pilot.press("enter")
         await pilot.pause()
 
@@ -999,6 +1002,7 @@ async def test_escape_opens_pause_and_escape_returns():
         await pilot.pause()
         assert isinstance(app.screen, PauseScreen)
 
+        await asyncio.sleep(0.3)
         await pilot.press("escape")
         await pilot.pause()
         assert isinstance(app.screen, GameScreen)
@@ -1663,7 +1667,7 @@ def test_the_app_tells_a_repeat_from_a_new_press():
     assert app.note_key("enter") is True, "the repeat right behind it"
     assert app.note_key("enter") is True
 
-    time.sleep(0.2)
+    time.sleep(0.3)
     assert app.note_key("enter") is False, "a later press is a new one"
 
     # And the filter is spent: nothing after the gap is swallowed.
@@ -2263,6 +2267,7 @@ async def test_washing_a_curse_off_in_the_ui():
 
         await pilot.press("enter")
         await pilot.pause()
+        await asyncio.sleep(0.3)
         await pilot.press("enter")
         await pilot.pause()
 
@@ -3060,3 +3065,113 @@ async def test_enter_is_not_throttled():
 
         assert state.depth == 2, "the second enter was swallowed"
         assert [item.item_id for item in state.inventory] == ["potion"]
+
+
+# -- one held key must not walk four screens ----------------------------------
+async def hold_for(pilot, seconds: float = 1.6) -> int:
+    """Hold a key the way a terminal repeats it, for ``seconds``.
+
+    One press every ~30ms, which is what a real hold produces -- not three taps
+    with a pause between them, which is the fallback route the other helper
+    takes and a different path through the code.
+    """
+    presses = 0
+    start = time.monotonic()
+    while time.monotonic() - start < seconds:
+        await pilot.press("enter")
+        presses += 1
+        await asyncio.sleep(0.03)
+    await pilot.pause()
+    return presses
+
+
+async def test_holding_enter_through_the_death_summary_stops_at_the_name_entry():
+    """It did not, once.
+
+    The summary closes on a held enter, the name entry is closed by enter too,
+    and the only thing between them was a filter that cleared the first time two
+    repeats arrived more than 150ms apart -- which a slow repeat rate, a loaded
+    machine or bundled events produce at will. One held key then walked the
+    summary, the name entry, the title, the hero select and into a new run, and
+    the name on the board was whatever was prefilled.
+    """
+    from neverdeads_revenge.ui.screens.name_entry import NameEntryScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        app._prologue_seen = True
+        app.push_screen(GameScreen("noxx", seed=3))
+        await pilot.pause()
+        screen = app.screen
+        screen.state.kills = 3
+        screen._game_over()
+        await pilot.pause()
+
+        await hold_for(pilot)
+
+        assert isinstance(app.screen, NameEntryScreen), (
+            f"a held enter walked past it, to {type(app.screen).__name__}"
+        )
+
+
+async def test_a_new_press_after_the_hold_still_keeps_the_name():
+    """The filter has to stop the leftovers and then let go, or the player could
+    never confirm the name at all."""
+    from neverdeads_revenge.ui.screens.name_entry import NameEntryScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+        screen.state.kills = 3
+        screen._game_over()
+        await pilot.pause()
+
+        await hold_for(pilot)
+        assert isinstance(app.screen, NameEntryScreen)
+
+        await asyncio.sleep(0.6)  # the key came up
+        await pilot.press("N")
+        await pilot.pause()
+        await pilot.press("X")
+        await pilot.pause()
+        assert clean_name("NX") == "NX"
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert isinstance(app.screen, TitleScreen)
+        assert app.progress.scores[-1].name == "NX"
+
+
+async def test_holding_escape_in_the_pause_does_not_close_the_menu_it_opened():
+    """``escape`` opens the pause menu and is ``resume`` in it. Without the key
+    recorded as the opening key, a held escape closes it on the way in."""
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        screen = await drive_to_game(app, pilot)
+
+        for _ in range(12):
+            await pilot.press("escape")
+            await asyncio.sleep(0.03)
+        await pilot.pause()
+
+        assert isinstance(app.screen, PauseScreen), (
+            f"the menu closed itself: {type(app.screen).__name__}"
+        )
+        assert screen.state is not None
+
+
+async def test_holding_escape_at_the_title_does_not_answer_the_quit_dialog():
+    """The dialog is opened by ``escape`` and ``escape`` is ``no`` in it."""
+    from neverdeads_revenge.ui.screens.confirm import ConfirmScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        for _ in range(12):
+            await pilot.press("escape")
+            await asyncio.sleep(0.03)
+        await pilot.pause()
+
+        assert isinstance(app.screen, ConfirmScreen)
+        assert not app._exit, "the game quit on the way to the question"

@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import time
 
-__all__ = ["HoldToContinue", "BAR_CELLS", "HOLD_SECONDS", "REPEAT_GAP"]
+__all__ = ["HoldToContinue", "BAR_CELLS", "HOLD_SECONDS", "REPEAT_GAP", "FILTER_GAP"]
 
 #: How long the key has to be held, in seconds.
 HOLD_SECONDS = 1.0
@@ -47,6 +47,26 @@ HOLD_KEYS = ("enter", "return")
 #: Comfortably above a terminal's repeat rate and comfortably below how fast
 #: anybody presses a key twice on purpose.
 REPEAT_GAP = 0.15
+
+#: Silence longer than this, while the repeat filter is armed, means the key that
+#: opened the screen has come up.
+#:
+#: Its own constant rather than ``REPEAT_GAP`` for a reason worth spelling out.
+#: The filter is the thing standing between a screen that closes on a *held* key
+#: and the screens after it, and two of them act on the same key: hold enter to
+#: leave the death summary and the name entry that follows is also closed by
+#: enter. So the filter clears only on a gap that is too long to be a repeat --
+#: and a terminal repeats every ~33ms, while a repeat *rate* set slow, a loaded
+#: machine, or events the terminal bundled can put a quarter of a second between
+#: two repeats of the same held key. At ``REPEAT_GAP`` that reads as a new press,
+#: and one held enter then walks the summary, the name entry, the title, the
+#: hero select and into a new run. Measured on this machine, exactly that.
+#:
+#: The same rule the hold itself uses (``RESET_AFTER``): silence longer than a
+#: quarter of a second is a key that came up. So a player on a terminal without
+#: key repeat -- who taps deliberately, about a third of a second apart -- still
+#: gets through, and a repeat stream at 180ms does not.
+FILTER_GAP = 0.25
 
 
 class HoldToContinue:

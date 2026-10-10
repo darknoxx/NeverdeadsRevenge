@@ -7,6 +7,8 @@ asks first.
 
 from __future__ import annotations
 
+import asyncio
+
 from neverdeads_revenge.ui.app import NeverdeadsRevenge
 from neverdeads_revenge.ui.screens.confirm import ConfirmScreen
 from neverdeads_revenge.ui.screens.title import TitleScreen
@@ -59,6 +61,7 @@ async def test_escape_answers_no_like_it_does_everywhere_else():
         await pilot.pause()
         await pilot.press("escape")
         await pilot.pause()
+        await asyncio.sleep(0.3)
         await pilot.press("escape")
         await pilot.pause()
 

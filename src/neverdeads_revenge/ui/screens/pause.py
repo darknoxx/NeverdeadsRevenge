@@ -67,6 +67,13 @@ class PauseScreen(ModalScreen[str]):
             return "[dim]no player found[/]"
         return "[dim]off[/]" if self.sfx.muted else "[bold green]on[/]"
 
+    # A key still repeating from the screen before this one must not answer this
+    # one on the way in. See App.note_key. Only the repeats are stopped:
+    # everything else has to reach the bindings, which is where the answer is.
+    def on_key(self, event) -> None:
+        if self.app.note_key(event.key):
+            event.stop()
+
     def action_toggle_sound(self) -> None:
         if self.sfx is not None:
             # Through the app when there is one, so the choice is written down

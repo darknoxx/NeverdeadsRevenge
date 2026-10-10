@@ -33,7 +33,7 @@ from ..persistence import (
     save_run as write_run,
 )
 from .audio import Sfx
-from .hold import REPEAT_GAP
+from .hold import FILTER_GAP, REPEAT_GAP
 from .screens.game import GameScreen
 from .screens.game_over import GameOverScreen
 from .screens.help import HelpScreen
@@ -92,13 +92,25 @@ class NeverdeadsRevenge(App[None]):
         self._last_action_time = 0.0
         self._filter_repeats = False
 
-    def arm_repeat_filter(self) -> None:
+    def arm_repeat_filter(self, key: str | None = None) -> None:
         """Swallow the rest of a key held on the screen that just went away.
 
         Armed by a hold-to-continue dismissal, because that is the only time a
         key is known to be down as the screen changes.
+
+        ``key`` is what was pressed, and it is worth passing whenever the caller
+        knows it: the filter clears on a *gap*, so the clock has to start at the
+        moment the key was seen -- which for a binding (``c``, ``escape``) is a
+        key event the app never saw at all, because bindings reach the action
+        directly. Without a key the clock is left alone, because the caller that
+        arms after a key event already has a fresh one and resetting it here
+        would swallow the *next* deliberate press too.
         """
         self._filter_repeats = True
+        if key is None:
+            return
+        self._last_key = key
+        self._last_key_time = time.monotonic()
 
     def allows_action(self, key: str, speed: float = 1.0) -> bool:
         """Whether this press should act, or is a held key repeating.
@@ -140,16 +152,27 @@ class NeverdeadsRevenge(App[None]):
         the first attempt and it hung the test harness.
         """
         now = time.monotonic()
-        repeat = key == self._last_key and now - self._last_key_time < REPEAT_GAP
+        same_key = key == self._last_key
+        gap = now - self._last_key_time
         self._last_key = key
         self._last_key_time = now
 
         if not self._filter_repeats:
             return False
-        if repeat:
+
+        # Armed, so the question is no longer "is this a repeat" but "is the key
+        # that opened the screen still down?" -- and that is a wider window than
+        # REPEAT_GAP. A terminal repeats every ~33ms; a repeat rate set slow, a
+        # loaded machine or bundled events can put a quarter of a second between
+        # two repeats of the same held key, and a filter that cleared on that
+        # would let one held enter walk the death summary, the name entry, the
+        # title, the hero select and into a new run. It did.
+        if same_key and gap < FILTER_GAP:
             return True
-        # A gap: the key came up, so the burst that crossed the screen change is
-        # over and everything after it is somebody pressing on purpose.
+
+        # A gap wider than that: the key came up, so the burst that crossed the
+        # screen change is over and everything after it is somebody pressing on
+        # purpose.
         self._filter_repeats = False
         return False
 

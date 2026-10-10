@@ -172,6 +172,11 @@ class TitleScreen(Screen[None]):
         otherwise start a run on the way past.
         """
         if event.key in ("s", "h", "l", "escape", "q"):
+            # A binding has it -- but the app has never *seen* the key, and the
+            # repeat filter clears on a gap measured from the last key event.
+            # Recording it here is what makes a held ``escape`` not answer the
+            # quit dialog it just opened.
+            self.app.note_key(event.key)
             return  # a binding has it
         if event.key == "c" and self._has_saved_run():
             # Only swallowed when there is something to pick up; otherwise "c"

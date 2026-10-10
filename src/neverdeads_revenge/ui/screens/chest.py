@@ -69,6 +69,13 @@ class ChestScreen(ModalScreen[str | None]):
                 id="chest-hint",
             )
 
+    # A key still repeating from the screen before this one must not answer
+    # this one on the way in. See App.note_key. Only the repeats are stopped:
+    # everything else has to reach the bindings, which is where the answer is.
+    def on_key(self, event) -> None:
+        if self.app.note_key(event.key):
+            event.stop()
+
     def action_open_it(self) -> None:
         # Enter is *bound*, so it never reaches ``on_key`` -- Textual checks the
         # bindings first. Holding enter on a chest used to open it before the

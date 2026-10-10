@@ -465,18 +465,23 @@ class GameScreen(Screen[None]):
 
     # -- actions ------------------------------------------------------------
     def action_help(self) -> None:
-        self.app.arm_repeat_filter()
+        # A binding, not a key event: the app never saw the ``?``, so the filter
+        # has to be told what to look for.
+        self.app.arm_repeat_filter("?")
         self.app.push_screen("help")
 
     def action_character(self) -> None:
         """The full sheet. Costs no turn -- it is only a look."""
         assert self.state is not None
-        self.app.arm_repeat_filter()
+        self.app.arm_repeat_filter("c")
         self.app.push_screen(CharacterScreen(self.state))
 
     def action_menu(self) -> None:
         # An instance rather than a name, so the menu can be told whether the
-        # sound is on before it draws itself.
+        # sound is on before it draws itself. And the opening key is recorded:
+        # ``escape`` opens this menu *and* is ``resume`` in it, so a held
+        # ``escape`` would otherwise close the menu it just opened.
+        self.app.arm_repeat_filter("escape")
         self.app.push_screen(PauseScreen(self.app.sfx), self._pause_result)
 
     def _pause_result(self, result: str | None) -> None:
