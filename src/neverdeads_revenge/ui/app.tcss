@@ -512,6 +512,39 @@ NpcScreen {
     color: #6b6b6b;
 }
 
+/* -- a question with two answers ------------------------------------------ */
+
+#confirm {
+    width: 56;
+    height: auto;
+    padding: 1 2;
+    border: round $warning;
+    background: $surface;
+}
+
+#confirm-title {
+    width: 1fr;
+    height: auto;
+    margin: 0 0 1 0;
+    content-align: center middle;
+    text-style: bold;
+    color: $warning;
+}
+
+#confirm-body {
+    width: 1fr;
+    height: auto;
+    margin: 0 0 1 0;
+    color: $foreground;
+}
+
+#confirm-hint {
+    width: 1fr;
+    height: auto;
+    content-align: center middle;
+    color: #6b6b6b;
+}
+
 /* -- a page of the chronicle --------------------------------------------- */
 
 #page {

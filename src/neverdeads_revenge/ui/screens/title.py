@@ -137,6 +137,32 @@ class TitleScreen(Screen[None]):
         self.app.arm_repeat_filter()
         self.app.open_shop()
 
+    def action_quit(self) -> None:
+        """``escape`` and ``q`` ask before they close the game.
+
+        The one action in the game that cannot be taken back by pressing another
+        key: everything else happens *inside* a run and can be lived with or
+        lifted, and this ends the program. It used to fall through to Textual's
+        own ``action_quit`` and close on the first press, which is a fine way to
+        lose a game by leaning on the keyboard.
+        """
+        from .confirm import ConfirmScreen
+
+        # Armed first: the key that opened this is still down, and a dialog that
+        # answers its own opening keypress answers a question nobody read.
+        self.app.arm_repeat_filter()
+        self.app.push_screen(
+            ConfirmScreen(
+                "QUIT NEVERDEAD'S REVENGE?",
+                "The dungeon will still be here when you come back.",
+            ),
+            self._quit_confirmed,
+        )
+
+    def _quit_confirmed(self, answer: bool | None) -> None:
+        if answer:
+            self.app.exit()
+
     def on_key(self, event) -> None:
         """Any key starts the game -- no hunting for the right one.
 

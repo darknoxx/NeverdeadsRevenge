@@ -356,8 +356,10 @@ mistake rather than a style.
 | `Esc` | Menu: `r` resume, `s` save and quit, `m` sound on/off, `q` quit to title |
 
 On the **title screen**: any key starts a run, `s` opens the shop, `h` opens the
-scoreboard and `l` opens the chronicle. In the **shop**: up/down choose, `enter`
-buys, `s` or `Esc` leaves.
+scoreboard, `l` opens the chronicle, and `esc` (or `q`) asks before it closes the
+game — it is the only thing in the game that cannot be taken back by pressing
+another key, so it is the only thing that asks. In the **shop**: up/down choose,
+`enter` buys, `s` or `Esc` leaves.
 
 **Holding a direction walks, and fights, at six steps a second** -- and it scales
 with the hero's speed, so Noxx rattles along at nine and Yeti plods at four and a
