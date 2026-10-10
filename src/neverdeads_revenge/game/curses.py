@@ -5,10 +5,10 @@ owed half. The reward stays hidden until the lid is up -- that is what makes it
 daring rather than arithmetic -- so the price has to be stated plainly, and
 :attr:`Curse.price` is the sentence the player decides on.
 
-A wide record rather than one class per curse. There are six of these, each uses
-one or two of the fields, and one table you can take in at a glance beats six
-small classes with one method each. The alternative would be a hierarchy built to
-express five different kinds of nothing.
+A wide record rather than one class per curse. There are thirteen of these,
+each uses one or two of the fields, and one table you can take in at a glance
+beats thirteen small classes with one method each. The alternative would be a
+hierarchy built to express a dozen different kinds of nothing.
 
 Lives in ``game/`` because a curse changes how a run plays. The chest itself
 carries only the curse's *key*, so ``world/`` never has to import this.
@@ -62,9 +62,6 @@ class Curse:
     #: How much wider the damage roll swings. Above one is the fever: not less
     #: damage, less *predictable* damage.
     damage_spread: float = 1.0
-    #: Whether taking this empties the pack, the way wither takes health. The
-    #: run's reserve, gone in one sentence.
-    empties_pack: bool = False
     #: How many of the monsters left alive follow the player down. Capped, and
     #: the price says so: "what you leave alive" uncapped is a swarm, and a
     #: swarm is not a price, it is the end of the run.
@@ -158,12 +155,6 @@ CURSES: dict[str, Curse] = {
         name="FEVER",
         price="your blows swing twice as wide",
         damage_spread=2.0,
-    ),
-    "hollow": Curse(
-        key="hollow",
-        name="HOLLOW",
-        price="everything you are carrying, gone",
-        empties_pack=True,
     ),
     "crawl": Curse(
         key="crawl",

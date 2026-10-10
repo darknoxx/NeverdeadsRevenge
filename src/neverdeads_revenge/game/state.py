@@ -89,15 +89,14 @@ KILL_SCORE = 30
 
 #: What one promise of fame is worth, added to the score multiplier.
 #:
-#: Added rather than multiplied. A fifth each sounds small, but six of them
-#: multiplied is two and a half times and the top of the board stops being about
-#: the run at all.
+#: Added rather than multiplied. A fifth each sounds small, but multiplied it
+#: runs away: the top of the board stops being about the run at all.
 #:
 #: There is no ceiling, and there does not need to be one: a chest is only ever
-#: placed for a curse the player has *not* already paid, so the six curses are
-#: the ceiling. Six promises is 2.2x -- and six curses at once is WITHER, BLEED,
-#: FRAIL, HEAVY, DIM and FAMINE together, which is very nearly a death sentence.
-#: A spring can free a curse for another promise, at forty coin and a detour.
+#: placed for a curse the player has *not* already paid, so the curses themselves
+#: are the ceiling. Taking every one of the thirteen is 3.6x on a run that is not
+#: going to finish, and a spring can free a curse for another promise, at forty
+#: coin and a detour.
 FAME_PER_CHEST = 0.20
 
 #: Points per turn saved against that budget.
@@ -271,13 +270,6 @@ class GameState:
             # Written down, because the fraction is of the maximum at this
             # moment and recomputing it later would give a different number.
             self.curses[-1] = replace(curse, wither_taken=lost)
-
-        if curse.empties_pack and self.inventory:
-            self.inventory.clear()
-            self.say(
-                "The pack is empty. Whatever you were saving is not yours.",
-                LogKind.BAD,
-            )
 
         self.say(f"{curse.name}: {curse.price}.", LogKind.BAD)
 
@@ -989,8 +981,7 @@ def _apply_wilds(state: GameState, keys) -> None:
     """Apply the bargains. Each one is its own small rule, on purpose.
 
     A table of effects would be shorter and would also be a table of lambdas,
-    which is not shorter to read. There are six of these and each does something
-    the others do not.
+    which is not shorter to read. Each one does something the others do not.
     """
     for key in keys:
         state.wilds.add(key)

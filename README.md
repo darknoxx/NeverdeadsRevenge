@@ -268,10 +268,9 @@ and the speed bonus into a rounding error.
 either way; what changes is what is bought with it. Take the blade behind the
 lid, or leave it and take the name -- a bigger score at the end of the run. It
 has no ceiling and does not need one: a chest is only ever placed for a curse the
-player has *not* already paid, so the six curses are the ceiling. Six promises is
-2.2x, and six curses at once is WITHER, BLEED, FRAIL, HEAVY, DIM and FAMINE
-together, which is very nearly a death sentence. A spring can free a curse for
-another promise, at forty coin and a detour.
+player has *not* already paid, so the curses themselves are the ceiling. Taking
+every one of the thirteen is 3.6x on a run that is not going to finish, and a
+spring can free a curse for another promise, at forty coin and a detour.
 
 The two currencies are set against each other on purpose, in both directions. The
 nameless run halves the score and doubles the coin; fame raises the score and
@@ -741,8 +740,8 @@ costs a turn, like a draught does, so the bargain is not the one thing in the ga
 a monster has no answer to.
 
 A chest never offers a price you have already paid. A run draws fifteen of them
-from six curses, so without that rule duplicates were not just possible but
-likely — and two of the six stack when repeated while four do not, which made the
+from thirteen curses, so without that rule duplicates were not just possible but
+likely — and some of them stack when repeated while others do not, which made the
 same second curse a sentence on one run and a no-op on the next. Each chest on a
 floor gets a different one, and if you carry every curse there is, the floor has
 no chests at all: better an empty floor than a lid that charges nothing.
@@ -813,8 +812,14 @@ behind do not stack, so the second dose would read as a bug.
 | ASHEN HAND | half of what every coin is worth |
 | LONG DARK | your sight, cut to one pace |
 | FEVER | your blows swing twice as wide |
-| HOLLOW | everything you are carrying, gone |
 | CRAWL | three of what you leave alive follows you down |
+
+**There is no curse that empties the pack**, and there was: HOLLOW took
+everything you were carrying. It was the one price in the game that was an
+*event* rather than a state — the pack refills on the next floor — so it sat in
+the list of what was on you doing nothing, and a spring could charge you to lift
+a curse that had already finished. A price that stops mattering the moment it is
+paid is not a curse, it is a fine, and the other thirteen all keep taking.
 
 The second half of that table is the experimental branch, and the four in the
 middle are all the same idea from four directions: the score is distance and

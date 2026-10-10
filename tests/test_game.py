@@ -1307,7 +1307,7 @@ def test_the_unpaid_curses_are_the_ones_you_do_not_carry():
 
 
 def test_a_floor_never_offers_a_price_you_have_already_paid():
-    """Fifteen chests over a run drawn from six curses made duplicates not just
+    """Fifteen chests over a run drawn from a handful of curses made duplicates not just
     possible but likely -- and two of the six stack when repeated while four do
     not, so the second one was sometimes a sentence and sometimes a no-op."""
     from neverdeads_revenge.game.curses import CURSES
@@ -2360,10 +2360,11 @@ def test_a_promise_of_fame_raises_what_the_run_is_worth():
 
 
 def test_fame_is_added_and_not_multiplied():
-    """A fifth each sounds small; six of them multiplied is two and a half times.
+    """A fifth each sounds small; multiplied it runs away.
 
     There is no ceiling on it and none is needed -- a chest is only ever placed
-    for a curse the player has not paid, so the six curses are the ceiling.
+    for a curse the player has not paid, so the curses themselves are the
+    ceiling.
     """
     state = start_run(NOXX, seed=3)
     state.fame = 2
