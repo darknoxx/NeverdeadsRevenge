@@ -133,3 +133,45 @@ def test_a_floor_with_a_hunter_is_still_winnable_by_leaving():
     assert all(e.glyph != "X" for e in state.enemies), (
         "the hunter followed through the stairs"
     )
+
+
+def test_a_floor_with_a_hunter_says_so_in_red():
+    """A threat nobody was told about is not a decision, it is an ambush.
+
+    Everything else on a floor can be met by walking into it. This one is
+    already on its way, and the warning is the whole difference between a
+    floor that has a decision on it and a floor that has a nasty surprise.
+    """
+    from neverdeads_revenge.game.state import LogKind
+
+    for seed in range(60):
+        state = start_run(NOXX, seed=seed)
+        state.build_floor(8)
+        if not any(e.glyph == "X" for e in state.enemies):
+            continue
+
+        warnings = [
+            entry
+            for entry in state.log
+            if entry.kind is LogKind.BAD and "knows where you are" in entry.text
+        ]
+        assert warnings, "the hunter arrived unannounced"
+        return
+
+    raise AssertionError("no hunter turned up in sixty floors")
+
+
+def test_a_floor_without_one_says_nothing():
+    for seed in range(60):
+        state = start_run(NOXX, seed=seed)
+        before = len(state.log)
+        state.build_floor(8)
+        if any(e.glyph == "X" for e in state.enemies):
+            continue
+
+        assert not any(
+            "knows where you are" in entry.text for entry in state.log[before:]
+        )
+        return
+
+    raise AssertionError("every floor had a hunter")

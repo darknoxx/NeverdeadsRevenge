@@ -106,6 +106,11 @@ is a decision rather than a wall: it can be outrun (1.4 against Noxx's 1.50, the
 one constraint in the whole balance) and left behind on the stairs, and killing
 it pays a great deal and is not the answer a floor is asking for.
 
+**A floor that has one says so, in red, the moment you arrive** — *something on
+this floor already knows where you are*. Everything else down here can be met by
+walking into it; this one is already on its way, and a threat nobody was told
+about is not a decision, it is an ambush.
+
 It never stands on floor one. Floor one is where a player learns what a monster
 looks like, and the first thing they learn should not be something they cannot
 kill.

@@ -635,6 +635,15 @@ class GameState:
             self.enemies.append(
                 make_enemy(scale_template(ENEMIES["hunter"], depth), floor.hunter)
             )
+            # Said out loud, in the colour the game uses for things that are
+            # happening *to* the player. Everything else on a floor can be met
+            # by walking into it; this one is already on its way, and a threat
+            # nobody was told about is not a decision, it is an ambush.
+            self.say(
+                "Something on this floor already knows where you are. "
+                "It is not waiting.",
+                LogKind.BAD,
+            )
         self.toughen_enemies()
         self.npcs = [make_npc(NPCS[key], pos) for pos, key in floor.npcs]
         if following:
