@@ -40,7 +40,8 @@ __all__ = [
     "npc_count",
     "ESCAPE_DEPTH",
     "NPC_CHANCE",
-    "HUNTER_CHANCE",
+    "HUNTER_CHANCE_BY_DEPTH",
+    "hunter_chance",
 ]
 
 
@@ -65,14 +66,43 @@ def enemy_count(depth: int) -> int:
 #: them -- they are the only thing down here that is not trying to kill you.
 NPC_CHANCE = 0.25
 
-#: How likely a floor is to have the hunter on it.
+#: How likely a floor is to have the hunter on it, by depth.
 #:
-#: One floor in ten, from the second down. Not the first: floor one is where a
-#: player learns what a monster looks like, and the first thing they learn
-#: should not be something they cannot kill. Ten per cent is a floor that is
-#: usually ordinary and occasionally a decision -- flee it, fight it, or feed it
-#: the turns it costs to go around.
-HUNTER_CHANCE = 0.10
+#: It climbs, because the hunter is a *decision* and the deeper the floor the
+#: more of a decision it can carry: floor two is the first hint of one, and the
+#: floors near the bottom are half hunter. Floor one stays at zero and for the
+#: same reason it always did -- it is where a player learns what a monster looks
+#: like, and the first thing they learn should not be something they cannot
+#: kill.
+#:
+#: The last floor holds at half rather than climbing further, and stays there
+#: for anything deeper: a floor where the hunter is *certain* is not a decision
+#: any more, it is the floor.
+HUNTER_CHANCE_BY_DEPTH: dict[int, float] = {
+    1: 0.0,
+    2: 0.075,
+    3: 0.10,
+    4: 0.15,
+    5: 0.20,
+    6: 0.25,
+    7: 0.30,
+    8: 0.40,
+    9: 0.50,
+    10: 0.50,
+}
+
+
+def hunter_chance(depth: int) -> float:
+    """How likely a floor at ``depth`` is to have the hunter on it.
+
+    Anything past the last floor keeps the last floor's value rather than
+    silently dropping to nothing, which is the failure mode a bare ``.get``
+    would have.
+    """
+    if depth <= 1:
+        return 0.0
+    last = max(HUNTER_CHANCE_BY_DEPTH)
+    return HUNTER_CHANCE_BY_DEPTH.get(depth, HUNTER_CHANCE_BY_DEPTH[last])
 
 
 def npc_count(rng: Rng, depth: int) -> int:
@@ -341,7 +371,8 @@ def generate_floor(
     # The hunter, sometimes, on ground nothing else is standing on. Placed
     # before the loot so its cell is kept clear the same way the spring's is.
     hunter = None
-    if depth >= 2 and rng.chance(HUNTER_CHANCE):
+    chance = hunter_chance(depth)
+    if chance and rng.chance(chance):
         taken = set(spawn_points) | {exit_pos}
         free = [pos for pos in candidates if pos not in taken]
         if free:

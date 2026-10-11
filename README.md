@@ -71,10 +71,11 @@ because they are not the same kind of hard:
   be climbing at least as fast just to stand still, and a ceiling reached early
   makes every floor after it the same floor. The two dials are kept in step by a
   test that insists the ceiling is reached exactly on the last floor.
-* **the hunter**, one floor in ten from the second down. A floor that has one is
-  a floor with a decision on it, and the bot makes that decision badly: it
-  fights things it should walk away from, which is the exact judgement it is
-  documented not to have.
+* **the hunter**, whose odds climb with the floor — about one floor in thirteen
+  on the second, half the floors at the bottom. A floor that has one is a floor
+  with a decision on it, and the bot makes that decision badly: it fights things
+  it should walk away from, which is the exact judgement it is documented not to
+  have.
 * **the tanky monsters**, which cost turns rather than blood. Turns are the
   score, so they do not show up in the escape rate the way they show up in a
   run.
@@ -95,7 +96,7 @@ climbs — or it may be a floor that has stopped being fun. The dial is
 | `o` **ooze** | a wall: the most health in the game and almost no damage | costs turns, not blood |
 | `v` **viper** | almost no health, quick, and it leaves **poison** | kill it first, not second |
 | `m` **mound** | hits hard, armoured, enough health that going around is often right | cautious, so it waits |
-| `X` **hunter** | one floor in ten from the second down | it comes looking |
+| `X` **hunter** | odds climbing from the second floor down — half the floors at the bottom | it comes looking |
 
 The **hunter** is the only thing down here that hunts. Everything else waits to
 be walked into, or drifts at the player once it can see them; the hunter knows

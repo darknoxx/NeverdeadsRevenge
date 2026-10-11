@@ -65,11 +65,14 @@ as it goes because a good weapon outgrows the floor.
 
 ## Step 5 — The hunter — **done**
 
-One floor in ten, something that is looking for you.
+Something that is looking for you, more often the deeper you go.
 
 * `X` on the map, if the glyph is free.
 * Lots of health, faster than most things, and it hunts: it walks toward the
   player from anywhere on the floor rather than waiting to be walked into.
+* The odds climb with the floor — about one floor in thirteen on the second,
+  half the floors at the bottom — and floor one stays at zero, because that is
+  where a player learns what a monster looks like.
 * It is a decision, not a wall: it can be outrun, and it can be left behind on
   the stairs. Killing it should be worth something.
 * More health than anything else on the floor, a heavy purse, and the only

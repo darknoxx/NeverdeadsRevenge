@@ -15,7 +15,11 @@ from neverdeads_revenge.game.actions import advance_world, take_turn
 from neverdeads_revenge.game.actors import ENEMIES, HEROES, NOXX, make_enemy
 from neverdeads_revenge.game.gifts import GIFTS
 from neverdeads_revenge.game.state import start_run
-from neverdeads_revenge.world.generator import HUNTER_CHANCE, generate_floor
+from neverdeads_revenge.world.generator import (
+    ESCAPE_DEPTH,
+    generate_floor,
+    hunter_chance,
+)
 
 
 def _far_from_player(state):
@@ -43,15 +47,26 @@ def test_the_hunter_never_stands_on_the_first_floor():
         assert floor.hunter is None
 
 
-def test_the_hunter_turns_up_about_one_floor_in_ten():
+def test_the_chance_climbs_with_the_floor():
+    """Deeper floors carry more of a decision, and never less of one."""
+    chances = [hunter_chance(depth) for depth in range(1, ESCAPE_DEPTH + 1)]
+
+    assert chances[0] == 0.0, "floor one teaches what a monster is"
+    assert chances == sorted(chances), "the curve dipped somewhere"
+    assert chances[-1] == 0.5, "the bottom of the dungeon is half hunter"
+    assert hunter_chance(ESCAPE_DEPTH + 5) == 0.5, (
+        "past the last floor the odds fell off a cliff"
+    )
+
+
+def test_the_odds_on_the_table_are_the_odds_on_the_floor():
+    """The curve is not decoration: the generator rolls it."""
     floors = 400
     found = sum(
-        1
-        for seed in range(floors)
-        if generate_floor(Rng(seed), depth=5).hunter is not None
+        1 for seed in range(floors) if generate_floor(Rng(seed), depth=5).hunter
     )
-    assert 0.05 < found / floors < 0.18, found
-    assert HUNTER_CHANCE == 0.10
+
+    assert abs(found / floors - hunter_chance(5)) < 0.06, found
 
 
 def test_a_hunter_that_turns_up_is_at_the_floor_strength_and_not_floor_one():
