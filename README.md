@@ -769,11 +769,27 @@ the player already has three slots of those; a gift changes what they can do.
 | THE ASH MARK | every blow you land leaves it burning |
 | THE OPEN WOUND | your first blow on each thing leaves it bleeding |
 | THE SLOW KNITTING | every twentieth step puts one health back |
+| THE HUNGRY ROAD | every square you leave cuts whatever walks after you |
+| MOMENTUM | the longer you walk one way, the harder your next blow lands |
+| THE DEBT OF BLOOD | what you are made to bleed is owed back on your next blow |
+| THE LAST BREATH | three health or less: you hit twice as hard and are harder to hit |
+| THE DARK KNOWS | you see every monster on the floor, through the walls |
+| THE SALT CIRCLE | wait three turns in a row and nothing can reach you |
+| THE BLOOD PRICE | every blow you take scatters coin at your feet |
+| THE KINDNESS | whoever you meet hands you something to drink |
+| NOTHING WASTED | a draught you drink shatters into everything beside you |
 
 They are meant to be about as good as the curse is bad. Not better: a chest worth
 opening for free would make the price decoration. Not worse: nobody takes the
 bargain twice. The pair is a *trade of shape*, and the run afterwards is played
 differently rather than harder.
+
+Three of the newer ones are about the shape of a *turn* rather than a swing:
+**momentum** is loaded by a straight walk and spent on the blow, so a corridor
+becomes a decision; **the hungry road** leaves a short trail of glass behind the
+hero -- drawn as red commas on the floor -- so being chased is something you can
+prepare for; and **the salt circle** turns waiting, usually the most passive
+thing in the game, into a defence you have to stand still to earn.
 
 The two worth explaining are the reach and the hour. **The reach** is why walking
 into a monster is still how you attack: the gift widens what "into" means rather

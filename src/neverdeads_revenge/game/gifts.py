@@ -78,6 +78,51 @@ GIFTS: dict[str, Gift] = {
         name="THE SLOW KNITTING",
         blurb="every twentieth step puts one health back",
     ),
+    "hungry_road": Gift(
+        key="hungry_road",
+        name="THE HUNGRY ROAD",
+        blurb="every square you leave cuts whatever walks after you",
+    ),
+    "momentum": Gift(
+        key="momentum",
+        name="MOMENTUM",
+        blurb="the longer you walk one way, the harder your next blow lands",
+    ),
+    "blood_debt": Gift(
+        key="blood_debt",
+        name="THE DEBT OF BLOOD",
+        blurb="what you are made to bleed is owed back on your next blow",
+    ),
+    "last_breath": Gift(
+        key="last_breath",
+        name="THE LAST BREATH",
+        blurb="three health or less: you hit twice as hard and are harder to hit",
+    ),
+    "dark_knows": Gift(
+        key="dark_knows",
+        name="THE DARK KNOWS",
+        blurb="you see every monster on the floor, through the walls",
+    ),
+    "salt_circle": Gift(
+        key="salt_circle",
+        name="THE SALT CIRCLE",
+        blurb="wait three turns in a row and nothing can reach you",
+    ),
+    "blood_price": Gift(
+        key="blood_price",
+        name="THE BLOOD PRICE",
+        blurb="every blow you take scatters coin at your feet",
+    ),
+    "kindness": Gift(
+        key="kindness",
+        name="THE KINDNESS",
+        blurb="whoever you meet hands you something to drink",
+    ),
+    "nothing_wasted": Gift(
+        key="nothing_wasted",
+        name="NOTHING WASTED",
+        blurb="a draught you drink shatters into everything beside you",
+    ),
 }
 
 

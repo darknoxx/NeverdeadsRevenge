@@ -17,6 +17,7 @@ from dataclasses import fields, is_dataclass
 
 import pytest
 
+from neverdeads_revenge.core.direction import Direction
 from neverdeads_revenge.core.rng import Rng
 from neverdeads_revenge.core.turn_queue import TurnQueue
 from neverdeads_revenge.game.actions import Action, perform_action
@@ -51,6 +52,13 @@ def a_busy_run() -> GameState:
     state.shrouded = 1
     state.ward_ready = True
     state.revenge_stacks = 2
+    state.momentum = 3
+    state.momentum_direction = Direction.EAST
+    state.blood_debt = 5
+    state.waits_in_a_row = 2
+    state.salt_ward = 1
+    state.trail = {(state.player.position[0] - 1, state.player.position[1]): 5}
+    state.helped = {(state.player.position[0] + 1, state.player.position[1])}
     state.npcs = [make_npc(NPCS["tally"], state.player.position)]
     for _ in range(3):
         perform_action(state, Action.WAIT)

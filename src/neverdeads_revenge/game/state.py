@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from enum import Enum
 
-from neverdeads_revenge.core.direction import Pos, chebyshev
+from neverdeads_revenge.core.direction import Direction, Pos, chebyshev
 from neverdeads_revenge.core.rng import Rng
 from neverdeads_revenge.core.turn_queue import TurnQueue
 from neverdeads_revenge.world.fov import compute_fov_full
@@ -62,6 +62,15 @@ __all__ = [
 
 VIEW_RADIUS = 9
 """How far the player can see, in cells."""
+
+#: The health at which THE LAST BREATH turns on: at or below it, the hero's blows
+#: land twice and the enemies' find them harder to reach.
+#:
+#: Three, because it has to be a state a fight can put you in and get you out
+#: of -- not a number you aim for. It lives here rather than beside the other
+#: gift constants because the *state* asks the question (``GameState.cornered``)
+#: and ``game/actions.py`` imports this module, not the other way round.
+LAST_BREATH_HP = 3
 
 ESCAPE_BONUS = 5000
 """Score awarded for leaving the dungeon alive instead of dying in it."""
@@ -228,6 +237,26 @@ class GameState:
     #: Whether the grave ward is still unspent on this floor. Armed when the
     #: floor is built, spent by the first blow that reaches you.
     ward_ready: bool = False
+    #: MOMENTUM: consecutive steps taken in one direction, and which direction
+    #: that was. The walk loads it, the next blow spends it, and a turn resets
+    #: it. Per floor, like revenge -- a charge carried down the stairs would be
+    #: a charge for a fight that has not happened yet.
+    momentum: int = 0
+    momentum_direction: Direction | None = None
+    #: THE DEBT OF BLOOD: what the hero has been made to bleed since the last
+    #: blow they landed. Owed back on it, then forgotten.
+    blood_debt: int = 0
+    #: THE SALT CIRCLE: waits in a row, and the turn of untouchability three of
+    #: them buy.
+    waits_in_a_row: int = 0
+    salt_ward: int = 0
+    #: THE HUNGRY ROAD: the squares the hero has left glass on, oldest first,
+    #: and what it will cost whatever follows them onto one. On the run rather
+    #: than the map because it is a rule about the player, and ``world/`` has no
+    #: business knowing what a gift does.
+    trail: dict[Pos, int] = field(default_factory=dict)
+    #: THE KINDNESS OF STRANGERS: the people who have already given.
+    helped: set[Pos] = field(default_factory=set)
     #: Which wild offers are in force this run, by key.
     #:
     #: The two that multiply -- greed and the pact -- are numbers rather than
@@ -411,6 +440,16 @@ class GameState:
         if self.has_wild("mirror_of_hunger"):
             scale *= 1.5
         return scale
+
+    @property
+    def cornered(self) -> bool:
+        """THE LAST BREATH: the hero is down to the last few points.
+
+        A question the *state* answers rather than one each rule re-derives, so
+        the double blow and the harder-to-hit half can never disagree about
+        where the line is.
+        """
+        return self.player is not None and self.player.stats.hp <= LAST_BREATH_HP
 
     # -- amulets ------------------------------------------------------------
     @property
@@ -676,6 +715,18 @@ class GameState:
         # needing to know which that is.
         self.revenge_stacks = 0
         apply_revenge(self.player, 0)
+
+        # The rest of the per-floor bookkeeping. Momentum is a charge built up on
+        # this floor and spent on it; the debt is owed for wounds taken here; the
+        # circle and the glass are both about this floor's ground; and a person
+        # who has already given does not give again on the next one.
+        self.momentum = 0
+        self.momentum_direction = None
+        self.blood_debt = 0
+        self.waits_in_a_row = 0
+        self.salt_ward = 0
+        self.trail.clear()
+        self.helped.clear()
 
         self.arm_amulets()
 

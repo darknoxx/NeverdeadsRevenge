@@ -3068,19 +3068,16 @@ async def test_enter_is_not_throttled():
 
 
 # -- one held key must not walk four screens ----------------------------------
-async def hold_for(pilot, seconds: float = 1.6) -> int:
-    """Hold a key the way a terminal repeats it, for ``seconds``.
+async def hold_for(pilot, presses: int = 30) -> int:
+    """Hold a key the way a terminal repeats it.
 
-    One press every ~30ms, which is what a real hold produces -- not three taps
-    with a pause between them, which is the fallback route the other helper
-    takes and a different path through the code.
+    Back to back, with no pause between: that is what a held key *is* to the
+    filter -- the same key arriving again inside its window -- and it is what a
+    real terminal sends. A test that slept between the presses was testing the
+    sleep: under load the gap drifts past the window and a hold stops being one.
     """
-    presses = 0
-    start = time.monotonic()
-    while time.monotonic() - start < seconds:
+    for _ in range(presses):
         await pilot.press("enter")
-        presses += 1
-        await asyncio.sleep(0.03)
     await pilot.pause()
     return presses
 
@@ -3152,7 +3149,6 @@ async def test_holding_escape_in_the_pause_does_not_close_the_menu_it_opened():
 
         for _ in range(12):
             await pilot.press("escape")
-            await asyncio.sleep(0.03)
         await pilot.pause()
 
         assert isinstance(app.screen, PauseScreen), (
@@ -3170,7 +3166,6 @@ async def test_holding_escape_at_the_title_does_not_answer_the_quit_dialog():
         await pilot.pause()
         for _ in range(12):
             await pilot.press("escape")
-            await asyncio.sleep(0.03)
         await pilot.pause()
 
         assert isinstance(app.screen, ConfirmScreen)
@@ -3207,7 +3202,6 @@ async def test_the_help_opens_its_filter_under_the_key_textual_reports(monkeypat
 
         for _ in range(8):
             await pilot.press("question_mark")
-            await asyncio.sleep(0.03)
         await pilot.pause()
 
         assert isinstance(app.screen, HelpScreen)
@@ -3237,7 +3231,6 @@ async def test_the_pack_opens_its_filter_under_its_own_key(monkeypatch):
 
         for _ in range(8):
             await pilot.press("i")
-            await asyncio.sleep(0.03)
         await pilot.pause()
 
         assert isinstance(app.screen, InventoryScreen)
@@ -3273,7 +3266,6 @@ async def test_keeping_the_name_arms_the_filter_for_what_follows():
         # The same key, still down, must not walk into the hero select.
         for _ in range(10):
             await pilot.press("enter")
-            await asyncio.sleep(0.03)
         await pilot.pause()
         assert isinstance(app.screen, TitleScreen), (
             f"the keep's own key walked on, to {type(app.screen).__name__}"
@@ -3286,9 +3278,10 @@ async def test_a_held_anything_at_the_title_stops_at_the_hero_select():
     async with app.run_test(size=SIZE) as pilot:
         await pilot.pause()
 
-        for _ in range(10):
+        # Back to back, with no pause to drift over the filter's window: that is
+        # what a held key *is* to the app, and it is what a real terminal sends.
+        for _ in range(6):
             await pilot.press("enter")
-            await asyncio.sleep(0.03)
         await pilot.pause()
 
         assert isinstance(app.screen, HeroSelectScreen), (
@@ -3314,7 +3307,6 @@ async def test_holding_enter_at_the_shop_buys_one_thing():
 
         for _ in range(10):
             await pilot.press("enter")
-            await asyncio.sleep(0.03)
         await pilot.pause()
 
         assert app.screen is screen, "the shop closed itself"

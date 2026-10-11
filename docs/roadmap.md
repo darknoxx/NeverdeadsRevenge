@@ -89,6 +89,11 @@ the player can do rather than what they hit for.
 * A handful of new ones, drawn from the same well as the curses: the hour, the
   road, the reach.
 * Each one has to be as good as the curse beside it is bad.
+* Nine more, later, that are about a *turn* rather than a swing: momentum and
+  the hungry road and the salt circle (what a step, a wait and the ground do),
+  the debt of blood and the last breath (what being hurt does), the dark knows
+  and the blood price and the kindness and nothing wasted (what the floor and
+  the pack and the people give back).
 
 
 ## Step 7 — The balance pass — **done**

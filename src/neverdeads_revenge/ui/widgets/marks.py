@@ -187,6 +187,16 @@ def _names(state: GameState | None, kind: str) -> list[str]:
             names.append("the borrowed hour")
         if state.shrouded:
             names.append("the borrowed face")
+        # The ones a *gift* turns on, and their numbers where they have one: a
+        # charge the player cannot see is a charge they cannot spend on purpose.
+        if state.momentum:
+            names.append(f"momentum {state.momentum}")
+        if state.blood_debt:
+            names.append(f"a debt of {state.blood_debt}")
+        if state.has_gift("last_breath") and state.cornered:
+            names.append("the last breath")
+        if state.salt_ward:
+            names.append("the salt circle")
         return names
 
     return []

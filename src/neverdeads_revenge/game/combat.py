@@ -109,6 +109,8 @@ def attack(
     force_crit: bool = False,
     damage_scale: float = 1.0,
     spread: float = 1.0,
+    bonus: int = 0,
+    evasion_bonus: int = 0,
 ) -> AttackOutcome:
     """Resolve one attack from ``attacker`` against adjacent ``defender``.
 
@@ -121,8 +123,14 @@ def attack(
     in rather than read from the actors, because the rules behind them live in
     ``game/`` and this function deliberately knows nothing about amulets or
     curses.
+
+    ``bonus`` is flat damage added after everything else -- MOMENTUM's charge,
+    the DEBT OF BLOOD paid back -- and ``evasion_bonus`` is the defender's
+    evasion for this one swing, which is how THE LAST BREATH makes a cornered
+    hero harder to land on without touching their stats.
     """
-    if not rng.chance(hit_chance(attacker, defender)):
+    chance = chance_against(attacker.accuracy, defender.evasion + evasion_bonus)
+    if not rng.chance(chance):
         return AttackOutcome(hit=False, crit=False, damage=0, killed=False, dodged=True)
 
     base = attacker.damage_roll(rng, spread)
@@ -132,6 +140,8 @@ def attack(
         # Never nothing. A ward that turned a blow into a no-op would be a
         # different amulet, and the message would be a lie.
         damage = max(1, int(round(damage * damage_scale)))
+    if bonus:
+        damage = max(1, damage + bonus)
 
     dealt = defender.hurt(damage)
     killed = not defender.stats.alive

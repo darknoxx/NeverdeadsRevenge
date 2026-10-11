@@ -18,6 +18,7 @@ from rich.text import Text
 from textual.reactive import reactive
 from textual.widget import Widget
 
+from neverdeads_revenge.game.actors import ActorKind
 from neverdeads_revenge.game.state import GameState
 from neverdeads_revenge.world.tiles import Tile
 
@@ -26,6 +27,12 @@ __all__ = ["MapView"]
 #: Colour for terrain the player has seen before but cannot see right now.
 MEMORY_COLOR = "grey30"
 UNSEEN_COLOR = "black"
+
+#: THE HUNGRY ROAD, drawn on the floor: a comma, because it is a scatter of
+#: small cuts rather than a mark, and red because it is the only thing on the map
+#: that was put there by the player and is meant to hurt.
+TRAIL_GLYPH = ","
+TRAIL_COLOR = "red"
 
 
 class MapView(Widget):
@@ -108,12 +115,18 @@ class MapView(Widget):
         visible = dungeon.is_visible(position)
 
         actor = state.actor_at(position)
-        if actor is not None and visible:
-            # Bold for everyone, the hero included: the player used to be drawn
-            # un-bolded because an ``@`` does not need the help, but a named
-            # hero in his own colour is the thing the eye should land on first
-            # and must not be the dimmest mark on the map.
-            return actor.glyph, f"bold {actor.color}"
+        if actor is not None:
+            if visible:
+                # Bold for everyone, the hero included: the player used to be
+                # drawn un-bolded because an ``@`` does not need the help, but a
+                # named hero in his own colour is the thing the eye should land
+                # on first and must not be the dimmest mark on the map.
+                return actor.glyph, f"bold {actor.color}"
+            if actor.kind is ActorKind.ENEMY and state.has_gift("dark_knows"):
+                # WHAT THE DARK KNOWS: sensed, not seen. Not bold, so the eye
+                # can still tell a monster it can see from one it only knows
+                # about -- and drawn at all through a wall, which is the rule.
+                return actor.glyph, actor.color
 
         # Loot sits on the ground, so it is drawn over the terrain and under any
         # monster standing on it -- which is exactly the choice the player has to
@@ -121,6 +134,12 @@ class MapView(Widget):
         item = dungeon.item_at(position)
         if item is not None and visible:
             return item.glyph, f"bold {item.color}"
+
+        # THE HUNGRY ROAD. Under the loot and the monsters, over the floor, and
+        # only where the player can actually see it: the trail is a thing on the
+        # ground, not a thing remembered.
+        if visible and position in state.trail:
+            return TRAIL_GLYPH, TRAIL_COLOR
 
         # ``display_tile`` rather than ``tile_at``: rock that touches the floor
         # is drawn as wall, because a room the player can see the edge of should

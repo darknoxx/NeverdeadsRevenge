@@ -27,6 +27,7 @@ from dataclasses import fields, is_dataclass
 from enum import Enum
 from typing import Any
 
+from ..core.direction import Direction
 from ..core.rng import Rng
 from ..core.turn_queue import TurnQueue
 from ..world.map import DungeonMap, GroundItem
@@ -67,7 +68,7 @@ _DATACLASSES: dict[str, type] = {
 #: Every enum it can rebuild, by name. Tiles are absent on purpose: the map keeps
 #: them as plain ints, which is what makes a floor cheap to store.
 _ENUMS: dict[str, type] = {
-    cls.__name__: cls for cls in (ActorKind, Trait, LogKind, RunState)
+    cls.__name__: cls for cls in (ActorKind, Trait, LogKind, RunState, Direction)
 }
 
 
@@ -196,6 +197,13 @@ def dump(state: GameState) -> dict:
         "extra_lives": state.extra_lives,
         "shrouded": state.shrouded,
         "ward_ready": state.ward_ready,
+        "momentum": state.momentum,
+        "momentum_direction": _encode(state.momentum_direction),
+        "blood_debt": state.blood_debt,
+        "waits_in_a_row": state.waits_in_a_row,
+        "salt_ward": state.salt_ward,
+        "trail": _encode(state.trail),
+        "helped": _encode(state.helped),
         "wilds": _encode(state.wilds),
         "gifts": _encode(state.gifts),
         # Sorted lists rather than sets: the save is JSON. ``missing_pages`` is
@@ -262,6 +270,16 @@ def load(payload: dict) -> GameState:
         state.extra_lives = payload["extra_lives"]
         state.shrouded = payload["shrouded"]
         state.ward_ready = payload["ward_ready"]
+        # ``get`` for all of these, and the version is not bumped: each is a
+        # counter or a rule that starts empty, so a run saved before the gift
+        # that uses it still resumes -- it simply has none of whatever it was.
+        state.momentum = payload.get("momentum", 0)
+        state.momentum_direction = _decode(payload.get("momentum_direction"))
+        state.blood_debt = payload.get("blood_debt", 0)
+        state.waits_in_a_row = payload.get("waits_in_a_row", 0)
+        state.salt_ward = payload.get("salt_ward", 0)
+        state.trail = _decode(payload.get("trail", {}))
+        state.helped = set(_decode(payload.get("helped", [])))
         # ``set`` around both, because ``_decode`` hands back a list and these
         # are declared as sets -- and ``gifts`` is *added to* when a chest is
         # opened, so a run loaded from disk would have crashed on the first lid

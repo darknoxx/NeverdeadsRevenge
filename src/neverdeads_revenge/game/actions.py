@@ -19,10 +19,11 @@ from enum import Enum
 from neverdeads_revenge.core.direction import (
     DIRECTIONS,
     Direction,
+    Pos,
     chebyshev,
     direction_towards,
 )
-from neverdeads_revenge.world.items import make_coin
+from neverdeads_revenge.world.items import ITEMS, make_coin, make_item
 from neverdeads_revenge.world.map import GroundItem
 from neverdeads_revenge.world.tiles import Tile
 
@@ -407,16 +408,24 @@ def _drop_coins(state: GameState, enemy: Actor) -> None:
         return
 
     value = max(1, round(state.rng.between(low, high) * state.coin_factor))
-    existing = state.dungeon_map.item_at(enemy.position)
+    _scatter_coins(state, enemy.position, value)
+
+
+def _scatter_coins(state: GameState, pos: Pos, value: int) -> None:
+    """Put ``value`` coins on ``pos``, merging with a pile already lying there.
+
+    Split out of :func:`_drop_coins` so THE BLOOD PRICE can pay in the same
+    currency and by the same rules: two piles in one corner are one bigger pile,
+    and a pile under a chest is coin the player will never see.
+    """
+    existing = state.dungeon_map.item_at(pos)
     if existing is not None and existing.kind == "coin":
-        # Two kills in the same corner should be one bigger pile, not one pile
-        # and a silently overwritten one.
         existing.gold += value
         return
     if existing is not None:
         return  # something else is lying there; the coins are lost to it
 
-    state.dungeon_map.add_item(enemy.position, make_coin(value))
+    state.dungeon_map.add_item(pos, make_coin(value))
 
 
 def _player_takes_damage(state: GameState, enemy: Actor, outcome) -> None:
@@ -429,6 +438,20 @@ def _player_takes_damage(state: GameState, enemy: Actor, outcome) -> None:
             f"The {enemy.name} {outcome.verb} you for {outcome.damage}.",
             LogKind.BAD if outcome.killed else LogKind.DAMAGE,
         )
+        # THE DEBT OF BLOOD. Every point a blow costs is owed back on the next
+        # one the hero lands, which turns being hurt from a pure loss into a
+        # loaded answer.
+        if state.has_gift("blood_debt"):
+            state.blood_debt += outcome.damage
+        # THE BLOOD PRICE. The floor pays for what the hero bleeds, at the
+        # hero's own feet -- coin you have to pick up in the middle of a fight,
+        # which is the decision the gift is made of.
+        if state.has_gift("blood_price"):
+            _scatter_coins(
+                state,
+                state.player.position,
+                max(1, round(outcome.damage * state.coin_factor)),
+            )
     else:
         state.say(f"The {enemy.name} attacks and misses you.", LogKind.PLAIN)
     if outcome.killed:
@@ -525,6 +548,12 @@ def perform_action(state: GameState, action: Action) -> ActionResult:
     if state.rewind_ready:
         state.snapshot = _snapshot(state)
 
+    # THE SALT CIRCLE counts waits *in a row*, so anything that is not a wait
+    # breaks the run of them. This is the one place every action passes through,
+    # which is why it is here and not in the wait itself.
+    if action is not Action.WAIT:
+        state.waits_in_a_row = 0
+
     match action:
         case Action.INTERACT:
             return _interact(state)
@@ -547,6 +576,11 @@ def perform_action(state: GameState, action: Action) -> ActionResult:
 
     if action is Action.WAIT:
         state.say("You wait.", LogKind.PLAIN)
+        # Waiting breaks the line as surely as turning does: a charge that
+        # survived standing still would be a charge with no rule behind it.
+        state.momentum = 0
+        state.momentum_direction = None
+        _hold_the_circle(state)
         acted, spent = True, True
     else:
         acted, spent = _try_move(state, action.direction)
@@ -564,6 +598,24 @@ def perform_action(state: GameState, action: Action) -> ActionResult:
         advance_world(state)
     state.refresh_vision()
     return _outcome(state, consumed_turn=spent, acted=acted)
+
+
+def _hold_the_circle(state: GameState) -> None:
+    """THE SALT CIRCLE. Waiting is the one thing a floor cannot answer.
+
+    Three waits in a row close it, and the turn it closes is untouchable -- the
+    same one-turn window the borrowed face buys, bought instead with the thing a
+    run is scored in. The third wait is what raises it, and the counter resets so
+    the next circle costs three more.
+    """
+    if not state.has_gift("salt_circle"):
+        return
+    state.waits_in_a_row += 1
+    if state.waits_in_a_row < SALT_CIRCLE_WAITS:
+        return
+    state.waits_in_a_row = 0
+    state.salt_ward = 1
+    state.say("You close the circle. Nothing will reach you.", LogKind.GOOD)
 
 
 def _try_move(state: GameState, direction: Direction) -> tuple[bool, bool]:
@@ -627,11 +679,13 @@ def _try_move(state: GameState, direction: Direction) -> tuple[bool, bool]:
         # only worked on the tiles the map calls wall would be a gift that
         # visibly refused at every room's edge.
         if state.has_gift("hollow_road"):
-            return _through_stone(state, target)
+            return _through_stone(state, target, direction)
         return False, False
 
+    origin = state.player.position
     state.player.position = target
     state.player.steps += 1
+    _after_step(state, origin, direction)
     _bleed(state)
     _knit(state)
 
@@ -645,15 +699,80 @@ def _try_move(state: GameState, direction: Direction) -> tuple[bool, bool]:
     return True, True
 
 
-def _through_stone(state: GameState, target) -> tuple[bool, bool]:
+def _after_step(state: GameState, origin: Pos, direction: Direction) -> None:
+    """Everything a step does that is not the step itself.
+
+    Two gifts read the step and only the step: MOMENTUM loads on it, and THE
+    HUNGRY ROAD writes on the ground it left behind. Both live here rather than
+    being spelled out at the two places a step can land -- floor and stone --
+    because a rule written twice is a rule that drifts.
+    """
+    if state.has_gift("momentum"):
+        if state.momentum_direction is direction:
+            state.momentum = min(state.momentum + 1, MOMENTUM_MAX)
+        else:
+            # A new line. The step that starts it is the first charge, so the
+            # rule reads as "walk straight and it builds" rather than "walk
+            # straight twice before anything happens".
+            state.momentum = 1
+            state.momentum_direction = direction
+    _lay_trail(state, origin)
+
+
+def _lay_trail(state: GameState, origin: Pos) -> None:
+    """THE HUNGRY ROAD. Leave glass on the square the step began on.
+
+    A trail rather than a minefield: only the last few squares hold, so what is
+    behind the hero reads as a path they walked and not as a floor they salted.
+    The length is the whole difference between a rule and a chore.
+    """
+    if not state.has_gift("hungry_road"):
+        return
+    trail = state.trail
+    # Re-stamped rather than duplicated, so stepping back over your own line
+    # moves it to the head of the trail instead of leaving a second entry.
+    trail.pop(origin, None)
+    trail[origin] = HUNGRY_ROAD_DAMAGE
+    while len(trail) > HUNGRY_ROAD_TRAIL:
+        trail.pop(next(iter(trail)))
+
+
+def _spring_the_trail(state: GameState, actor: Actor) -> None:
+    """Whatever walks onto the hero's glass pays for it.
+
+    Only enemies: it is the hero's own rule, and a floor that cut the person who
+    laid it would be a floor you could not retreat across.
+    """
+    if not state.trail:
+        return
+    damage = state.trail.pop(actor.position, None)
+    if damage is None:
+        return
+
+    dealt = actor.stats.hurt(damage)
+    state.hits.append(actor.position)
+    state.say(f"The glass bites the {actor.name}. {dealt}.", LogKind.GOOD)
+    if not actor.stats.alive:
+        state.say(f"The {actor.name} comes apart on it.", LogKind.GOOD)
+        _on_death(state, actor)
+        _remove_corpse(state, actor)
+        return
+    _inflict(state, actor, ("bleed",))
+
+
+def _through_stone(
+    state: GameState, target: Pos, direction: Direction
+) -> tuple[bool, bool]:
     """Take a step into something solid, and pay for it.
 
     It can kill, like the bleed can, and for the same reason: a gift that cannot
     finish you has no floor, and the whole point of the hollow road is that it
     makes the wall a *decision*.
     """
+    origin = state.player.position
     state.player.position = target
     state.player.steps += 1
+    _after_step(state, origin, direction)
     state.player.stats.hp = max(0, state.player.stats.hp - HOLLOW_ROAD_COST)
     state.say(
         f"You push through the stone. {HOLLOW_ROAD_COST} of you stays in it.",
@@ -709,12 +828,24 @@ def _resolve_player_attack(state: GameState, target: Actor) -> None:
     # has to remember whether there has been one. The flag is cleared on every
     # descent, with the monsters it belonged to.
     first = not target.struck
+    # Three gifts load the blow itself. The charge and the debt are read here and
+    # spent below, and only on a *landing* blow -- a swing that missed was not
+    # the blow either of them was waiting for, which is the rule the patient
+    # knife reads too.
+    bonus = 0
+    if state.has_gift("momentum"):
+        bonus += state.momentum
+    if state.has_gift("blood_debt"):
+        bonus += state.blood_debt
+    cornered = state.has_gift("last_breath") and state.cornered
     outcome = attack(
         state.player,
         target,
         state.rng,
         force_crit=first and state.has_passive("patient_knife"),
+        damage_scale=2.0 if cornered else 1.0,
         spread=state.damage_spread,
+        bonus=bonus,
     )
 
     if not outcome.hit:
@@ -726,6 +857,13 @@ def _resolve_player_attack(state: GameState, target: Actor) -> None:
         return
 
     target.struck = True
+
+    if state.has_gift("momentum"):
+        state.momentum = 0
+        state.momentum_direction = None
+    if state.has_gift("blood_debt") and state.blood_debt:
+        state.say(f"The debt comes due: {state.blood_debt} more.", LogKind.GOOD)
+        state.blood_debt = 0
 
     if outcome.crit and state.has_passive("patient_knife") and first:
         state.say("It has been waiting for this one.", LogKind.GOOD)
@@ -827,6 +965,18 @@ def _talk(state: GameState, npc: Actor) -> ActionResult:
     template = npc_by_key(npc.npc)
     if template is None:
         return ActionResult(consumed_turn=False, acted=False)
+
+    # THE KINDNESS OF STRANGERS. The only thing down here that is not trying to
+    # kill you gives you something, once: a person who handed out a draught every
+    # time they were spoken to would be a well with a face on it.
+    if state.has_gift("kindness") and npc.position not in state.helped:
+        state.helped.add(npc.position)
+        state.inventory.append(make_item(ITEMS["potion"]))
+        state.say(
+            f"{template.name} presses something into your hand. It is still warm.",
+            LogKind.GOOD,
+        )
+
     return ActionResult(
         consumed_turn=False,
         acted=False,
@@ -1245,6 +1395,9 @@ def _quaff(state: GameState) -> ActionResult:
     if state.has_wild("mirror_of_hunger"):
         _wake_something(state)
 
+    if state.has_gift("nothing_wasted"):
+        _shatter(state)
+
     # Drinking takes a turn, so it is not a free action in the middle of a fight
     # and monsters get their answer.
     state.turn += 1
@@ -1252,6 +1405,25 @@ def _quaff(state: GameState) -> ActionResult:
     advance_world(state)
     state.refresh_vision()
     return _outcome(state, consumed_turn=True, acted=True)
+
+
+def _shatter(state: GameState) -> None:
+    """NOTHING WASTED. The empty glass goes into whatever is beside you.
+
+    Only the enemies standing next to the drink: it is a small rule about where
+    you choose to be thirsty, not a second weapon.
+    """
+    for direction in DIRECTIONS:
+        enemy = state.actor_at(direction.step(state.player.position))
+        if enemy is None or enemy.kind is not ActorKind.ENEMY or not enemy.alive:
+            continue
+        dealt = enemy.stats.hurt(NOTHING_WASTED_DAMAGE)
+        state.hits.append(enemy.position)
+        state.say(f"The glass goes into the {enemy.name}. {dealt}.", LogKind.GOOD)
+        if not enemy.stats.alive:
+            state.say(f"The {enemy.name} comes apart on it.", LogKind.GOOD)
+            _on_death(state, enemy)
+            _remove_corpse(state, enemy)
 
 
 def _wake_something(state: GameState) -> None:
@@ -1328,6 +1500,30 @@ SLOW_KNITTING_EVERY = 20
 #: What THE HOLLOW ROAD charges for a square of stone.
 HOLLOW_ROAD_COST = 2
 
+#: The ceiling on MOMENTUM: how many straight steps it can hold, and therefore
+#: how much a blow can carry. Five, because a run down a corridor is about that
+#: long before a doorway makes it a decision again.
+MOMENTUM_MAX = 5
+
+#: How many waits in a row close THE SALT CIRCLE.
+SALT_CIRCLE_WAITS = 3
+
+#: What THE LAST BREATH is worth to the enemy's aim: two points of evasion,
+#: which is twenty points off their hit chance, while the hero is cornered.
+LAST_BREATH_EVASION = 2
+
+#: What a square of THE HUNGRY ROAD costs whatever walks onto it, and how many
+#: squares of it a hero leaves behind at once.
+#:
+#: A trail rather than a minefield: the length is what makes it read as a path
+#: walked rather than a floor salted, and it is also what keeps the rule from
+#: turning a whole room into a trap the player set once and forgot.
+HUNGRY_ROAD_DAMAGE = 5
+HUNGRY_ROAD_TRAIL = 10
+
+#: What NOTHING WASTED puts into everything beside the drinker.
+NOTHING_WASTED_DAMAGE = 4
+
 #: Public wrapper so the UI can trigger a descent without importing internals.
 def descend(state: GameState) -> ActionResult:
     """Try to go down a level from wherever the player stands."""
@@ -1358,11 +1554,24 @@ def take_turn(state: GameState, actor: Actor) -> bool:
         return True
 
     if _move_towards_player(state, actor, player, distance):
+        # THE HUNGRY ROAD: the step it just took may have been onto the hero's
+        # glass, which is the whole point of leaving it.
+        _spring_the_trail(state, actor)
         return True
     return False
 
 
 def _resolve_enemy_attack(state: GameState, attacker: Actor, player: Actor) -> None:
+    if state.salt_ward:
+        # THE SALT CIRCLE. The whole of what it buys: this one turn, nothing
+        # lands. Checked before anything else, because a circle that let a blow
+        # through would be a circle that did not hold.
+        state.say(
+            f"The {attacker.name} strikes at the circle and cannot find you.",
+            LogKind.PLAIN,
+        )
+        return
+
     if state.shrouded and state.has_passive("borrowed_face"):
         state.say(
             f"The {attacker.name} strikes at where you were, and finds nothing.",
@@ -1371,7 +1580,21 @@ def _resolve_enemy_attack(state: GameState, attacker: Actor, player: Actor) -> N
         return
 
     warded = state.ward_ready and state.has_passive("grave_ward")
-    outcome = attack(attacker, player, state.rng, damage_scale=0.5 if warded else 1.0)
+    # THE LAST BREATH, the defensive half: a cornered hero is harder to land on,
+    # worth two points of evasion for this one swing and only while the rule is
+    # on.
+    evasion = (
+        LAST_BREATH_EVASION
+        if state.has_gift("last_breath") and state.cornered
+        else 0
+    )
+    outcome = attack(
+        attacker,
+        player,
+        state.rng,
+        damage_scale=0.5 if warded else 1.0,
+        evasion_bonus=evasion,
+    )
 
     _player_takes_damage(state, attacker, outcome)
     if outcome.hit and not outcome.killed:
@@ -1529,3 +1752,5 @@ def advance_world(state: GameState) -> None:
     # exactly the monsters that answer the kill and not the ones after them.
     if state.shrouded:
         state.shrouded -= 1
+    if state.salt_ward:
+        state.salt_ward -= 1
