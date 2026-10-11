@@ -598,3 +598,33 @@ def test_the_wild_offers_are_priced_against_the_run_they_change():
     assert max(o.price for o in single) < cheapest_upgrade
     assert permanent, "no permanent wild offers at all"
     assert max(o.price for o in permanent) >= min(o.price for o in single)
+
+
+def test_the_mirror_of_hunger_delivers_its_own_pitch():
+    """"a draught heals half again as much" is what the 115 coin buy. It used to
+    buy only the drinking monster, and the first half of that sentence was
+    nothing: heal_scale never read the mirror."""
+    from neverdeads_revenge.game.actions import Action, perform_action
+    from neverdeads_revenge.world.items import ITEMS, make_item
+
+    state = _wearing_wild("mirror_of_hunger")
+    state.enemies = []
+    state.inventory.append(make_item(ITEMS["potion"]))
+    state.player.stats.hp = 4
+
+    perform_action(state, Action.QUAFF)
+
+    assert state.player.stats.hp == 4 + round(8 * 1.5), (
+        f"the mirror promised 12, it paid {state.player.stats.hp - 4}"
+    )
+
+
+def test_the_mirror_and_famine_agree_to_a_number():
+    """The two halves cancel, which is the reason the wording can meet at all."""
+    from neverdeads_revenge.game.curses import CURSES
+
+    state = _wearing_wild("mirror_of_hunger")
+    state.add_curse(CURSES["famine"])
+
+    assert state.heal_scale == 0.5 * 1.5
+    assert abs(state.heal_scale - 0.75) < 1e-9

@@ -310,6 +310,52 @@ def test_a_rewind_puts_the_run_back_the_way_it_was():
     assert state.depth == 1
 
 
+def test_a_rewind_leaves_the_queue_holding_the_real_actors():
+    """The hour gives the run back, not a wax copy of it.
+
+    The turn queue has to be rebuilt around the *same* objects state.player and
+    state.enemies point at, or the restored queue schedules a set of phantom
+    copies that nobody outside the queue can see or kill. Rebuilding the
+    snapshot field by field did exactly that: the player and every monster fell
+    out of the queue on the first rewind, dead monsters kept taking turns, and
+    the hero's own status ticks went to a duplicate that was never rendered.
+    """
+    state = holding("borrowed_hour")
+    state.build_floor(1)
+    perform_action(state, Action.WAIT)
+    perform_action(state, Action.REWIND)
+
+    # ``in`` is identity on the queue, which is the whole point of this test.
+    assert state.player in state.turn_queue
+    assert len(state.enemies) > 0
+    for enemy in state.enemies:
+        assert enemy in state.turn_queue
+
+
+def test_a_monster_rewritten_after_the_rewind_is_rewritten_in_the_queue():
+    """The rewind's bodies and the queue's bodies are one and the same.
+
+    The restored actors are fresh copies by design -- the whole run is put
+    back -- so the test pins the property that matters: whatever the state
+    fields hold after the rewind, the queue holds that same thing. Killing
+    serves as the sharpest probe, because it is the one thing that touches the
+    queue by identity.
+    """
+    state = holding("borrowed_hour")
+    state.build_floor(1)
+    enemy = brute_at(state, 1)
+    perform_action(state, Action.WAIT)
+    perform_action(state, Action.REWIND)
+
+    restored = [e for e in state.enemies if e.position == enemy.position]
+    assert len(restored) == 1, "the brute did not come back to life at its post"
+    restored = restored[0]
+
+    removed = state.turn_queue.remove(restored)
+    assert removed, "the restored queue was scheduling a stranger"
+    assert restored not in state.turn_queue
+
+
 # -- the save ----------------------------------------------------------------
 def test_gifts_survive_a_save_and_an_old_save_does_not_have_them():
     state = start_run(NOXX, seed=3)

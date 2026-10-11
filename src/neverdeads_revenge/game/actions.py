@@ -926,9 +926,18 @@ def _snapshot(state: GameState) -> dict:
     A copy of every field rather than a reference to the state: the point is to
     put the run back the way it *was*, and a reference to something mutable is a
     record of where it went rather than of where it started.
+
+    One memo across every field, which is not a detail: the turn queue holds
+    the very same objects the ``player`` and ``enemies`` fields hold, and
+    separate ``deepcopy`` calls would hand the snapshot a queue full of
+    strangers the restored ``player`` has never met -- a phantom who keeps
+    taking turns, never visibly moves, and cannot be removed when it dies. The
+    save code warns of the same trap in its own docstring and solves it the
+    same way.
     """
+    memo: dict = {}
     return {
-        f.name: copy.deepcopy(getattr(state, f.name))
+        f.name: copy.deepcopy(getattr(state, f.name), memo)
         for f in fields(state)
         if f.name != "snapshot"
     }
@@ -940,9 +949,14 @@ def _restore(state: GameState, snapshot: dict) -> None:
     In place because everything that holds a run holds *this* object -- the
     screen, the save, the tests -- and handing back a different one would mean
     every caller had to notice.
+
+    One memo per restore, for the same reason the snapshot takes one: the queue
+    and the actors have to come back as each other's, not as near misses that
+    happen to share every attribute.
     """
+    memo: dict = {}
     for name, value in snapshot.items():
-        setattr(state, name, copy.deepcopy(value))
+        setattr(state, name, copy.deepcopy(value, memo))
 
 
 def _rewind(state: GameState) -> ActionResult:

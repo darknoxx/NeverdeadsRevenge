@@ -94,6 +94,10 @@ class NameEntryScreen(ModalScreen[str]):
 
     def action_keep(self) -> None:
         """Take the name as it stands, falling back to something readable."""
+        # Armed before the stack unwinds: the enter that confirms the name is
+        # the same enter a player holds on to, and the screens this dismiss
+        # uncovers -- the title among them -- listen to every key they see.
+        self.app.arm_repeat_filter()
         self.dismiss(self._name or "???")
 
     # -- drawing ------------------------------------------------------------

@@ -352,7 +352,11 @@ class Sfx:
 
     def play(self, name: str) -> None:
         """Queue a sound. Returns immediately, always."""
-        if self._muted or self._thread is None:
+        if self._muted or self._thread is None or self._device is None:
+            # The device check is why this is three conditions and not two:
+            # without it, an urgent sound -- a level-up, a death -- would pump
+            # a ring no device is draining, on a machine whose open failed and
+            # whose give-up counter never read three.
             return
         self._queue.put(name)
 
@@ -456,7 +460,6 @@ class Sfx:
             next(frames)
             device.start(frames)
         except Exception as exc:  # noqa: BLE001 - audio is never worth a crash
-            self._failures += 1
             self._note(f"OPEN FAILED {type(exc).__name__}: {exc}")
             self._count_failure()
             return

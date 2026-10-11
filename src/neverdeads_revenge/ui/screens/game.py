@@ -222,7 +222,16 @@ class GameScreen(Screen[None]):
 
         # A key still being repeated from the screen before this one is not a
         # new press and must not act. See App.note_key.
-        if event.key in ("enter", "return") and self.app.note_key(event.key):
+        #
+        # ``question_mark`` and ``f1`` are in the list although their action is
+        # a binding: they are otherwise keys the app never *records*, and a
+        # filter armed from a stale event reads every repeat as deliberate --
+        # which is how a held ``?`` used to open and close the help it just
+        # opened. Recording them costs the movement throttle nothing, because
+        # they are not movement and never touch ``allows_action``.
+        if event.key in ("enter", "return", "question_mark", "f1") and self.app.note_key(
+            event.key
+        ):
             event.stop()
             return
 
@@ -260,7 +269,12 @@ class GameScreen(Screen[None]):
             # A look, not a turn. The domain verb still exists and is still
             # headless -- it reports the pack as a line of text -- and the screen
             # is what the UI does with the same question.
-            self.app.arm_repeat_filter()
+            #
+            # ``i`` gets recorded here because it is otherwise a key the app
+            # never sees: it travels by binding, and the filter clears on a gap
+            # measured from the last key event. Arming with the key is what
+            # makes a held ``i`` not close the sheet it just opened.
+            self.app.arm_repeat_filter("i")
             self.app.push_screen(InventoryScreen(self.state))
             return
 
@@ -465,9 +479,11 @@ class GameScreen(Screen[None]):
 
     # -- actions ------------------------------------------------------------
     def action_help(self) -> None:
-        # A binding, not a key event: the app never saw the ``?``, so the filter
-        # has to be told what to look for.
-        self.app.arm_repeat_filter("?")
+        # No key passed on purpose: ``on_key`` above has already recorded
+        # whichever of ``question_mark`` and ``f1`` opened this, and re-arming
+        # with a guess would misname it -- Textual calls the ``?`` key
+        # ``question_mark``, and a filter armed as ``"?"`` never matches it.
+        self.app.arm_repeat_filter()
         self.app.push_screen("help")
 
     def action_character(self) -> None:

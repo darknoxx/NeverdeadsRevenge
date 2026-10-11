@@ -77,19 +77,14 @@ class ChestScreen(ModalScreen[str | None]):
             event.stop()
 
     def action_open_it(self) -> None:
-        # Enter is *bound*, so it never reaches ``on_key`` -- Textual checks the
-        # bindings first. Holding enter on a chest used to open it before the
-        # dialog had been read, which is the one thing this dialog exists to
-        # prevent.
-        if self.app.note_key("enter"):
-            return
+        # Not guarded here on purpose: this action runs only after ``on_key``
+        # above has had its say, so anything still repeating never reaches a
+        # binding at all. The guard used to live in this action, where it could
+        # only ever see a filter that ``on_key`` had already cleared.
         self.dismiss(OPEN)
 
     def action_take_fame(self) -> None:
-        # Bound rather than handled in ``on_key``, for the same reason enter is:
-        # a key that is bound never reaches ``on_key`` at all.
-        if self.app.note_key("f"):
-            return
+        # See ``action_open_it``: the same applies to ``f``.
         self.dismiss(FAME)
 
     def action_leave_it(self) -> None:

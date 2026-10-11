@@ -187,6 +187,12 @@ class TitleScreen(Screen[None]):
         if self.app.note_key(event.key):
             event.stop()
             return
+        # Armed before the push, with the key above already recorded: hero
+        # select is opened by *any* key, and whatever key it was, the repeats
+        # that follow it into hero select are the same hold this filter exists
+        # for -- without arming here, one held enter would confirm its run on
+        # the way past, at the hero the cursor happened to be on.
+        self.app.arm_repeat_filter()
         event.stop()
         self.app.open_hero_select()
 

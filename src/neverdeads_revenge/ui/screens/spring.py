@@ -63,8 +63,9 @@ class SpringScreen(ModalScreen[bool]):
             event.stop()
 
     def action_wash_it(self) -> None:
-        if self.app.note_key("enter"):
-            return
+        # See the screen's ``on_key``: repeats are stopped there, before the
+        # bindings are ever consulted, so what reaches this action is a press
+        # somebody meant.
         self.dismiss(True)
 
     def action_leave_it(self) -> None:

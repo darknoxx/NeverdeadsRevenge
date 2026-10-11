@@ -3175,3 +3175,147 @@ async def test_holding_escape_at_the_title_does_not_answer_the_quit_dialog():
 
         assert isinstance(app.screen, ConfirmScreen)
         assert not app._exit, "the game quit on the way to the question"
+
+
+# -- screens armed with keys the app never saw yesterday -----------------------
+async def test_the_help_opens_its_filter_under_the_key_textual_reports(monkeypatch):
+    """``?`` is no such thing inside the app.
+
+    Textual calls the key ``question_mark``, and a filter armed as ``"?"``
+    could only ever miss: every repeat read as a fresh press, closed the help,
+    and the next repeat opened it again. Counting the closes is the honest way
+    to see it -- the screen ends up open either way, one flash per repeat.
+    """
+    from neverdeads_revenge.ui.screens.help import HelpScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await drive_to_game(app, pilot)
+
+        await pilot.press("question_mark")
+        await pilot.pause()
+        assert isinstance(app.screen, HelpScreen)
+
+        closes: list[int] = []
+        original = HelpScreen.dismiss
+
+        def counting_dismiss(self, *args, **kwargs):
+            closes.append(1)
+            return original(self, *args, **kwargs)
+
+        monkeypatch.setattr(HelpScreen, "dismiss", counting_dismiss)
+
+        for _ in range(8):
+            await pilot.press("question_mark")
+            await asyncio.sleep(0.03)
+        await pilot.pause()
+
+        assert isinstance(app.screen, HelpScreen)
+        assert not closes, "the key that opened the help closed it again"
+
+
+async def test_the_pack_opens_its_filter_under_its_own_key(monkeypatch):
+    """``i`` is a binding, so apart from the arming call the app never sees it."""
+    from neverdeads_revenge.ui.screens.inventory import InventoryScreen
+
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await drive_to_game(app, pilot)
+
+        await pilot.press("i")
+        await pilot.pause()
+        assert isinstance(app.screen, InventoryScreen)
+
+        closes: list[int] = []
+        original = InventoryScreen.dismiss
+
+        def counting_dismiss(self, *args, **kwargs):
+            closes.append(1)
+            return original(self, *args, **kwargs)
+
+        monkeypatch.setattr(InventoryScreen, "dismiss", counting_dismiss)
+
+        for _ in range(8):
+            await pilot.press("i")
+            await asyncio.sleep(0.03)
+        await pilot.pause()
+
+        assert isinstance(app.screen, InventoryScreen)
+        assert not closes, "a held i closed the sheet it just opened"
+
+
+async def test_keeping_the_name_arms_the_filter_for_what_follows():
+    """The keep lands on the title, and the title listens to every key.
+
+    The enter that confirms the name is the same enter a player holds on to,
+    and the stack this dismiss unwinds talks to the title directly. Without the
+    arming, the leftover repeats open the hero select; with it, the title is
+    where the run stays until the player lets go.
+    """
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        from neverdeads_revenge.ui.screens.name_entry import NameEntryScreen
+
+        screen = await drive_to_game(app, pilot)
+        screen.state.kills = 3
+        screen._game_over()
+        await pilot.pause()
+
+        await hold_for(pilot)
+        assert isinstance(app.screen, NameEntryScreen)
+
+        await asyncio.sleep(0.3)  # the key came up
+        await pilot.press("enter")  # keep the name
+        await pilot.pause()
+        assert isinstance(app.screen, TitleScreen)
+        assert app.progress.scores[-1].name == "???"
+
+        # The same key, still down, must not walk into the hero select.
+        for _ in range(10):
+            await pilot.press("enter")
+            await asyncio.sleep(0.03)
+        await pilot.pause()
+        assert isinstance(app.screen, TitleScreen), (
+            f"the keep's own key walked on, to {type(app.screen).__name__}"
+        )
+
+
+async def test_a_held_anything_at_the_title_stops_at_the_hero_select():
+    """Every key starts a run -- but every key held is one key, not many."""
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+
+        for _ in range(10):
+            await pilot.press("enter")
+            await asyncio.sleep(0.03)
+        await pilot.pause()
+
+        assert isinstance(app.screen, HeroSelectScreen), (
+            f"a held enter confirmed the run itself: {type(app.screen).__name__}"
+        )
+
+
+async def test_holding_enter_at_the_shop_buys_one_thing():
+    """The purchase is the one thing in the title's orbit you can do thirty times
+    a second without a dialog caring -- so the shop arms its own key."""
+    app = NeverdeadsRevenge()
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        app.progress.gold = 9999
+        await pilot.press("s")
+        await pilot.pause()
+        screen = app.screen
+
+        await pilot.press("enter")
+        await pilot.pause()
+        after_first = app.progress.gold
+        assert 0 < after_first < 9999, "nothing was bought, so nothing is tested"
+
+        for _ in range(10):
+            await pilot.press("enter")
+            await asyncio.sleep(0.03)
+        await pilot.pause()
+
+        assert app.screen is screen, "the shop closed itself"
+        assert app.progress.gold == after_first, "the held enter kept buying"

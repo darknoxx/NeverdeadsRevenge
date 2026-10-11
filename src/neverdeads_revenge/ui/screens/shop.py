@@ -109,6 +109,12 @@ class ShopScreen(ModalScreen[None]):
             self._move(1)
         elif key in ("enter", "return"):
             event.stop()
+            # Armed again with the key just used. This press cleared the filter
+            # -- enter is not the key that opened the shop -- so without the
+            # re-arm the repeats behind it would buy at repeat rate. One
+            # purchase per press is the rule, and the repeat that follows a
+            # press is exactly what the filter exists to swallow.
+            self.app.arm_repeat_filter(key)
             self._purchase()
 
     def action_leave(self) -> None:

@@ -437,3 +437,35 @@ def test_the_sounds_live_inside_the_package():
     package = Path(audio.__file__).resolve().parent.parent
     assert SOUNDS_DIR == package / "sounds"
     assert SOUNDS_DIR.exists()
+
+
+# -- a failure is a failure ---------------------------------------------------
+def test_an_open_failure_counts_once_a_row(devices, monkeypatch):
+    """A counter that counts double reaches its give-up in half the time, and
+    one that resets on every unmute never reaches it at all."""
+    class _RaisingPlayback:
+        def __init__(self, **kwargs):
+            raise RuntimeError("no card")
+
+    class _RaisingLibrary:
+        SampleFormat = _SampleFormat
+        PlaybackDevice = _RaisingPlayback
+
+    monkeypatch.setattr(audio._Library, "get", lambda: _RaisingLibrary)
+    sfx = Sfx()
+
+    assert sfx._failures == 1, "failed once, counted twice"
+
+
+def test_no_device_means_no_ring_to_drain(devices):
+    """An urgent sound bypasses the backlog on purpose -- which is exactly why it
+    has to refuse when the open failed and nothing is draining what it pumps."""
+    sfx = Sfx()
+    sfx._close_stream()
+    assert sfx._device is None
+
+    for _ in range(60):
+        sfx.play("death")  # urgent: it would bypass the backlog if it queued
+
+    assert sfx._ring.seconds_pending == 0.0
+    assert sfx._queue.empty(), "the names queued up for nobody"

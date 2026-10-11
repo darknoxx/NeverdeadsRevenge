@@ -395,14 +395,20 @@ class GameState:
     def heal_scale(self) -> float:
         """What a draught is worth, as a fraction of what it says on the tin.
 
-        Curses take their share and the marrow adds to it, and the two are meant
+        Curses take their share and the amulets add to it, and the two are meant
         to be able to meet: FAMINE halves a draught and the marrow makes it half
         again as much, which is the whole reason the marrow is worded that way.
+
+        The mirror of hunger quotes the same figure from the shop's side of the
+        counter: its pitch says a draught heals half again as much, and its
+        price is set for that promise, so this is where the promise is kept.
         """
         scale = 1.0
         for curse in self.curses:
             scale *= curse.heal_scale
         if self.has_passive("marrow"):
+            scale *= 1.5
+        if self.has_wild("mirror_of_hunger"):
             scale *= 1.5
         return scale
 

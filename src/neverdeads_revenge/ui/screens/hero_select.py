@@ -225,6 +225,23 @@ class HeroSelectScreen(Screen[str]):
         self._index = (self._index + delta) % total
         self.redraw()
 
+    def on_key(self, event) -> None:
+        """A held key is not a choice.
+
+        The repeats that follow a press into this screen must not land on
+        ``confirm`` -- that is how one held key started a run at whatever hero
+        the cursor happened to be on, without the player having seen the roster.
+        See ``App.note_key``.
+
+        Navigation is deliberately *not* re-armed per press the way the shop
+        re-arms a purchase. Browsing is the one thing a player does by holding a
+        key down: a tap-through of the roster and a held arrow are the same
+        events, so swallowing either would swallow the other, and a shelf of
+        names is exactly what a player wants to scroll.
+        """
+        if self.app.note_key(event.key):
+            event.stop()
+
     def action_previous(self) -> None:
         self._move(-1)
 
