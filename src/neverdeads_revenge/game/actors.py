@@ -673,12 +673,14 @@ ENEMIES: dict[str, EnemyTemplate] = {
         # It is a decision rather than a wall: it can be outrun (speed 1.4
         # against Noxx's 1.50, which is the one constraint in the whole balance)
         # and it can be left behind on the stairs. Killing it is worth a great
-        # deal, and is not the answer a floor is asking for.
+        # deal -- more health than anything else on the floor, a heavy purse,
+        # and the only monster in the dungeon with a *rule* to leave behind --
+        # and is still not the answer a floor is asking for.
         behaviour="hunter",
         stats=Stats(
-            max_hp=55, hp=55, speed=1.4, damage=(7, 11), accuracy=2, armor=2
+            max_hp=80, hp=80, speed=1.4, damage=(7, 11), accuracy=2, armor=2
         ),
-        gold=(30, 45),
+        gold=(60, 90),
         # Never rolled: the floor spawns it deliberately, or not at all. See
         # ``world/generator.py``.
         weight=0.0,

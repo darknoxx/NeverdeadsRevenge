@@ -72,6 +72,10 @@ One floor in ten, something that is looking for you.
   player from anywhere on the floor rather than waiting to be walked into.
 * It is a decision, not a wall: it can be outrun, and it can be left behind on
   the stairs. Killing it should be worth something.
+* More health than anything else on the floor, a heavy purse, and the only
+  monster that leaves a *rule* behind -- a gift drawn from the ones the run does
+  not have yet, the way a chest's is. Killing it is a commitment, not a lucky
+  round.
 
 
 ## Step 6 — More gifts — **done**

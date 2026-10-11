@@ -104,7 +104,11 @@ shortest path — not by the straightest line, because a monster that presses in
 the first wall between it and the player looks broken rather than dangerous. It
 is a decision rather than a wall: it can be outrun (1.4 against Noxx's 1.50, the
 one constraint in the whole balance) and left behind on the stairs, and killing
-it pays a great deal and is not the answer a floor is asking for.
+it pays a great deal and is not the answer a floor is asking for. It has more
+health than anything else down here, so killing it is a commitment rather than a
+lucky round — and it is the only monster with a **rule** to leave behind: it
+drops a heavy purse and a gift the run does not have yet, drawn from the same
+unheld well a chest draws from.
 
 **A floor that has one says so, in red, the moment you arrive** — *something on
 this floor already knows where you are*. Everything else down here can be met by

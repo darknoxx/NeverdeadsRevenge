@@ -13,6 +13,7 @@ from neverdeads_revenge.core.direction import chebyshev
 from neverdeads_revenge.core.rng import Rng
 from neverdeads_revenge.game.actions import advance_world, take_turn
 from neverdeads_revenge.game.actors import ENEMIES, HEROES, NOXX, make_enemy
+from neverdeads_revenge.game.gifts import GIFTS
 from neverdeads_revenge.game.state import start_run
 from neverdeads_revenge.world.generator import HUNTER_CHANCE, generate_floor
 
@@ -175,3 +176,123 @@ def test_a_floor_without_one_says_nothing():
         return
 
     raise AssertionError("every floor had a hunter")
+
+
+# -- what killing it leaves behind -------------------------------------------
+def _kill_adjacent(state, template, hp: int = 1):
+    """Put a monster east of the player and hit it until it dies.
+
+    Its own damage is zeroed for the duration: a miss is still possible at the
+    hit-chance ceiling (0.97), and this helper is not about the fight, it is
+    about what the fight pays.
+    """
+    from neverdeads_revenge.game.actions import Action, perform_action
+    from neverdeads_revenge.world.tiles import Tile
+
+    pos = (state.player.position[0] + 1, state.player.position[1])
+    state.dungeon_map.set_tile(pos, Tile.FLOOR)
+    enemy = make_enemy(template, pos)
+    enemy.stats.hp = hp
+    enemy.stats.damage = (0, 0)
+    state.enemies = [enemy]
+    state.turn_queue = type(state.turn_queue)([state.player, enemy])
+
+    for _ in range(20):
+        perform_action(state, Action.MOVE_EAST)
+        if state.kills:
+            break
+    assert state.kills, f"the {template.key} would not die"
+    return enemy
+
+
+def test_killing_it_pays_a_purse_and_a_rule():
+    """It is the only monster in the dungeon with a rule to leave behind.
+
+    Everything else drops coin and maybe a wound. The hunter is the floor's
+    decision, and beating a decision is supposed to change what the player can
+    do, not just what they carry.
+    """
+    state = start_run(NOXX, seed=3)
+    before = set(state.gifts)
+
+    hunter = _kill_adjacent(state, ENEMIES["hunter"])
+
+    assert state.gifts - before, "the hunter left no rule"
+    assert state.gifts - before <= set(GIFTS)
+    coins = state.dungeon_map.item_at(hunter.position)
+    assert coins is not None and coins.kind == "coin"
+    assert coins.gold >= ENEMIES["hunter"].gold[0], (
+        f"a purse of {coins.gold} is not 'a great deal'"
+    )
+
+
+def test_the_rule_is_never_one_already_in_hand():
+    """Drawn from the unheld ones, the way a chest's is."""
+    state = start_run(NOXX, seed=3)
+    state.gifts = {next(iter(GIFTS))}
+    held = set(state.gifts)
+
+    _kill_adjacent(state, ENEMIES["hunter"])
+
+    assert state.gifts - held, "the hunter paid nothing"
+    assert not (state.gifts - held) & held
+
+
+def test_when_there_is_nothing_left_to_teach_it_says_so():
+    """All eight rules in hand: the kill cannot invent a ninth."""
+    from neverdeads_revenge.game.state import LogKind
+
+    state = start_run(NOXX, seed=3)
+    state.gifts = set(GIFTS)
+    held = set(state.gifts)
+
+    _kill_adjacent(state, ENEMIES["hunter"])
+
+    assert state.gifts == held, "the hunter duplicated a rule"
+    assert any(
+        entry.kind is LogKind.PLAIN and "nothing left" in entry.text
+        for entry in state.log
+    ), "the empty-handed kill was silent about it"
+
+
+def test_an_ordinary_monster_leaves_no_rule():
+    """The gift is the hunter's, not a kill's."""
+    state = start_run(NOXX, seed=3)
+    before = set(state.gifts)
+
+    _kill_adjacent(state, ENEMIES["ghoul"])
+
+    assert state.gifts == before, "a ghoul handed out a rule"
+
+
+def test_it_has_more_health_than_anything_else_on_the_floor():
+    """The strength is the point: killing it is a commitment, not a lucky round."""
+    hunter = ENEMIES["hunter"].stats.max_hp
+    others = max(
+        template.stats.max_hp for key, template in ENEMIES.items() if key != "hunter"
+    )
+
+    assert hunter > others
+
+
+def test_a_rule_a_chest_already_owes_is_not_the_hunter_s_to_give():
+    """The chest was stocked before the player saw either of them.
+
+    A hunter that spent that lid's gift would turn the chest into a second copy
+    of a rule -- the one thing a chest's own docstring refuses to be.
+    """
+    from neverdeads_revenge.world.items import make_chest
+    from neverdeads_revenge.world.tiles import Tile
+
+    state = start_run(NOXX, seed=3)
+    owed = next(iter(GIFTS))
+    state.gifts = set(GIFTS) - {owed}
+
+    chest_pos = (state.player.position[0] - 1, state.player.position[1])
+    state.dungeon_map.set_tile(chest_pos, Tile.FLOOR)
+    state.dungeon_map.add_item(chest_pos, make_chest("dim", None, gift=owed))
+
+    _kill_adjacent(state, ENEMIES["hunter"])
+
+    assert owed not in state.gifts, "the hunter spent the chest's own gift"
+    assert state.gifts == set(GIFTS) - {owed}

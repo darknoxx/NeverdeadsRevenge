@@ -290,6 +290,8 @@ def _on_death(state: GameState, enemy: Actor) -> None:
     """
     state.kills += 1
     _drop_coins(state, enemy)
+    if enemy.behaviour == "hunter":
+        _hunter_spoils(state, enemy)
     _learn(state)
 
     # THE TITHE. The one price that argues with the score, which now pays for
@@ -351,6 +353,45 @@ def _learn(state: GameState) -> None:
     state.level = reached
     apply_gain(state.player, gain)
     state.say(f"Level {reached}: {gain.describe()}.", LogKind.GOOD)
+
+
+def _hunter_spoils(state: GameState, enemy: Actor) -> None:
+    """The rule the thing that hunts leaves behind when it is finally killed.
+
+    It is the one monster with a rule to give. Everything else drops coin and
+    maybe a wound; the hunter is the floor's decision, and beating a decision
+    should change what the player can do rather than just what they carry. The
+    rule is drawn from the ones the run does not have yet, exactly the way a
+    chest's is, so the prize is never something already in hand -- and when
+    there is nothing left to hand over, the kill says so rather than inventing
+    a second copy of a rule the player is already holding.
+
+    A rule a chest on this same floor is already owing is left out of the draw
+    too. The chest was stocked before the player saw either of them, and a
+    hunter that spent that lid's gift would turn the chest into a second copy of
+    a rule -- which is the one thing a chest's own docstring refuses to be.
+    """
+    promised = {
+        item.gift
+        for item in state.dungeon_map.items.values()
+        if item.kind == "chest" and item.gift is not None
+    }
+    unheld = tuple(key for key in state.unheld_gifts if key not in promised)
+    if not unheld:
+        state.say(
+            f"The {enemy.name} falls, and there is nothing left it can teach you.",
+            LogKind.PLAIN,
+        )
+        return
+
+    gift = gift_by_key(state.rng.pick(unheld))
+    if gift is None:  # pragma: no cover - the table and its keys agree
+        return
+    state.gifts.add(gift.key)
+    state.say(
+        f"The {enemy.name} was carrying something. {gift.name}: {gift.blurb}.",
+        LogKind.GOOD,
+    )
 
 
 def _drop_coins(state: GameState, enemy: Actor) -> None:
