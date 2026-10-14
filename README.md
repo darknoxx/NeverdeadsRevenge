@@ -889,7 +889,8 @@ logic testable without a terminal and makes a headless simulator possible later.
 
 ## License
 
-**MIT.** The full text is in [LICENSE](LICENSE).
+**AGPL-3.0-or-later.** The full text is in [LICENSE](LICENSE).
 
-In short: do what you like with this — use it, change it, share it, sell it —
-as long as the copyright notice stays with it. There is no warranty.
+In short: use it, change it, share it, sell it — but whoever you pass a copy to
+gets the source with it, under this same licence, and so do the players of a
+version you run as a service. There is no warranty.
