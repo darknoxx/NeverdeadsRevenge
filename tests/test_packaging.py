@@ -411,14 +411,14 @@ def test_the_licence_says_the_same_thing_everywhere():
 
     project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
     declared = project["license"]["text"]
-    assert "MIT" in declared, f"pyproject says {declared!r}"
+    assert "AGPL" in declared, f"pyproject says {declared!r}"
 
     licence = (ROOT / "LICENSE").read_text(encoding="utf-8")
-    assert "MIT License" in licence
-    assert "Permission is hereby granted" in licence
+    assert "GNU AFFERO GENERAL PUBLIC LICENSE" in licence
+    assert "Version 3, 19 November 2007" in licence
 
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "MIT" in readme, "the README does not name the licence"
+    assert "AGPL" in readme, "the README does not name the licence"
     assert "LICENSE" in readme, "the README does not point at the file"
 
 
@@ -436,25 +436,29 @@ def test_the_licence_file_is_shipped_with_the_package():
 def test_the_licence_is_the_real_thing_and_not_a_summary():
     """The grant and the disclaimer both have to be there, in full.
 
-    A "MIT" that omits the permission grant or the warranty disclaimer is not
-    MIT, whatever the file is called.
+    An "AGPL" that omits the permission grant or the warranty disclaimer is not
+    the AGPL, whatever the file is called -- and the AGPL is a long document,
+    so a page that calls itself one is a summary of it.
     """
     licence = (ROOT / "LICENSE").read_text(encoding="utf-8")
-    assert "without restriction" in licence, "the permission grant is missing"
-    assert "WITHOUT WARRANTY OF ANY KIND" in licence, "the disclaimer is missing"
+    assert "This program is free software" in licence, "the grant is missing"
+    assert "WITHOUT ANY WARRANTY" in licence, "the disclaimer is missing"
     assert "MERCHANTABILITY" in licence
-    assert len(licence) > 900, "the LICENSE file looks like a summary"
+    assert "GNU AFFERO GENERAL PUBLIC LICENSE" in licence, "the text is missing"
+    assert len(licence) > 30000, "the LICENSE file looks like a summary"
 
 
 def test_the_licence_names_a_copyright_holder():
-    """MIT grants nothing to nobody: the copyright line is the whole hook.
+    """The AGPL grants nothing to nobody: the notice is the hook.
 
-    Without a name and a year there is no one to attribute, which is the one
-    thing this licence asks for in return.
+    The licence's own text carries the FSF's copyright, so a search of the whole
+    file would pass on a file that never says whose program this is. The
+    program's own notice is the part above where the licence text begins.
     """
     licence = (ROOT / "LICENSE").read_text(encoding="utf-8")
-    assert re.search(r"Copyright \(c\) \d{4} \S", licence), (
-        "no 'Copyright (c) YEAR NAME' line in the LICENSE file"
+    notice = licence.split("GNU AFFERO GENERAL PUBLIC LICENSE")[0]
+    assert re.search(r"Copyright \(C\) \d{4} \S", notice), (
+        "no 'Copyright (C) YEAR NAME' line above the licence text"
     )
 
 
@@ -465,4 +469,5 @@ def test_the_copyright_holder_matches_the_package_author():
     project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
     author = project["authors"][0]["name"]
     licence = (ROOT / "LICENSE").read_text(encoding="utf-8")
-    assert author in licence, f"{author!r} is the author but not the copyright holder"
+    notice = licence.split("GNU AFFERO GENERAL PUBLIC LICENSE")[0]
+    assert author in notice, f"{author!r} is the author but not the copyright holder"
